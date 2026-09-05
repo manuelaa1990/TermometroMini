@@ -1,0 +1,224 @@
+<!DOCTYPE HTML>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>HVAC Monitor Mini App</title>
+  
+  <!-- SDK Oficial de Telegram Web Apps -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Chart.js para Gráficas -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg-color: var(--tg-theme-bg-color, #f1f5f9);
+      --text-color: var(--tg-theme-text-color, #0f172a);
+      --card-bg: var(--tg-theme-secondary-bg-color, #ffffff);
+      --hint-color: var(--tg-theme-hint-color, #64748b);
+      --button-color: var(--tg-theme-button-color, #3b82f6);
+      --button-text: var(--tg-theme-button-text-color, #ffffff);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      padding: 12px;
+      text-align: center;
+    }
+
+    .container { max-width: 600px; margin: 0 auto; }
+    
+    .card {
+      background: var(--card-bg);
+      padding: 16px;
+      border-radius: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      margin-bottom: 12px;
+    }
+
+    .config-box {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .temp-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .temp-box {
+      background: rgba(0,0,0,0.03);
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    .temp-label { font-size: 12px; color: var(--hint-color); font-weight: 600; }
+    .temp-val { font-size: 22px; font-weight: 700; }
+    .s1-color { color: #ef4444; }
+    .s2-color { color: #3b82f6; }
+
+    .dt-box {
+      font-size: 20px;
+      font-weight: 800;
+      color: #10b981;
+      padding: 10px;
+      border-radius: 10px;
+      background: rgba(16, 185, 129, 0.1);
+      margin-bottom: 10px;
+    }
+    
+    .dt-alert {
+      color: #ffffff !important;
+      background-color: #ef4444 !important;
+    }
+
+    .btn-group { display: flex; gap: 8px; justify-content: center; }
+    .btn {
+      flex: 1;
+      background-color: var(--button-color);
+      color: var(--button-text);
+      border: none;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 35vh;
+      width: 100%;
+      background: var(--card-bg);
+      padding: 10px;
+      border-radius: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Configuración IP Wemos -->
+    <div class="card">
+      <div class="config-box">
+        <input type="text" id="ip-input" placeholder="IP del Wemos (ej: 192.168.4.1)">
+        <button class="btn" onclick="guardarIP()">Guardar</button>
+      </div>
+    </div>
+
+    <!-- Panel de Lecturas -->
+    <div class="card">
+      <div class="temp-grid">
+        <div class="temp-box">
+          <div class="temp-label">SONDA 1</div>
+          <div class="temp-val s1-color"><span id="s1">--</span> °C</div>
+        </div>
+        <div class="temp-box">
+          <div class="temp-label">SONDA 2</div>
+          <div class="temp-val s2-color"><span id="s2">--</span> °C</div>
+        </div>
+      </div>
+
+      <div id="dt-box" class="dt-box">
+        &Delta;T: <span id="dt">--</span> &deg;C <span id="alert-tag"></span>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn" onclick="descargarCSV()">📥 Descargar CSV</button>
+      </div>
+    </div>
+
+    <!-- Gráfica -->
+    <div class="chart-container">
+      <canvas id="tempChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    // Inicializar Telegram WebApp
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand(); // Expandir a pantalla completa en Telegram
+
+    let wemosIP = localStorage.getItem('wemos_ip') || '192.168.4.1';
+    document.getElementById('ip-input').value = wemosIP;
+
+    function guardarIP() {
+      wemosIP = document.getElementById('ip-input').value.trim();
+      localStorage.setItem('wemos_ip', wemosIP);
+      if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      updateData();
+    }
+
+    // Inicializar Chart.js
+    const ctx = document.getElementById('tempChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'S1 (°C)', borderColor: '#ef4444', data: [], fill: false, tension: 0.2 },
+          { label: 'S2 (°C)', borderColor: '#3b82f6', data: [], fill: false, tension: 0.2 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { suggestedMin: -5, suggestedMax: 45 } }
+      }
+    });
+
+    function updateData() {
+      if (!wemosIP) return;
+      
+      fetch(`http://${wemosIP}/data`)
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('s1').innerText = data.t1;
+          document.getElementById('s2').innerText = data.t2;
+          document.getElementById('dt').innerText = data.dt;
+
+          const dtBox = document.getElementById('dt-box');
+          if (data.dt >= 20.0) {
+            dtBox.className = "dt-box dt-alert";
+            document.getElementById('alert-tag').innerText = " (ALTO)";
+          } else {
+            dtBox.className = "dt-box";
+            document.getElementById('alert-tag').innerText = "";
+          }
+
+          if (data.hist1 && data.hist2 && data.labels) {
+            chart.data.labels = data.labels;
+            chart.data.datasets[0].data = data.hist1;
+            chart.data.datasets[1].data = data.hist2;
+            chart.update();
+          }
+        })
+        .catch(err => console.log("Error conectando al Wemos:", err));
+    }
+
+    function descargarCSV() {
+      window.location.href = `http://${wemosIP}/download_full`;
+    }
+
+    setInterval(updateData, 3000);
+    updateData();
+  </script>
+</body>
+</html>
