@@ -4,6 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Monitor Temperatura</title>
+  
+  <!-- Configuración de Ícono y PWA -->
+  <link rel="icon" type="image/svg+xml" href="icono.svg">
+  <link rel="apple-touch-icon" href="icono.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Chart.js -->
@@ -278,8 +287,10 @@
     }
 
     function processRow(row) {
-      const raw1 = row.temp1;
-      const raw2 = row.temp2;
+      // Filtrar lecturas erróneas de sondas desconectadas (-127°C o fuera de rango)
+      const raw1 = (row.temp1 === null || row.temp1 <= -127 || row.temp1 < -50 || row.temp1 > 125) ? null : row.temp1;
+      const raw2 = (row.temp2 === null || row.temp2 <= -127 || row.temp2 < -50 || row.temp2 > 125) ? null : row.temp2;
+
       const s1 = isInverted ? raw2 : raw1;
       const s2 = isInverted ? raw1 : raw2;
       const delta = (s1 !== null && s2 !== null) ? Math.abs(s1 - s2) : null;
