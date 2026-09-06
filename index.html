@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Monitor Temperatura</title>
+  <title>Monitor Temperatura HVAC</title>
   
   <!-- Configuración de Ícono y PWA -->
   <link rel="icon" type="image/svg+xml" href="icono.svg">
@@ -26,7 +26,6 @@
     
     <!-- Barra Superior Discreta: Batería, WiFi y Estado -->
     <div class="flex flex-wrap justify-between items-center bg-slate-800/60 border border-slate-700/50 px-3 py-1.5 rounded-xl text-xs gap-2">
-      <!-- BATERÍA Y WIFI -->
       <div class="flex items-center gap-3 text-slate-400">
         <!-- Batería -->
         <div class="flex items-center gap-1.5">
@@ -56,7 +55,7 @@
 
     <!-- Título Principal -->
     <header class="text-center py-1">
-      <h1 class="text-2xl font-bold text-sky-400">Monitor Temperatura</h1>
+      <h1 class="text-2xl font-bold text-sky-400">Monitor Temperatura HVAC</h1>
     </header>
 
     <!-- Bloque de Lecturas -->
@@ -67,17 +66,16 @@
         <div class="flex justify-between items-center text-[10px] font-bold text-sky-400 uppercase tracking-wider px-1">
           <div class="flex items-center gap-1.5">
             <input type="checkbox" id="chk-s1" checked onchange="updateChartVisibility()" class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0 cursor-pointer" title="Mostrar/Ocultar en Gráfica">
-            <span>SONDA 1</span>
+            <span>SONDA 1 (Entrada/Evap)</span>
           </div>
           <div class="flex items-center gap-1 text-[9px] text-slate-400">
             <span>Alarma Max:</span>
-            <input type="number" id="alarm1-input" value="40" min="-50" max="100" oninput="saveAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-sky-400 text-center rounded focus:outline-none py-0.5">
+            <input type="number" id="alarm1-input" value="40" min="-50" max="100" step="0.5" oninput="saveAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-sky-400 text-center rounded focus:outline-none py-0.5">
             <span>°C</span>
           </div>
         </div>
         <div id="temp1-val" class="text-2xl font-extrabold text-sky-400 mt-0.5 transition-colors">--.- °C</div>
         
-        <!-- Mínimo y Máximo Sonda 1 -->
         <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-1">
           <span>Mín: <strong id="s1-min" class="text-slate-200">--.-</strong> °C</span>
           <span>Máx: <strong id="s1-max" class="text-slate-200">--.-</strong> °C</span>
@@ -99,17 +97,16 @@
         <div class="flex justify-between items-center text-[10px] font-bold text-rose-400 uppercase tracking-wider px-1">
           <div class="flex items-center gap-1.5">
             <input type="checkbox" id="chk-s2" checked onchange="updateChartVisibility()" class="rounded bg-slate-900 border-slate-700 text-rose-500 focus:ring-0 cursor-pointer" title="Mostrar/Ocultar en Gráfica">
-            <span>SONDA 2</span>
+            <span>SONDA 2 (Salida/Amb)</span>
           </div>
           <div class="flex items-center gap-1 text-[9px] text-slate-400">
             <span>Alarma Max:</span>
-            <input type="number" id="alarm2-input" value="40" min="-50" max="100" oninput="saveAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-rose-400 text-center rounded focus:outline-none py-0.5">
+            <input type="number" id="alarm2-input" value="40" min="-50" max="100" step="0.5" oninput="saveAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-rose-400 text-center rounded focus:outline-none py-0.5">
             <span>°C</span>
           </div>
         </div>
         <div id="temp2-val" class="text-2xl font-extrabold text-rose-400 mt-0.5 transition-colors">--.- °C</div>
         
-        <!-- Mínimo y Máximo Sonda 2 -->
         <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-1">
           <span>Mín: <strong id="s2-min" class="text-slate-200">--.-</strong> °C</span>
           <span>Máx: <strong id="s2-max" class="text-slate-200">--.-</strong> °C</span>
@@ -117,27 +114,27 @@
         <div id="temp2-time" class="text-[9px] text-slate-500 mt-0.5">Esperando...</div>
       </div>
 
-      <!-- DIFERENCIAL (ΔT) -->
-      <div class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center">
+      <!-- DIFERENCIAL (ΔT) - CRÍTICO SI CERCANO A CERO -->
+      <div id="card-delta" class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center transition-all">
         <div class="flex justify-between items-center text-[10px] font-bold text-amber-400 uppercase tracking-wider px-1">
           <div class="flex items-center gap-1.5">
             <input type="checkbox" id="chk-delta" checked onchange="updateChartVisibility()" class="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0 cursor-pointer" title="Mostrar/Ocultar en Gráfica">
             <span>DIFERENCIAL (ΔT)</span>
           </div>
+          <!-- ALARMA MÍNIMA PARA RETORNO DE LÍQUIDO -->
           <div class="flex items-center gap-1 text-[9px] text-slate-400">
-            <span>Alarma Max:</span>
-            <input type="number" id="alarmDelta-input" value="10" min="0" max="50" oninput="saveAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-amber-400 text-center rounded focus:outline-none py-0.5">
+            <span class="text-rose-400 font-semibold" title="Riesgo Retorno de Líquido si ΔT es menor o igual">Alarma Mín (Retorno Líquido):</span>
+            <input type="number" id="alarmDeltaMin-input" value="0.5" min="0" max="10" step="0.1" oninput="saveAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-rose-400 text-center rounded focus:outline-none py-0.5 font-bold">
             <span>°C</span>
           </div>
         </div>
         <div id="delta-val" class="text-2xl font-extrabold text-amber-400 mt-0.5 transition-colors">--.- °C</div>
         
-        <!-- Mínimo y Máximo Diferencial -->
         <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-1">
           <span>Mín: <strong id="delta-min" class="text-slate-200">--.-</strong> °C</span>
           <span>Máx: <strong id="delta-max" class="text-slate-200">--.-</strong> °C</span>
         </div>
-        <div class="text-[9px] text-slate-500 mt-0.5">|SONDA 1 - SONDA 2|</div>
+        <div id="delta-status-msg" class="text-[9px] text-slate-500 mt-0.5">|SONDA 1 - SONDA 2|</div>
       </div>
 
     </div>
@@ -183,6 +180,7 @@
     let rawData = [];
     let lastGlobalRecord = null;
     let isInverted = false;
+    let lastVibrationTime = 0; // Control de frecuencia de vibración
 
     // Configuración Chart.js
     const ctx = document.getElementById('tempChart').getContext('2d');
@@ -252,33 +250,27 @@
       tempChart.update();
     }
 
-    // Carga inicial de alarmas guardadas al abrir o recargar la página
+    // Carga inicial de alarmas guardadas al abrir la app
     function loadSavedAlarms() {
       const saved1 = localStorage.getItem('alarm1-input');
-      if (saved1 !== null && saved1 !== '') {
-        document.getElementById('alarm1-input').value = saved1;
-      }
+      if (saved1 !== null && saved1 !== '') document.getElementById('alarm1-input').value = saved1;
 
       const saved2 = localStorage.getItem('alarm2-input');
-      if (saved2 !== null && saved2 !== '') {
-        document.getElementById('alarm2-input').value = saved2;
-      }
+      if (saved2 !== null && saved2 !== '') document.getElementById('alarm2-input').value = saved2;
 
-      const savedDelta = localStorage.getItem('alarmDelta-input');
-      if (savedDelta !== null && savedDelta !== '') {
-        document.getElementById('alarmDelta-input').value = savedDelta;
-      }
+      const savedDeltaMin = localStorage.getItem('alarmDeltaMin-input');
+      if (savedDeltaMin !== null && savedDeltaMin !== '') document.getElementById('alarmDeltaMin-input').value = savedDeltaMin;
     }
 
-    // Guarda en tiempo real con cada pulsación y re-evalúa
+    // Guardado continuo e instantáneo en localStorage
     function saveAndRender() {
       const a1 = document.getElementById('alarm1-input').value;
       const a2 = document.getElementById('alarm2-input').value;
-      const ad = document.getElementById('alarmDelta-input').value;
+      const adMin = document.getElementById('alarmDeltaMin-input').value;
 
       if (a1 !== '') localStorage.setItem('alarm1-input', a1);
       if (a2 !== '') localStorage.setItem('alarm2-input', a2);
-      if (ad !== '') localStorage.setItem('alarmDelta-input', ad);
+      if (adMin !== '') localStorage.setItem('alarmDeltaMin-input', adMin);
 
       renderData();
     }
@@ -316,6 +308,19 @@
       return { ...row, s1, s2, delta, bateria, wifi };
     }
 
+    // Función para activar vibración si está soportada en el móvil
+    function triggerPhoneVibration() {
+      const now = Date.now();
+      // Evitar saturar el motor vibrando máximo una vez cada 8 segundos
+      if (now - lastVibrationTime > 8000) {
+        if ('vibrate' in navigator) {
+          // Patrón: Vibra 500ms, pausa 200ms, vibra 500ms, pausa 200ms, vibra 500ms
+          navigator.vibrate([500, 200, 500, 200, 500]);
+          lastVibrationTime = now;
+        }
+      }
+    }
+
     function updateCards(processedRow) {
       const badge = document.getElementById('status-badge');
       const wifiEl = document.getElementById('wifi-val');
@@ -344,7 +349,7 @@
         badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse";
       }
 
-      // 2. Estado Wi-Fi
+      // 2. Wi-Fi
       if (isDeviceOnline && processedRow.wifi) {
         wifiEl.textContent = `Wifi: "${processedRow.wifi}"`;
       } else {
@@ -359,6 +364,7 @@
       const temp1El = document.getElementById('temp1-val');
       const temp2El = document.getElementById('temp2-val');
       const deltaEl = document.getElementById('delta-val');
+      const deltaMsgEl = document.getElementById('delta-status-msg');
 
       temp1El.textContent = s1Val !== null ? `${s1Val.toFixed(1)} °C` : "DESC";
       temp2El.textContent = s2Val !== null ? `${s2Val.toFixed(1)} °C` : "DESC";
@@ -384,27 +390,39 @@
         else bar.className = "bg-rose-500 h-full transition-all duration-500";
       }
 
-      // 5. Comparación contra Alarmas guardadas
+      // 5. EVALUACIÓN DE ALARMAS DE TEMPERATURA Y RETORNO DE LÍQUIDO
       const alarm1 = getAlarmValue('alarm1-input', 40);
       const alarm2 = getAlarmValue('alarm2-input', 40);
-      const alarmDelta = getAlarmValue('alarmDelta-input', 10);
+      const alarmDeltaMin = getAlarmValue('alarmDeltaMin-input', 0.5);
 
+      // Alarma Sonda 1
       if (s1Val !== null && s1Val >= alarm1) {
         temp1El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
       } else {
         temp1El.className = "text-2xl font-extrabold text-sky-400 mt-0.5 transition-colors";
       }
 
+      // Alarma Sonda 2
       if (s2Val !== null && s2Val >= alarm2) {
         temp2El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
       } else {
         temp2El.className = "text-2xl font-extrabold text-rose-400 mt-0.5 transition-colors";
       }
 
-      if (deltaVal !== null && deltaVal >= alarmDelta) {
-        deltaEl.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
+      // ALARMA CRÍTICA ΔT CERCANO A CERO (Riesgo de retorno de líquido)
+      if (deltaVal !== null && deltaVal <= alarmDeltaMin) {
+        deltaEl.className = "text-2xl font-extrabold bg-rose-600 text-white animate-pulse rounded my-1 mx-8 py-0.5 transition-colors shadow-lg shadow-rose-600/50";
+        deltaMsgEl.textContent = "⚠️ ALERTA: ΔT MUY BAJO - POSIBLE RETORNO DE LÍQUIDO";
+        deltaMsgEl.className = "text-[10px] text-rose-400 font-bold mt-0.5 animate-pulse";
+
+        // Ejecutar vibración en tiempo real solo si estamos en directo (modo Live)
+        if (isLive) {
+          triggerPhoneVibration();
+        }
       } else {
         deltaEl.className = "text-2xl font-extrabold text-amber-400 mt-0.5 transition-colors";
+        deltaMsgEl.textContent = "|SONDA 1 - SONDA 2|";
+        deltaMsgEl.className = "text-[9px] text-slate-500 mt-0.5";
       }
     }
 
@@ -522,20 +540,20 @@
       })
       .subscribe();
 
-    // 1. Restaurar alarmas guardadas del localStorage
+    // 1. Cargar umbrales del localStorage
     loadSavedAlarms();
 
     // 2. Cargar datos iniciales
     fetchWindowData();
 
-    // Reconsultar BD cada 10s
+    // Consultas periódicas a la base de datos
     setInterval(() => {
       if (isLive) {
         fetchWindowData();
       }
     }, 10000);
 
-    // Verificar estado de conexión cada 5s
+    // Revisar el estado de alarmas cada 5 segundos
     setInterval(() => {
       if (isLive) {
         const activeRecord = (rawData.length > 0) ? rawData[rawData.length - 1] : lastGlobalRecord;
