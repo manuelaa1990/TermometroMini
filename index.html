@@ -301,65 +301,97 @@
     }
 
     function updateCards(processedRow) {
-      if (!processedRow) return;
+  if (!processedRow) return;
 
-      const s1Val = processedRow.s1;
-      const s2Val = processedRow.s2;
-      const deltaVal = processedRow.delta;
+  const now = new Date().getTime();
+  const lastReadingTime = new Date(processedRow.created_at).getTime();
+  const diffSeconds = (now - lastReadingTime) / 1000;
+  const badge = document.getElementById('status-badge');
 
-      const temp1El = document.getElementById('temp1-val');
-      const temp2El = document.getElementById('temp2-val');
-      const deltaEl = document.getElementById('delta-val');
+  // Si pasaron más de 30 segundos sin datos nuevos (en modo En Vivo)
+  if (isLive && diffSeconds > 30) {
+    badge.textContent = "Wemos Offline";
+    badge.className = "px-2 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse";
 
-      temp1El.textContent = s1Val !== null ? `${s1Val.toFixed(2)} °C` : "DESC";
-      temp2El.textContent = s2Val !== null ? `${s2Val.toFixed(2)} °C` : "DESC";
-      deltaEl.textContent = deltaVal !== null ? `${deltaVal.toFixed(2)} °C` : "--.- °C";
-      
-      const formattedTime = new Date(processedRow.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      document.getElementById('temp1-time').textContent = `Lectura: ${formattedTime}`;
-      document.getElementById('temp2-time').textContent = `Lectura: ${formattedTime}`;
+    const temp1El = document.getElementById('temp1-val');
+    const temp2El = document.getElementById('temp2-val');
+    const deltaEl = document.getElementById('delta-val');
 
-      if (processedRow.wifi) {
-        document.getElementById('wifi-val').textContent = `Wifi: "${processedRow.wifi}"`;
-      }
+    temp1El.textContent = "OFFLINE";
+    temp1El.className = "text-2xl font-extrabold text-slate-500 mt-0.5";
 
-      if (processedRow.bateria !== null) {
-        const bat = Math.max(0, Math.min(100, processedRow.bateria));
-        const bar = document.getElementById('bat-bar');
-        document.getElementById('bat-val').textContent = `${bat.toFixed(0)}%`;
-        bar.style.width = `${bat}%`;
+    temp2El.textContent = "OFFLINE";
+    temp2El.className = "text-2xl font-extrabold text-slate-500 mt-0.5";
 
-        if (bat > 50) bar.className = "bg-emerald-500 h-full transition-all duration-500";
-        else if (bat > 20) bar.className = "bg-amber-500 h-full transition-all duration-500";
-        else bar.className = "bg-rose-500 h-full transition-all duration-500";
-      }
+    deltaEl.textContent = "--.- °C";
+    deltaEl.className = "text-2xl font-extrabold text-slate-500 mt-0.5";
 
-      // Evaluación de Alarmas
-      const alarm1 = sanitizeAlarmInput('alarm1-input', -50, 100);
-      const alarm2 = sanitizeAlarmInput('alarm2-input', -50, 100);
-      const alarmDelta = sanitizeAlarmInput('alarmDelta-input', 0, 50);
+    const formattedTime = new Date(processedRow.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    document.getElementById('temp1-time').textContent = `Última: ${formattedTime}`;
+    document.getElementById('temp2-time').textContent = `Última: ${formattedTime}`;
+    return;
+  }
 
-      // Alarma Sonda 1
-      if (s1Val !== null && s1Val >= alarm1) {
-        temp1El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
-      } else {
-        temp1El.className = "text-2xl font-extrabold text-sky-400 mt-0.5 transition-colors";
-      }
+  // Si el Wemos está activo (menos de 30s de inactividad)
+  if (isLive) {
+    badge.textContent = "Sistema En Vivo";
+    badge.className = "px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+  }
 
-      // Alarma Sonda 2
-      if (s2Val !== null && s2Val >= alarm2) {
-        temp2El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
-      } else {
-        temp2El.className = "text-2xl font-extrabold text-rose-400 mt-0.5 transition-colors";
-      }
+  const s1Val = processedRow.s1;
+  const s2Val = processedRow.s2;
+  const deltaVal = processedRow.delta;
 
-      // Alarma Diferencial (ΔT)
-      if (deltaVal !== null && deltaVal >= alarmDelta) {
-        deltaEl.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
-      } else {
-        deltaEl.className = "text-2xl font-extrabold text-amber-400 mt-0.5 transition-colors";
-      }
-    }
+  const temp1El = document.getElementById('temp1-val');
+  const temp2El = document.getElementById('temp2-val');
+  const deltaEl = document.getElementById('delta-val');
+
+  temp1El.textContent = s1Val !== null ? `${s1Val.toFixed(2)} °C` : "DESC";
+  temp2El.textContent = s2Val !== null ? `${s2Val.toFixed(2)} °C` : "DESC";
+  deltaEl.textContent = deltaVal !== null ? `${deltaVal.toFixed(2)} °C` : "--.- °C";
+  
+  const formattedTime = new Date(processedRow.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  document.getElementById('temp1-time').textContent = `Lectura: ${formattedTime}`;
+  document.getElementById('temp2-time').textContent = `Lectura: ${formattedTime}`;
+
+  if (processedRow.wifi) {
+    document.getElementById('wifi-val').textContent = `Wifi: "${processedRow.wifi}"`;
+  }
+
+  if (processedRow.bateria !== null) {
+    const bat = Math.max(0, Math.min(100, processedRow.bateria));
+    const bar = document.getElementById('bat-bar');
+    document.getElementById('bat-val').textContent = `${bat.toFixed(0)}%`;
+    bar.style.width = `${bat}%`;
+
+    if (bat > 50) bar.className = "bg-emerald-500 h-full transition-all duration-500";
+    else if (bat > 20) bar.className = "bg-amber-500 h-full transition-all duration-500";
+    else bar.className = "bg-rose-500 h-full transition-all duration-500";
+  }
+
+  // Evaluación de Alarmas
+  const alarm1 = sanitizeAlarmInput('alarm1-input', -50, 100);
+  const alarm2 = sanitizeAlarmInput('alarm2-input', -50, 100);
+  const alarmDelta = sanitizeAlarmInput('alarmDelta-input', 0, 50);
+
+  if (s1Val !== null && s1Val >= alarm1) {
+    temp1El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
+  } else {
+    temp1El.className = "text-2xl font-extrabold text-sky-400 mt-0.5 transition-colors";
+  }
+
+  if (s2Val !== null && s2Val >= alarm2) {
+    temp2El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
+  } else {
+    temp2El.className = "text-2xl font-extrabold text-rose-400 mt-0.5 transition-colors";
+  }
+
+  if (deltaVal !== null && deltaVal >= alarmDelta) {
+    deltaEl.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
+  } else {
+    deltaEl.className = "text-2xl font-extrabold text-amber-400 mt-0.5 transition-colors";
+  }
+}
 
     function renderData() {
       tempChart.data.labels = [];
@@ -489,3 +521,10 @@
   </script>
 </body>
 </html>
+
+// Verificar cada 5 segundos si el dispositivo se ha desconectado
+setInterval(() => {
+  if (isLive && rawData.length > 0) {
+    updateCards(processRow(rawData[rawData.length - 1]));
+  }
+}, 5000);
