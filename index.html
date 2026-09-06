@@ -49,7 +49,7 @@
       </div>
 
       <!-- Estado de Conexión -->
-      <div id="status-badge" class="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+      <div id="status-badge" class="px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
         Conectando...
       </div>
     </div>
@@ -144,7 +144,7 @@
 
     <!-- Navegación Simplificada de Gráfica -->
     <div class="bg-slate-800 border border-slate-700/60 p-2 rounded-xl shadow-md flex items-center justify-center gap-3">
-      <button onclick="navigateWindow(-2)" title="Atrás" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition active:scale-95">
+      <button onclick="navigateWindow(-2)" title="Atrás 2 Horas" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition active:scale-95">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
@@ -155,7 +155,7 @@
         Actual
       </button>
 
-      <button id="btn-next" onclick="navigateWindow(2)" title="Adelante" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed">
+      <button id="btn-next" onclick="navigateWindow(2)" title="Adelante 2 Horas" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
         </svg>
@@ -181,6 +181,7 @@
     let windowEndTime = new Date();
     let isLive = true;
     let rawData = [];
+    let lastGlobalRecord = null; // Guarda la última lectura absoluta para cuando el Wemos esté apagado
     let isInverted = false;
 
     // Configuración Chart.js con 3 Datasets
@@ -287,6 +288,8 @@
     }
 
     function processRow(row) {
+      if (!row) return null;
+
       // Filtrar lecturas erróneas de sondas desconectadas (-127°C o fuera de rango)
       const raw1 = (row.temp1 === null || row.temp1 <= -127 || row.temp1 < -50 || row.temp1 > 125) ? null : row.temp1;
       const raw2 = (row.temp2 === null || row.temp2 <= -127 || row.temp2 < -50 || row.temp2 > 125) ? null : row.temp2;
@@ -300,86 +303,94 @@
       return { ...row, s1, s2, delta, bateria, wifi };
     }
 
-function updateCards(processedRow) {
-  if (!processedRow) return;
+    function updateCards(processedRow) {
+      const badge = document.getElementById('status-badge');
 
-  const now = new Date().getTime();
-  const lastReadingTime = new Date(processedRow.created_at).getTime();
-  const diffSeconds = (now - lastReadingTime) / 1000;
-  const badge = document.getElementById('status-badge');
+      if (!processedRow) {
+        badge.textContent = "Sin Datos";
+        badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-slate-800 text-slate-400 border border-slate-700";
+        return;
+      }
 
-  // 1. Estado del Wemos: Online (Verde) / Offline (Rojo) / Historial (Amarillo)
-  const isWemosOnline = isLive && diffSeconds <= 30;
+      const now = new Date().getTime();
+      const lastReadingTime = new Date(processedRow.created_at).getTime();
+      const diffSeconds = (now - lastReadingTime) / 1000;
 
-  if (isWemosOnline) {
-    badge.textContent = "Online";
-    badge.className = "px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse";
-  } else if (isLive) {
-    badge.textContent = "Offline";
-    badge.className = "px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40";
-  } else {
-    badge.textContent = "Historial";
-    badge.className = "px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40";
-  }
+      // 1. Estado del Wemos: Online (Verde) / Offline (Rojo) / Historial (Azul)
+      if (!isLive) {
+        badge.textContent = "Historial";
+        badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/40";
+      } else if (diffSeconds <= 30) {
+        badge.textContent = "Online";
+        badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse";
+      } else {
+        badge.textContent = "Offline";
+        badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40";
+      }
 
-  // 2. Mantener las últimas mediciones en las tarjetas
-  const s1Val = processedRow.s1;
-  const s2Val = processedRow.s2;
-  const deltaVal = processedRow.delta;
+      // 2. Mantener las últimas mediciones en las tarjetas
+      const s1Val = processedRow.s1;
+      const s2Val = processedRow.s2;
+      const deltaVal = processedRow.delta;
 
-  const temp1El = document.getElementById('temp1-val');
-  const temp2El = document.getElementById('temp2-val');
-  const deltaEl = document.getElementById('delta-val');
+      const temp1El = document.getElementById('temp1-val');
+      const temp2El = document.getElementById('temp2-val');
+      const deltaEl = document.getElementById('delta-val');
 
-  temp1El.textContent = s1Val !== null ? `${s1Val.toFixed(1)} °C` : "DESC";
-  temp2El.textContent = s2Val !== null ? `${s2Val.toFixed(1)} °C` : "DESC";
-  deltaEl.textContent = deltaVal !== null ? `${deltaVal.toFixed(1)} °C` : "--.- °C";
-  
-  const formattedTime = new Date(processedRow.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  document.getElementById('temp1-time').textContent = `Lectura: ${formattedTime}`;
-  document.getElementById('temp2-time').textContent = `Lectura: ${formattedTime}`;
+      temp1El.textContent = s1Val !== null ? `${s1Val.toFixed(1)} °C` : "DESC";
+      temp2El.textContent = s2Val !== null ? `${s2Val.toFixed(1)} °C` : "DESC";
+      deltaEl.textContent = deltaVal !== null ? `${deltaVal.toFixed(1)} °C` : "--.- °C";
+      
+      const dateObj = new Date(processedRow.created_at);
+      const isToday = new Date().toDateString() === dateObj.toDateString();
+      const timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const dateStr = isToday ? '' : `${dateObj.getDate()}/${dateObj.getMonth() + 1} `;
 
-  // 3. Información de Red Wi-Fi y Batería
-  if (processedRow.wifi) {
-    document.getElementById('wifi-val').textContent = `Wifi: "${processedRow.wifi}"`;
-  } else {
-    document.getElementById('wifi-val').textContent = `Wifi: "Desconectado"`;
-  }
+      document.getElementById('temp1-time').textContent = `Lectura: ${dateStr}${timeStr}`;
+      document.getElementById('temp2-time').textContent = `Lectura: ${dateStr}${timeStr}`;
 
-  if (processedRow.bateria !== null && processedRow.bateria !== undefined) {
-    const bat = Math.max(0, Math.min(100, processedRow.bateria));
-    const bar = document.getElementById('bat-bar');
-    document.getElementById('bat-val').textContent = `${bat.toFixed(0)}%`;
-    bar.style.width = `${bat}%`;
+      // 3. Información de Red Wi-Fi y Batería
+      if (processedRow.wifi) {
+        document.getElementById('wifi-val').textContent = `Wifi: "${processedRow.wifi}"`;
+      } else {
+        document.getElementById('wifi-val').textContent = `Wifi: "Desconectado"`;
+      }
 
-    if (bat > 50) bar.className = "bg-emerald-500 h-full transition-all duration-500";
-    else if (bat > 20) bar.className = "bg-amber-500 h-full transition-all duration-500";
-    else bar.className = "bg-rose-500 h-full transition-all duration-500";
-  }
+      if (processedRow.bateria !== null && processedRow.bateria !== undefined) {
+        const bat = Math.max(0, Math.min(100, processedRow.bateria));
+        const bar = document.getElementById('bat-bar');
+        document.getElementById('bat-val').textContent = `${bat.toFixed(0)}%`;
+        bar.style.width = `${bat}%`;
 
-  // 4. Evaluación de Alarmas por Umbral
-  const alarm1 = sanitizeAlarmInput('alarm1-input', -50, 100);
-  const alarm2 = sanitizeAlarmInput('alarm2-input', -50, 100);
-  const alarmDelta = sanitizeAlarmInput('alarmDelta-input', 0, 50);
+        if (bat > 50) bar.className = "bg-emerald-500 h-full transition-all duration-500";
+        else if (bat > 20) bar.className = "bg-amber-500 h-full transition-all duration-500";
+        else bar.className = "bg-rose-500 h-full transition-all duration-500";
+      }
 
-  if (s1Val !== null && s1Val >= alarm1) {
-    temp1El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
-  } else {
-    temp1El.className = "text-2xl font-extrabold text-sky-400 mt-0.5 transition-colors";
-  }
+      // 4. Evaluación de Alarmas por Umbral
+      const alarm1 = sanitizeAlarmInput('alarm1-input', -50, 100);
+      const alarm2 = sanitizeAlarmInput('alarm2-input', -50, 100);
+      const alarmDelta = sanitizeAlarmInput('alarmDelta-input', 0, 50);
 
-  if (s2Val !== null && s2Val >= alarm2) {
-    temp2El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
-  } else {
-    temp2El.className = "text-2xl font-extrabold text-rose-400 mt-0.5 transition-colors";
-  }
+      if (s1Val !== null && s1Val >= alarm1) {
+        temp1El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
+      } else {
+        temp1El.className = "text-2xl font-extrabold text-sky-400 mt-0.5 transition-colors";
+      }
 
-  if (deltaVal !== null && deltaVal >= alarmDelta) {
-    deltaEl.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
-  } else {
-    deltaEl.className = "text-2xl font-extrabold text-amber-400 mt-0.5 transition-colors";
-  }
-}
+      if (s2Val !== null && s2Val >= alarm2) {
+        temp2El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
+      } else {
+        temp2El.className = "text-2xl font-extrabold text-rose-400 mt-0.5 transition-colors";
+      }
+
+      if (deltaVal !== null && deltaVal >= alarmDelta) {
+        deltaEl.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
+      } else {
+        deltaEl.className = "text-2xl font-extrabold text-amber-400 mt-0.5 transition-colors";
+      }
+    }
+
     function renderData() {
       tempChart.data.labels = [];
       tempChart.data.datasets[0].data = [];
@@ -404,38 +415,21 @@ function updateCards(processedRow) {
         if (p.delta !== null && p.delta !== undefined) deltaVals.push(p.delta);
       });
 
-      // Mínimos y Máximos Sonda 1
-      if (s1Vals.length > 0) {
-        document.getElementById('s1-min').textContent = Math.min(...s1Vals).toFixed(1);
-        document.getElementById('s1-max').textContent = Math.max(...s1Vals).toFixed(1);
-      } else {
-        document.getElementById('s1-min').textContent = "--.-";
-        document.getElementById('s1-max').textContent = "--.-";
-      }
+      // Mínimos y Máximos de la ventana en pantalla
+      document.getElementById('s1-min').textContent = s1Vals.length > 0 ? Math.min(...s1Vals).toFixed(1) : "--.-";
+      document.getElementById('s1-max').textContent = s1Vals.length > 0 ? Math.max(...s1Vals).toFixed(1) : "--.-";
 
-      // Mínimos y Máximos Sonda 2
-      if (s2Vals.length > 0) {
-        document.getElementById('s2-min').textContent = Math.min(...s2Vals).toFixed(1);
-        document.getElementById('s2-max').textContent = Math.max(...s2Vals).toFixed(1);
-      } else {
-        document.getElementById('s2-min').textContent = "--.-";
-        document.getElementById('s2-max').textContent = "--.-";
-      }
+      document.getElementById('s2-min').textContent = s2Vals.length > 0 ? Math.min(...s2Vals).toFixed(1) : "--.-";
+      document.getElementById('s2-max').textContent = s2Vals.length > 0 ? Math.max(...s2Vals).toFixed(1) : "--.-";
 
-      // Mínimos y Máximos Diferencial (ΔT)
-      if (deltaVals.length > 0) {
-        document.getElementById('delta-min').textContent = Math.min(...deltaVals).toFixed(1);
-        document.getElementById('delta-max').textContent = Math.max(...deltaVals).toFixed(1);
-      } else {
-        document.getElementById('delta-min').textContent = "--.-";
-        document.getElementById('delta-max').textContent = "--.-";
-      }
+      document.getElementById('delta-min').textContent = deltaVals.length > 0 ? Math.min(...deltaVals).toFixed(1) : "--.-";
+      document.getElementById('delta-max').textContent = deltaVals.length > 0 ? Math.max(...deltaVals).toFixed(1) : "--.-";
 
       updateChartVisibility();
 
-      if (rawData.length > 0) {
-        updateCards(processRow(rawData[rawData.length - 1]));
-      }
+      // Si hay datos en la ventana actual, mostrar la última lectura. Si no, mostrar el último registro global.
+      const activeRecord = (rawData.length > 0) ? rawData[rawData.length - 1] : lastGlobalRecord;
+      updateCards(processRow(activeRecord));
     }
 
     async function fetchWindowData() {
@@ -461,16 +455,26 @@ function updateCards(processedRow) {
       }
 
       rawData = data || [];
-      renderData();
 
-      const badge = document.getElementById('status-badge');
-      if (isLive) {
-        badge.textContent = "Sistema En Vivo";
-        badge.className = "px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-      } else {
-        badge.textContent = "Navegando Historial";
-        badge.className = "px-2 py-0.5 text-[10px] font-semibold rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20";
+      // Si estamos En Vivo y no hay lecturas en las últimas 2 horas (Wemos Apagado),
+      // buscamos el ÚLTIMO registro absoluto registrado en la BD para no dejar las tarjetas vacías.
+      if (isLive && rawData.length === 0) {
+        const { data: latestData } = await supabaseClient
+          .from('lecturas_temperatura')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (latestData && latestData.length > 0) {
+          lastGlobalRecord = latestData[0];
+        } else {
+          lastGlobalRecord = null;
+        }
+      } else if (rawData.length > 0) {
+        lastGlobalRecord = rawData[rawData.length - 1];
       }
+
+      renderData();
     }
 
     function navigateWindow(hoursOffset) {
@@ -497,6 +501,7 @@ function updateCards(processedRow) {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lecturas_temperatura' }, payload => {
         if (isLive) {
           rawData.push(payload.new);
+          lastGlobalRecord = payload.new;
           const cutoff = new Date(Date.now() - TWO_HOURS_MS).toISOString();
           rawData = rawData.filter(r => r.created_at >= cutoff);
           renderData();
@@ -504,16 +509,19 @@ function updateCards(processedRow) {
       })
       .subscribe();
 
+    // Inicialización
     fetchWindowData();
 
-    </body>
-</html>
-
-// Verificar cada 5 segundos si el dispositivo se ha desconectado
-setInterval(() => {
-  if (isLive && rawData.length > 0) {
-    updateCards(processRow(rawData[rawData.length - 1]));
-  }
-}, 5000);
+    // Verificar cada 5 segundos si el dispositivo se ha desconectado (pasa a Offline si diff > 30s)
+    setInterval(() => {
+      if (isLive) {
+        const activeRecord = (rawData.length > 0) ? rawData[rawData.length - 1] : lastGlobalRecord;
+        if (activeRecord) {
+          updateCards(processRow(activeRecord));
+        }
+      }
+    }, 5000);
 
   </script>
+</body>
+</html>
