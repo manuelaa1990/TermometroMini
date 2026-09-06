@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Monitor Temperatura</title>
   
+  <!-- Configuración de Ícono y PWA -->
   <link rel="icon" type="image/svg+xml" href="icono.svg">
   <link rel="apple-touch-icon" href="icono.png">
   <link rel="manifest" href="manifest.json">
@@ -12,16 +13,22 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen p-3 md:p-6">
 
   <div class="max-w-md md:max-w-3xl mx-auto space-y-3">
     
+    <!-- Barra Superior Discreta: Batería, WiFi y Estado -->
     <div class="flex flex-wrap justify-between items-center bg-slate-800/60 border border-slate-700/50 px-3 py-1.5 rounded-xl text-xs gap-2">
+      <!-- BATERÍA Y WIFI -->
       <div class="flex items-center gap-3 text-slate-400">
+        <!-- Batería -->
         <div class="flex items-center gap-1.5">
           <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
@@ -32,6 +39,7 @@
           </div>
         </div>
 
+        <!-- Nombre de Red WiFi -->
         <div class="flex items-center gap-1 text-[11px] text-slate-300 border-l border-slate-700 pl-2.5">
           <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071a10 10 0 0114.142 0M1.42 9.428a16 16 0 0121.16 0"/>
@@ -40,17 +48,21 @@
         </div>
       </div>
 
+      <!-- Estado de Conexión -->
       <div id="status-badge" class="px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
         Conectando...
       </div>
     </div>
 
+    <!-- Título Principal -->
     <header class="text-center py-1">
       <h1 class="text-2xl font-bold text-sky-400">Monitor Temperatura</h1>
     </header>
 
+    <!-- Bloque de Lecturas -->
     <div class="space-y-2">
       
+      <!-- SONDA 1 (Azul) -->
       <div id="card-s1" class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all">
         <div class="flex justify-between items-center text-[10px] font-bold text-sky-400 uppercase tracking-wider px-1">
           <div class="flex items-center gap-1.5">
@@ -65,6 +77,7 @@
         </div>
         <div id="temp1-val" class="text-2xl font-extrabold text-sky-400 mt-0.5 transition-colors">--.- °C</div>
         
+        <!-- Mínimo y Máximo Sonda 1 -->
         <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-1">
           <span>Mín: <strong id="s1-min" class="text-slate-200">--.-</strong> °C</span>
           <span>Máx: <strong id="s1-max" class="text-slate-200">--.-</strong> °C</span>
@@ -72,6 +85,7 @@
         <div id="temp1-time" class="text-[9px] text-slate-500 mt-0.5">Esperando...</div>
       </div>
 
+      <!-- BOTÓN INVERTIR -->
       <div class="flex justify-center -my-1">
         <button id="btn-invert" onclick="toggleInvert()" title="Invertir Sondas" class="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition-all shadow-md active:scale-90">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,6 +94,7 @@
         </button>
       </div>
 
+      <!-- SONDA 2 (Rojo) -->
       <div id="card-s2" class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all">
         <div class="flex justify-between items-center text-[10px] font-bold text-rose-400 uppercase tracking-wider px-1">
           <div class="flex items-center gap-1.5">
@@ -94,6 +109,7 @@
         </div>
         <div id="temp2-val" class="text-2xl font-extrabold text-rose-400 mt-0.5 transition-colors">--.- °C</div>
         
+        <!-- Mínimo y Máximo Sonda 2 -->
         <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-1">
           <span>Mín: <strong id="s2-min" class="text-slate-200">--.-</strong> °C</span>
           <span>Máx: <strong id="s2-max" class="text-slate-200">--.-</strong> °C</span>
@@ -101,6 +117,7 @@
         <div id="temp2-time" class="text-[9px] text-slate-500 mt-0.5">Esperando...</div>
       </div>
 
+      <!-- DIFERENCIAL (ΔT) -->
       <div class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center">
         <div class="flex justify-between items-center text-[10px] font-bold text-amber-400 uppercase tracking-wider px-1">
           <div class="flex items-center gap-1.5">
@@ -115,6 +132,7 @@
         </div>
         <div id="delta-val" class="text-2xl font-extrabold text-amber-400 mt-0.5 transition-colors">--.- °C</div>
         
+        <!-- Mínimo y Máximo Diferencial -->
         <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-1">
           <span>Mín: <strong id="delta-min" class="text-slate-200">--.-</strong> °C</span>
           <span>Máx: <strong id="delta-max" class="text-slate-200">--.-</strong> °C</span>
@@ -124,6 +142,7 @@
 
     </div>
 
+    <!-- Navegación Simplificada de Gráfica -->
     <div class="bg-slate-800 border border-slate-700/60 p-2 rounded-xl shadow-md flex items-center justify-center gap-3">
       <button onclick="navigateWindow(-2)" title="Atrás 2 Horas" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition active:scale-95">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,6 +162,7 @@
       </button>
     </div>
 
+    <!-- Gráfica Histórica Escala -50°C a 100°C -->
     <div class="bg-slate-800 border border-slate-700/60 p-3 rounded-xl shadow-md">
       <div class="relative h-64 md:h-80">
         <canvas id="tempChart"></canvas>
@@ -180,3 +200,332 @@
             tension: 0.2,
             pointRadius: 1,
             fill: true
+          },
+          {
+            label: 'SONDA 2 (°C)',
+            borderColor: '#f87171',
+            backgroundColor: 'rgba(248, 113, 113, 0.05)',
+            data: [],
+            borderWidth: 2,
+            tension: 0.2,
+            pointRadius: 1,
+            fill: true
+          },
+          {
+            label: 'DIFERENCIAL ΔT (°C)',
+            borderColor: '#fbbf24',
+            backgroundColor: 'rgba(251, 191, 36, 0.05)',
+            data: [],
+            borderWidth: 2,
+            tension: 0.2,
+            pointRadius: 1,
+            fill: true
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#334155' } },
+          y: { 
+            min: -50,
+            max: 100,
+            ticks: { color: '#94a3b8', stepSize: 25, font: { size: 10 } }, 
+            grid: { color: '#334155' }
+          }
+        },
+        plugins: {
+          legend: { labels: { color: '#f1f5f9', font: { size: 11 } } }
+        }
+      }
+    });
+
+    function updateChartVisibility() {
+      const s1Vis = document.getElementById('chk-s1').checked;
+      const s2Vis = document.getElementById('chk-s2').checked;
+      const deltaVis = document.getElementById('chk-delta').checked;
+
+      tempChart.setDatasetVisibility(0, s1Vis);
+      tempChart.setDatasetVisibility(1, s2Vis);
+      tempChart.setDatasetVisibility(2, deltaVis);
+      tempChart.update();
+    }
+
+    function sanitizeAlarmInput(inputId, minVal, maxVal) {
+      const input = document.getElementById(inputId);
+      let val = parseFloat(input.value);
+
+      if (isNaN(val)) return maxVal;
+
+      if (val < minVal) val = minVal;
+      if (val > maxVal) val = maxVal;
+
+      input.value = val;
+      return val;
+    }
+
+    function validateAndRender() {
+      sanitizeAlarmInput('alarm1-input', -50, 100);
+      sanitizeAlarmInput('alarm2-input', -50, 100);
+      sanitizeAlarmInput('alarmDelta-input', 0, 50);
+      renderData();
+    }
+
+    function toggleInvert() {
+      isInverted = !isInverted;
+      const btn = document.getElementById('btn-invert');
+
+      if (isInverted) {
+        btn.className = "p-2 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/60 transition-all shadow-md active:scale-90 ring-2 ring-amber-500/30";
+      } else {
+        btn.className = "p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition-all shadow-md active:scale-90";
+      }
+
+      renderData();
+    }
+
+    function processRow(row) {
+      if (!row) return null;
+
+      const raw1 = (row.temp1 === null || row.temp1 <= -127 || row.temp1 < -50 || row.temp1 > 125) ? null : row.temp1;
+      const raw2 = (row.temp2 === null || row.temp2 <= -127 || row.temp2 < -50 || row.temp2 > 125) ? null : row.temp2;
+
+      const s1 = isInverted ? raw2 : raw1;
+      const s2 = isInverted ? raw1 : raw2;
+      const delta = (s1 !== null && s2 !== null) ? Math.abs(s1 - s2) : null;
+      const bateria = row.bateria !== undefined && row.bateria !== null ? row.bateria : null;
+      const wifi = row.wifi || row.ssid || null;
+
+      return { ...row, s1, s2, delta, bateria, wifi };
+    }
+
+    function updateCards(processedRow) {
+      const badge = document.getElementById('status-badge');
+      const wifiEl = document.getElementById('wifi-val');
+
+      if (!processedRow) {
+        badge.textContent = "Sin Datos";
+        badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-slate-800 text-slate-400 border border-slate-700";
+        wifiEl.textContent = 'Wifi: "Sin conexión"';
+        return;
+      }
+
+      const now = new Date().getTime();
+      const lastReadingTime = new Date(processedRow.created_at).getTime();
+      const diffSeconds = (now - lastReadingTime) / 1000;
+      const isDeviceOnline = diffSeconds <= 30;
+
+      // 1. Estado del Wemos: Online / Offline / Historial
+      if (!isLive) {
+        badge.textContent = "Historial";
+        badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/40";
+      } else if (isDeviceOnline) {
+        badge.textContent = "Online";
+        badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
+      } else {
+        badge.textContent = "Offline";
+        badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse";
+      }
+
+      // 2. Estado de Red Wi-Fi (Pasa a "Sin conexión" si el Wemos está Offline)
+      if (isDeviceOnline && processedRow.wifi) {
+        wifiEl.textContent = `Wifi: "${processedRow.wifi}"`;
+      } else {
+        wifiEl.textContent = 'Wifi: "Sin conexión"';
+      }
+
+      // 3. Mantener mediciones
+      const s1Val = processedRow.s1;
+      const s2Val = processedRow.s2;
+      const deltaVal = processedRow.delta;
+
+      const temp1El = document.getElementById('temp1-val');
+      const temp2El = document.getElementById('temp2-val');
+      const deltaEl = document.getElementById('delta-val');
+
+      temp1El.textContent = s1Val !== null ? `${s1Val.toFixed(1)} °C` : "DESC";
+      temp2El.textContent = s2Val !== null ? `${s2Val.toFixed(1)} °C` : "DESC";
+      deltaEl.textContent = deltaVal !== null ? `${deltaVal.toFixed(1)} °C` : "--.- °C";
+      
+      const dateObj = new Date(processedRow.created_at);
+      const isToday = new Date().toDateString() === dateObj.toDateString();
+      const timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const dateStr = isToday ? '' : `${dateObj.getDate()}/${dateObj.getMonth() + 1} `;
+
+      document.getElementById('temp1-time').textContent = `Lectura: ${dateStr}${timeStr}`;
+      document.getElementById('temp2-time').textContent = `Lectura: ${dateStr}${timeStr}`;
+
+      // 4. Batería
+      if (processedRow.bateria !== null && processedRow.bateria !== undefined) {
+        const bat = Math.max(0, Math.min(100, processedRow.bateria));
+        const bar = document.getElementById('bat-bar');
+        document.getElementById('bat-val').textContent = `${bat.toFixed(0)}%`;
+        bar.style.width = `${bat}%`;
+
+        if (bat > 50) bar.className = "bg-emerald-500 h-full transition-all duration-500";
+        else if (bat > 20) bar.className = "bg-amber-500 h-full transition-all duration-500";
+        else bar.className = "bg-rose-500 h-full transition-all duration-500";
+      }
+
+      // 5. Alarmas por Umbral
+      const alarm1 = sanitizeAlarmInput('alarm1-input', -50, 100);
+      const alarm2 = sanitizeAlarmInput('alarm2-input', -50, 100);
+      const alarmDelta = sanitizeAlarmInput('alarmDelta-input', 0, 50);
+
+      if (s1Val !== null && s1Val >= alarm1) {
+        temp1El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
+      } else {
+        temp1El.className = "text-2xl font-extrabold text-sky-400 mt-0.5 transition-colors";
+      }
+
+      if (s2Val !== null && s2Val >= alarm2) {
+        temp2El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
+      } else {
+        temp2El.className = "text-2xl font-extrabold text-rose-400 mt-0.5 transition-colors";
+      }
+
+      if (deltaVal !== null && deltaVal >= alarmDelta) {
+        deltaEl.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
+      } else {
+        deltaEl.className = "text-2xl font-extrabold text-amber-400 mt-0.5 transition-colors";
+      }
+    }
+
+    function renderData() {
+      tempChart.data.labels = [];
+      tempChart.data.datasets[0].data = [];
+      tempChart.data.datasets[1].data = [];
+      tempChart.data.datasets[2].data = [];
+
+      let s1Vals = [];
+      let s2Vals = [];
+      let deltaVals = [];
+
+      rawData.forEach(row => {
+        const p = processRow(row);
+        const timeLabel = new Date(p.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        tempChart.data.labels.push(timeLabel);
+        tempChart.data.datasets[0].data.push(p.s1);
+        tempChart.data.datasets[1].data.push(p.s2);
+        tempChart.data.datasets[2].data.push(p.delta);
+
+        if (p.s1 !== null && p.s1 !== undefined) s1Vals.push(p.s1);
+        if (p.s2 !== null && p.s2 !== undefined) s2Vals.push(p.s2);
+        if (p.delta !== null && p.delta !== undefined) deltaVals.push(p.delta);
+      });
+
+      document.getElementById('s1-min').textContent = s1Vals.length > 0 ? Math.min(...s1Vals).toFixed(1) : "--.-";
+      document.getElementById('s1-max').textContent = s1Vals.length > 0 ? Math.max(...s1Vals).toFixed(1) : "--.-";
+
+      document.getElementById('s2-min').textContent = s2Vals.length > 0 ? Math.min(...s2Vals).toFixed(1) : "--.-";
+      document.getElementById('s2-max').textContent = s2Vals.length > 0 ? Math.max(...s2Vals).toFixed(1) : "--.-";
+
+      document.getElementById('delta-min').textContent = deltaVals.length > 0 ? Math.min(...deltaVals).toFixed(1) : "--.-";
+      document.getElementById('delta-max').textContent = deltaVals.length > 0 ? Math.max(...deltaVals).toFixed(1) : "--.-";
+
+      updateChartVisibility();
+
+      const activeRecord = (rawData.length > 0) ? rawData[rawData.length - 1] : lastGlobalRecord;
+      updateCards(processRow(activeRecord));
+    }
+
+    async function fetchWindowData() {
+      if (isLive) {
+        windowEndTime = new Date();
+      }
+
+      const windowStartTime = new Date(windowEndTime.getTime() - TWO_HOURS_MS);
+
+      const btnNext = document.getElementById('btn-next');
+      btnNext.disabled = (windowEndTime >= new Date());
+
+      const { data, error } = await supabaseClient
+        .from('lecturas_temperatura')
+        .select('*')
+        .gte('created_at', windowStartTime.toISOString())
+        .lte('created_at', windowEndTime.toISOString())
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error al cargar datos:', error);
+        return;
+      }
+
+      rawData = data || [];
+
+      if (isLive && rawData.length === 0) {
+        const { data: latestData } = await supabaseClient
+          .from('lecturas_temperatura')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (latestData && latestData.length > 0) {
+          lastGlobalRecord = latestData[0];
+        } else {
+          lastGlobalRecord = null;
+        }
+      } else if (rawData.length > 0) {
+        lastGlobalRecord = rawData[rawData.length - 1];
+      }
+
+      renderData();
+    }
+
+    function navigateWindow(hoursOffset) {
+      isLive = false;
+      windowEndTime = new Date(windowEndTime.getTime() + (hoursOffset * 60 * 60 * 1000));
+      
+      if (windowEndTime >= new Date()) {
+        goLive();
+        return;
+      }
+
+      fetchWindowData();
+    }
+
+    function goLive() {
+      isLive = true;
+      windowEndTime = new Date();
+      fetchWindowData();
+    }
+
+    // Suscripción Realtime Supabase
+    supabaseClient
+      .channel('schema-db-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lecturas_temperatura' }, payload => {
+        if (isLive) {
+          rawData.push(payload.new);
+          lastGlobalRecord = payload.new;
+          const cutoff = new Date(Date.now() - TWO_HOURS_MS).toISOString();
+          rawData = rawData.filter(r => r.created_at >= cutoff);
+          renderData();
+        }
+      })
+      .subscribe();
+
+    // Carga inicial
+    fetchWindowData();
+
+    // Reconsultar la BD cada 10s en segundo plano para forzar actualización aunque se duerma el WebSocket
+    setInterval(() => {
+      if (isLive) {
+        fetchWindowData();
+      }
+    }, 10000);
+
+    // Verificar cada 5s el estado de conexión del dispositivo
+    setInterval(() => {
+      if (isLive) {
+        const activeRecord = (rawData.length > 0) ? rawData[rawData.length - 1] : lastGlobalRecord;
+        if (activeRecord) {
+          updateCards(processRow(activeRecord));
+        }
+      }
+    }, 5000);
+
+  </script>
+</body>
+</html>
