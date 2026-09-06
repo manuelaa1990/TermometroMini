@@ -71,7 +71,7 @@
           </div>
           <div class="flex items-center gap-1 text-[9px] text-slate-400">
             <span>Alarma Max:</span>
-            <input type="number" id="alarm1-input" value="40" min="-50" max="100" onchange="validateAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-sky-400 text-center rounded focus:outline-none py-0.5">
+            <input type="number" id="alarm1-input" value="40" min="-50" max="100" oninput="saveAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-sky-400 text-center rounded focus:outline-none py-0.5">
             <span>°C</span>
           </div>
         </div>
@@ -103,7 +103,7 @@
           </div>
           <div class="flex items-center gap-1 text-[9px] text-slate-400">
             <span>Alarma Max:</span>
-            <input type="number" id="alarm2-input" value="40" min="-50" max="100" onchange="validateAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-rose-400 text-center rounded focus:outline-none py-0.5">
+            <input type="number" id="alarm2-input" value="40" min="-50" max="100" oninput="saveAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-rose-400 text-center rounded focus:outline-none py-0.5">
             <span>°C</span>
           </div>
         </div>
@@ -126,7 +126,7 @@
           </div>
           <div class="flex items-center gap-1 text-[9px] text-slate-400">
             <span>Alarma Max:</span>
-            <input type="number" id="alarmDelta-input" value="10" min="0" max="50" onchange="validateAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-amber-400 text-center rounded focus:outline-none py-0.5">
+            <input type="number" id="alarmDelta-input" value="10" min="0" max="50" oninput="saveAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-amber-400 text-center rounded focus:outline-none py-0.5">
             <span>°C</span>
           </div>
         </div>
@@ -252,24 +252,40 @@
       tempChart.update();
     }
 
-    function sanitizeAlarmInput(inputId, minVal, maxVal) {
-      const input = document.getElementById(inputId);
-      let val = parseFloat(input.value);
+    // Carga inicial de alarmas guardadas al abrir o recargar la página
+    function loadSavedAlarms() {
+      const saved1 = localStorage.getItem('alarm1-input');
+      if (saved1 !== null && saved1 !== '') {
+        document.getElementById('alarm1-input').value = saved1;
+      }
 
-      if (isNaN(val)) return maxVal;
+      const saved2 = localStorage.getItem('alarm2-input');
+      if (saved2 !== null && saved2 !== '') {
+        document.getElementById('alarm2-input').value = saved2;
+      }
 
-      if (val < minVal) val = minVal;
-      if (val > maxVal) val = maxVal;
-
-      input.value = val;
-      return val;
+      const savedDelta = localStorage.getItem('alarmDelta-input');
+      if (savedDelta !== null && savedDelta !== '') {
+        document.getElementById('alarmDelta-input').value = savedDelta;
+      }
     }
 
-    function validateAndRender() {
-      sanitizeAlarmInput('alarm1-input', -50, 100);
-      sanitizeAlarmInput('alarm2-input', -50, 100);
-      sanitizeAlarmInput('alarmDelta-input', 0, 50);
+    // Guarda en tiempo real con cada pulsación y re-evalúa
+    function saveAndRender() {
+      const a1 = document.getElementById('alarm1-input').value;
+      const a2 = document.getElementById('alarm2-input').value;
+      const ad = document.getElementById('alarmDelta-input').value;
+
+      if (a1 !== '') localStorage.setItem('alarm1-input', a1);
+      if (a2 !== '') localStorage.setItem('alarm2-input', a2);
+      if (ad !== '') localStorage.setItem('alarmDelta-input', ad);
+
       renderData();
+    }
+
+    function getAlarmValue(inputId, defaultVal) {
+      const val = parseFloat(document.getElementById(inputId).value);
+      return isNaN(val) ? defaultVal : val;
     }
 
     function toggleInvert() {
@@ -316,7 +332,7 @@
       const diffSeconds = (now - lastReadingTime) / 1000;
       const isDeviceOnline = diffSeconds <= 30;
 
-      // 1. Estado del Wemos: Online / Offline / Historial
+      // 1. Estado Online / Offline / Historial
       if (!isLive) {
         badge.textContent = "Historial";
         badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/40";
@@ -328,14 +344,14 @@
         badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse";
       }
 
-      // 2. Estado de Red Wi-Fi (Pasa a "Sin conexión" si el Wemos está Offline)
+      // 2. Estado Wi-Fi
       if (isDeviceOnline && processedRow.wifi) {
         wifiEl.textContent = `Wifi: "${processedRow.wifi}"`;
       } else {
         wifiEl.textContent = 'Wifi: "Sin conexión"';
       }
 
-      // 3. Mantener mediciones
+      // 3. Mediciones
       const s1Val = processedRow.s1;
       const s2Val = processedRow.s2;
       const deltaVal = processedRow.delta;
@@ -368,10 +384,10 @@
         else bar.className = "bg-rose-500 h-full transition-all duration-500";
       }
 
-      // 5. Alarmas por Umbral
-      const alarm1 = sanitizeAlarmInput('alarm1-input', -50, 100);
-      const alarm2 = sanitizeAlarmInput('alarm2-input', -50, 100);
-      const alarmDelta = sanitizeAlarmInput('alarmDelta-input', 0, 50);
+      // 5. Comparación contra Alarmas guardadas
+      const alarm1 = getAlarmValue('alarm1-input', 40);
+      const alarm2 = getAlarmValue('alarm2-input', 40);
+      const alarmDelta = getAlarmValue('alarmDelta-input', 10);
 
       if (s1Val !== null && s1Val >= alarm1) {
         temp1El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
@@ -506,17 +522,20 @@
       })
       .subscribe();
 
-    // Carga inicial
+    // 1. Restaurar alarmas guardadas del localStorage
+    loadSavedAlarms();
+
+    // 2. Cargar datos iniciales
     fetchWindowData();
 
-    // Reconsultar la BD cada 10s en segundo plano para forzar actualización aunque se duerma el WebSocket
+    // Reconsultar BD cada 10s
     setInterval(() => {
       if (isLive) {
         fetchWindowData();
       }
     }, 10000);
 
-    // Verificar cada 5s el estado de conexión del dispositivo
+    // Verificar estado de conexión cada 5s
     setInterval(() => {
       if (isLive) {
         const activeRecord = (rawData.length > 0) ? rawData[rawData.length - 1] : lastGlobalRecord;
