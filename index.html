@@ -39,10 +39,27 @@
       margin-bottom: 12px;
     }
 
+    /* Barra Superior: WiFi y Batería */
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--hint-color);
+      padding: 4px 8px;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
     .config-box {
       display: flex;
       gap: 8px;
-      margin-bottom: 12px;
+      margin-top: 8px;
     }
 
     input[type="text"] {
@@ -87,9 +104,10 @@
       background-color: #ef4444 !important;
     }
 
-    .btn-group { display: flex; gap: 8px; justify-content: center; }
+    .btn-group { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
     .btn {
       flex: 1;
+      min-width: 120px;
       background-color: var(--button-color);
       color: var(--button-text);
       border: none;
@@ -98,6 +116,11 @@
       font-weight: 600;
       border-radius: 8px;
       cursor: pointer;
+    }
+
+    .btn-swap {
+      background-color: #8b5cf6;
+      color: #ffffff;
     }
 
     .chart-container {
@@ -114,11 +137,19 @@
 <body>
 
   <div class="container">
-    <!-- Configuración IP Wemos -->
+    <!-- Card Estado & Configuración -->
     <div class="card">
+      <div class="status-bar">
+        <div class="status-item">
+          <span>📶 WiFi:</span> <span id="wifi-ssid">--</span>
+        </div>
+        <div class="status-item">
+          <span>🔋 Batería:</span> <span id="bat-val">--</span>%
+        </div>
+      </div>
       <div class="config-box">
-        <input type="text" id="ip-input" placeholder="IP del Wemos (ej: 192.168.4.1)">
-        <button class="btn" onclick="guardarIP()">Guardar</button>
+        <input type="text" id="ip-input" placeholder="IP Wemos (ej: 192.168.4.1)">
+        <button class="btn" onclick="guardarIP()">Guardar IP</button>
       </div>
     </div>
 
@@ -126,11 +157,11 @@
     <div class="card">
       <div class="temp-grid">
         <div class="temp-box">
-          <div class="temp-label">SONDA 1</div>
+          <div class="temp-label" id="lbl-s1">SONDA 1 (Entrada)</div>
           <div class="temp-val s1-color"><span id="s1">--</span> °C</div>
         </div>
         <div class="temp-box">
-          <div class="temp-label">SONDA 2</div>
+          <div class="temp-label" id="lbl-s2">SONDA 2 (Salida)</div>
           <div class="temp-val s2-color"><span id="s2">--</span> °C</div>
         </div>
       </div>
@@ -140,6 +171,7 @@
       </div>
 
       <div class="btn-group">
+        <button class="btn btn-swap" onclick="toggleInvertirSondas()">🔄 Invertir Sondas</button>
         <button class="btn" onclick="descargarCSV()">📥 Descargar CSV</button>
       </div>
     </div>
@@ -154,15 +186,28 @@
     // Inicializar Telegram WebApp
     const tg = window.Telegram.WebApp;
     tg.ready();
-    tg.expand(); // Expandir a pantalla completa en Telegram
+    tg.expand();
 
     let wemosIP = localStorage.getItem('wemos_ip') || '192.168.4.1';
     document.getElementById('ip-input').value = wemosIP;
+
+    // Estado local para invertir sondas visualmente
+    let sondasInvertidas = false;
 
     function guardarIP() {
       wemosIP = document.getElementById('ip-input').value.trim();
       localStorage.setItem('wemos_ip', wemosIP);
       if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      updateData();
+    }
+
+    function toggleInvertirSondas() {
+      sondasInvertidas = !sondasInvertidas;
+      if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+      
+      // Opcional: enviar petición al Wemos si tu código tiene la ruta /swap
+      fetch(`http://${wemosIP}/swap`).catch(e => {});
+
       updateData();
     }
 
@@ -173,8 +218,8 @@
       data: {
         labels: [],
         datasets: [
-          { label: 'S1 (°C)', borderColor: '#ef4444', data: [], fill: false, tension: 0.2 },
-          { label: 'S2 (°C)', borderColor: '#3b82f6', data: [], fill: false, tension: 0.2 }
+          { label: 'Sonda 1 (°C)', borderColor: '#ef4444', data: [], fill: false, tension: 0.2 },
+          { label: 'Sonda 2 (°C)', borderColor: '#3b82f6', data: [], fill: false, tension: 0.2 }
         ]
       },
       options: {
@@ -190,10 +235,19 @@
       fetch(`http://${wemosIP}/data`)
         .then(res => res.json())
         .then(data => {
-          document.getElementById('s1').innerText = data.t1;
-          document.getElementById('s2').innerText = data.t2;
-          document.getElementById('dt').innerText = data.dt;
+          // Asignación de variables según estado de inversión
+          let valS1 = sondasInvertidas ? data.t2 : data.t1;
+          let valS2 = sondasInvertidas ? data.t1 : data.t2;
 
+          document.getElementById('s1').innerText = valS1 ?? '--';
+          document.getElementById('s2').innerText = valS2 ?? '--';
+          document.getElementById('dt').innerText = data.dt ?? '--';
+          
+          // WiFi y Batería desde la respuesta JSON
+          document.getElementById('wifi-ssid').innerText = data.ssid || 'Desconectado';
+          document.getElementById('bat-val').innerText = data.bat ?? '--';
+
+          // Alerta Delta T
           const dtBox = document.getElementById('dt-box');
           if (data.dt >= 20.0) {
             dtBox.className = "dt-box dt-alert";
@@ -203,14 +257,15 @@
             document.getElementById('alert-tag').innerText = "";
           }
 
+          // Gráfica de Historial
           if (data.hist1 && data.hist2 && data.labels) {
             chart.data.labels = data.labels;
-            chart.data.datasets[0].data = data.hist1;
-            chart.data.datasets[1].data = data.hist2;
+            chart.data.datasets[0].data = sondasInvertidas ? data.hist2 : data.hist1;
+            chart.data.datasets[1].data = sondasInvertidas ? data.hist1 : data.hist2;
             chart.update();
           }
         })
-        .catch(err => console.log("Error conectando al Wemos:", err));
+        .catch(err => console.log("Error consultando el Wemos:", err));
     }
 
     function descargarCSV() {
