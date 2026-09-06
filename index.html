@@ -61,15 +61,15 @@
     <!-- Bloque de Lecturas -->
     <div class="space-y-2">
       
-      <!-- SONDA 1 (Azul) -->
+      <!-- SONDA 1 -->
       <div id="card-s1" class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all">
         <div class="flex justify-between items-center text-[10px] font-bold text-sky-400 uppercase tracking-wider px-1">
           <div class="flex items-center gap-1.5">
             <input type="checkbox" id="chk-s1" checked onchange="updateChartVisibility()" class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0 cursor-pointer" title="Mostrar/Ocultar en Gráfica">
-            <span>SONDA 1 (Entrada/Evap)</span>
+            <span>SONDA 1</span>
           </div>
           <div class="flex items-center gap-1 text-[9px] text-slate-400">
-            <span>Alarma Max:</span>
+            <span>Alarma:</span>
             <input type="number" id="alarm1-input" value="40" min="-50" max="100" step="0.5" oninput="saveAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-sky-400 text-center rounded focus:outline-none py-0.5">
             <span>°C</span>
           </div>
@@ -92,15 +92,15 @@
         </button>
       </div>
 
-      <!-- SONDA 2 (Rojo) -->
+      <!-- SONDA 2 -->
       <div id="card-s2" class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all">
         <div class="flex justify-between items-center text-[10px] font-bold text-rose-400 uppercase tracking-wider px-1">
           <div class="flex items-center gap-1.5">
             <input type="checkbox" id="chk-s2" checked onchange="updateChartVisibility()" class="rounded bg-slate-900 border-slate-700 text-rose-500 focus:ring-0 cursor-pointer" title="Mostrar/Ocultar en Gráfica">
-            <span>SONDA 2 (Salida/Amb)</span>
+            <span>SONDA 2</span>
           </div>
           <div class="flex items-center gap-1 text-[9px] text-slate-400">
-            <span>Alarma Max:</span>
+            <span>Alarma:</span>
             <input type="number" id="alarm2-input" value="40" min="-50" max="100" step="0.5" oninput="saveAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-rose-400 text-center rounded focus:outline-none py-0.5">
             <span>°C</span>
           </div>
@@ -114,16 +114,15 @@
         <div id="temp2-time" class="text-[9px] text-slate-500 mt-0.5">Esperando...</div>
       </div>
 
-      <!-- DIFERENCIAL (ΔT) - CRÍTICO SI CERCANO A CERO -->
+      <!-- DIFERENCIAL (ΔT) -->
       <div id="card-delta" class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center transition-all">
         <div class="flex justify-between items-center text-[10px] font-bold text-amber-400 uppercase tracking-wider px-1">
           <div class="flex items-center gap-1.5">
             <input type="checkbox" id="chk-delta" checked onchange="updateChartVisibility()" class="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0 cursor-pointer" title="Mostrar/Ocultar en Gráfica">
             <span>DIFERENCIAL (ΔT)</span>
           </div>
-          <!-- ALARMA MÍNIMA PARA RETORNO DE LÍQUIDO -->
           <div class="flex items-center gap-1 text-[9px] text-slate-400">
-            <span class="text-rose-400 font-semibold" title="Riesgo Retorno de Líquido si ΔT es menor o igual">Alarma Mín (Retorno Líquido):</span>
+            <span class="text-rose-400 font-semibold">Alarma:</span>
             <input type="number" id="alarmDeltaMin-input" value="0.5" min="0" max="10" step="0.1" oninput="saveAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-rose-400 text-center rounded focus:outline-none py-0.5 font-bold">
             <span>°C</span>
           </div>
@@ -159,7 +158,7 @@
       </button>
     </div>
 
-    <!-- Gráfica Histórica Escala -50°C a 100°C -->
+    <!-- Gráfica Histórica Auto-Escalable -->
     <div class="bg-slate-800 border border-slate-700/60 p-3 rounded-xl shadow-md">
       <div class="relative h-64 md:h-80">
         <canvas id="tempChart"></canvas>
@@ -180,9 +179,9 @@
     let rawData = [];
     let lastGlobalRecord = null;
     let isInverted = false;
-    let lastVibrationTime = 0; // Control de frecuencia de vibración
+    let lastVibrationTime = 0;
 
-    // Configuración Chart.js
+    // Configuración Chart.js con Auto-Escala Dinámica
     const ctx = document.getElementById('tempChart').getContext('2d');
     const tempChart = new Chart(ctx, {
       type: 'line',
@@ -225,11 +224,13 @@
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-          x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#334155' } },
+          x: { 
+            ticks: { color: '#94a3b8', font: { size: 10 } }, 
+            grid: { color: '#334155' } 
+          },
           y: { 
-            min: -50,
-            max: 100,
-            ticks: { color: '#94a3b8', stepSize: 25, font: { size: 10 } }, 
+            grace: '5%', // Ajusta la escala dinámicamente dando un 5% de holgura
+            ticks: { color: '#94a3b8', font: { size: 10 } }, 
             grid: { color: '#334155' }
           }
         },
@@ -250,7 +251,6 @@
       tempChart.update();
     }
 
-    // Carga inicial de alarmas guardadas al abrir la app
     function loadSavedAlarms() {
       const saved1 = localStorage.getItem('alarm1-input');
       if (saved1 !== null && saved1 !== '') document.getElementById('alarm1-input').value = saved1;
@@ -262,7 +262,6 @@
       if (savedDeltaMin !== null && savedDeltaMin !== '') document.getElementById('alarmDeltaMin-input').value = savedDeltaMin;
     }
 
-    // Guardado continuo e instantáneo en localStorage
     function saveAndRender() {
       const a1 = document.getElementById('alarm1-input').value;
       const a2 = document.getElementById('alarm2-input').value;
@@ -308,13 +307,10 @@
       return { ...row, s1, s2, delta, bateria, wifi };
     }
 
-    // Función para activar vibración si está soportada en el móvil
     function triggerPhoneVibration() {
       const now = Date.now();
-      // Evitar saturar el motor vibrando máximo una vez cada 8 segundos
       if (now - lastVibrationTime > 8000) {
         if ('vibrate' in navigator) {
-          // Patrón: Vibra 500ms, pausa 200ms, vibra 500ms, pausa 200ms, vibra 500ms
           navigator.vibrate([500, 200, 500, 200, 500]);
           lastVibrationTime = now;
         }
@@ -337,7 +333,6 @@
       const diffSeconds = (now - lastReadingTime) / 1000;
       const isDeviceOnline = diffSeconds <= 30;
 
-      // 1. Estado Online / Offline / Historial
       if (!isLive) {
         badge.textContent = "Historial";
         badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/40";
@@ -349,14 +344,12 @@
         badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse";
       }
 
-      // 2. Wi-Fi
       if (isDeviceOnline && processedRow.wifi) {
         wifiEl.textContent = `Wifi: "${processedRow.wifi}"`;
       } else {
         wifiEl.textContent = 'Wifi: "Sin conexión"';
       }
 
-      // 3. Mediciones
       const s1Val = processedRow.s1;
       const s2Val = processedRow.s2;
       const deltaVal = processedRow.delta;
@@ -378,7 +371,6 @@
       document.getElementById('temp1-time').textContent = `Lectura: ${dateStr}${timeStr}`;
       document.getElementById('temp2-time').textContent = `Lectura: ${dateStr}${timeStr}`;
 
-      // 4. Batería
       if (processedRow.bateria !== null && processedRow.bateria !== undefined) {
         const bat = Math.max(0, Math.min(100, processedRow.bateria));
         const bar = document.getElementById('bat-bar');
@@ -390,32 +382,27 @@
         else bar.className = "bg-rose-500 h-full transition-all duration-500";
       }
 
-      // 5. EVALUACIÓN DE ALARMAS DE TEMPERATURA Y RETORNO DE LÍQUIDO
       const alarm1 = getAlarmValue('alarm1-input', 40);
       const alarm2 = getAlarmValue('alarm2-input', 40);
       const alarmDeltaMin = getAlarmValue('alarmDeltaMin-input', 0.5);
 
-      // Alarma Sonda 1
       if (s1Val !== null && s1Val >= alarm1) {
         temp1El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
       } else {
         temp1El.className = "text-2xl font-extrabold text-sky-400 mt-0.5 transition-colors";
       }
 
-      // Alarma Sonda 2
       if (s2Val !== null && s2Val >= alarm2) {
         temp2El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
       } else {
         temp2El.className = "text-2xl font-extrabold text-rose-400 mt-0.5 transition-colors";
       }
 
-      // ALARMA CRÍTICA ΔT CERCANO A CERO (Riesgo de retorno de líquido)
       if (deltaVal !== null && deltaVal <= alarmDeltaMin) {
         deltaEl.className = "text-2xl font-extrabold bg-rose-600 text-white animate-pulse rounded my-1 mx-8 py-0.5 transition-colors shadow-lg shadow-rose-600/50";
         deltaMsgEl.textContent = "⚠️ ALERTA: ΔT MUY BAJO - POSIBLE RETORNO DE LÍQUIDO";
         deltaMsgEl.className = "text-[10px] text-rose-400 font-bold mt-0.5 animate-pulse";
 
-        // Ejecutar vibración en tiempo real solo si estamos en directo (modo Live)
         if (isLive) {
           triggerPhoneVibration();
         }
@@ -526,7 +513,6 @@
       fetchWindowData();
     }
 
-    // Suscripción Realtime Supabase
     supabaseClient
       .channel('schema-db-changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lecturas_temperatura' }, payload => {
@@ -540,20 +526,15 @@
       })
       .subscribe();
 
-    // 1. Cargar umbrales del localStorage
     loadSavedAlarms();
-
-    // 2. Cargar datos iniciales
     fetchWindowData();
 
-    // Consultas periódicas a la base de datos
     setInterval(() => {
       if (isLive) {
         fetchWindowData();
       }
     }, 10000);
 
-    // Revisar el estado de alarmas cada 5 segundos
     setInterval(() => {
       if (isLive) {
         const activeRecord = (rawData.length > 0) ? rawData[rawData.length - 1] : lastGlobalRecord;
