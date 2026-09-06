@@ -15,18 +15,31 @@
 
   <div class="max-w-md md:max-w-3xl mx-auto space-y-3">
     
-    <!-- Barra Superior Discreta -->
-    <div class="flex justify-between items-center bg-slate-800/60 border border-slate-700/50 px-3 py-1.5 rounded-xl text-xs">
-      <div class="flex items-center gap-2 text-slate-400">
-        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-        </svg>
-        <span class="font-medium text-slate-300 text-[11px]" id="bat-val">--%</span>
-        <div class="w-10 bg-slate-700 h-1.5 rounded-full overflow-hidden">
-          <div id="bat-bar" class="bg-emerald-500 h-full transition-all duration-500" style="width: 0%"></div>
+    <!-- Barra Superior Discreta: Batería, WiFi y Estado -->
+    <div class="flex flex-wrap justify-between items-center bg-slate-800/60 border border-slate-700/50 px-3 py-1.5 rounded-xl text-xs gap-2">
+      <!-- BATERÍA Y WIFI -->
+      <div class="flex items-center gap-3 text-slate-400">
+        <!-- Batería -->
+        <div class="flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          <span class="font-medium text-slate-300 text-[11px]" id="bat-val">--%</span>
+          <div class="w-8 bg-slate-700 h-1.5 rounded-full overflow-hidden">
+            <div id="bat-bar" class="bg-emerald-500 h-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- Nombre de Red WiFi -->
+        <div class="flex items-center gap-1 text-[11px] text-slate-300 border-l border-slate-700 pl-2.5">
+          <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071a10 10 0 0114.142 0M1.42 9.428a16 16 0 0121.16 0"/>
+          </svg>
+          <span id="wifi-val">Wifi: "--"</span>
         </div>
       </div>
 
+      <!-- Estado de Conexión -->
       <div id="status-badge" class="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
         Conectando...
       </div>
@@ -38,58 +51,80 @@
       <p class="text-[11px] text-slate-400">Telemetría de temperatura en vivo</p>
     </header>
 
-    <!-- Bloque de Lecturas Estrecho y Centrado -->
+    <!-- Bloque de Lecturas (Ajustado y Centrado) -->
     <div class="space-y-2">
       
-      <!-- SONDA 1 -->
-      <div class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center">
-        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">SONDA 1</div>
+      <!-- SONDA 1 (Azul) -->
+      <div id="card-s1" class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all">
+        <div class="flex justify-between items-center text-[10px] font-bold text-sky-400 uppercase tracking-wider px-1">
+          <span>SONDA 1</span>
+          <div class="flex items-center gap-1 text-[9px] text-slate-400">
+            <span>Alarma Max:</span>
+            <input type="number" id="alarm1-input" value="40" onchange="renderData()" class="w-10 bg-slate-900 border border-slate-700 text-sky-400 text-center rounded focus:outline-none py-0.5">
+            <span>°C</span>
+          </div>
+        </div>
         <div id="temp1-val" class="text-2xl font-extrabold text-sky-400 mt-0.5">--.- °C</div>
+        
+        <!-- Mínimo y Máximo Sonda 1 -->
+        <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-1">
+          <span>Mín: <strong id="s1-min" class="text-slate-200">--.-</strong> °C</span>
+          <span>Máx: <strong id="s1-max" class="text-slate-200">--.-</strong> °C</span>
+        </div>
         <div id="temp1-time" class="text-[9px] text-slate-500 mt-0.5">Esperando...</div>
       </div>
 
-      <!-- BOTÓN INVERTIR (Flechas Verticales en el centro) -->
+      <!-- BOTÓN INVERTIR (Flechas Verticales) -->
       <div class="flex justify-center -my-1">
-        <button onclick="toggleInvert()" title="Invertir Sondas" class="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition-all shadow-md active:scale-90">
-          <!-- SVG Flechas Verticales (Arriba / Abajo) -->
+        <button id="btn-invert" onclick="toggleInvert()" title="Invertir Sondas" class="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition-all shadow-md active:scale-90">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
           </svg>
         </button>
       </div>
 
-      <!-- SONDA 2 -->
-      <div class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center">
-        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">SONDA 2</div>
-        <div id="temp2-val" class="text-2xl font-extrabold text-emerald-400 mt-0.5">--.- °C</div>
+      <!-- SONDA 2 (Rojo) -->
+      <div id="card-s2" class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all">
+        <div class="flex justify-between items-center text-[10px] font-bold text-rose-400 uppercase tracking-wider px-1">
+          <span>SONDA 2</span>
+          <div class="flex items-center gap-1 text-[9px] text-slate-400">
+            <span>Alarma Max:</span>
+            <input type="number" id="alarm2-input" value="40" onchange="renderData()" class="w-10 bg-slate-900 border border-slate-700 text-rose-400 text-center rounded focus:outline-none py-0.5">
+            <span>°C</span>
+          </div>
+        </div>
+        <div id="temp2-val" class="text-2xl font-extrabold text-rose-400 mt-0.5">--.- °C</div>
+        
+        <!-- Mínimo y Máximo Sonda 2 -->
+        <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-1">
+          <span>Mín: <strong id="s2-min" class="text-slate-200">--.-</strong> °C</span>
+          <span>Máx: <strong id="s2-max" class="text-slate-200">--.-</strong> °C</span>
+        </div>
         <div id="temp2-time" class="text-[9px] text-slate-500 mt-0.5">Esperando...</div>
       </div>
 
-      <!-- DIFERENCIAL (ΔT) -->
+      <!-- DIFERENCIAL (ΔT - Siempre Positivo) -->
       <div class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center">
-        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">DIFERENCIAL (ΔT)</div>
+        <div class="text-[10px] font-bold text-amber-400 uppercase tracking-wider">DIFERENCIAL (ΔT)</div>
         <div id="delta-val" class="text-2xl font-extrabold text-amber-400 mt-0.5">--.- °C</div>
         <div class="text-[9px] text-slate-500 mt-0.5">|SONDA 1 - SONDA 2|</div>
       </div>
 
     </div>
 
-    <!-- Navegación Simplificada de Gráfica (Sin horas ni fechas) -->
+    <!-- Navegación Simplificada de Gráfica -->
     <div class="bg-slate-800 border border-slate-700/60 p-2 rounded-xl shadow-md flex items-center justify-center gap-3">
-      <!-- Botón Atrás -->
       <button onclick="navigateWindow(-2)" title="Atrás" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition active:scale-95">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
       </button>
 
-      <!-- Botón Actual / En Vivo -->
       <button onclick="goLive()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition flex items-center gap-1.5 active:scale-95">
         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
         Actual
       </button>
 
-      <!-- Botón Adelante -->
       <button id="btn-next" onclick="navigateWindow(2)" title="Adelante" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
@@ -118,7 +153,7 @@
     let rawData = [];
     let isInverted = false;
 
-    // Chart.js con escala de -50 °C a 100 °C
+    // Configuración Chart.js con Sonda 1 (Azul) y Sonda 2 (Rojo)
     const ctx = document.getElementById('tempChart').getContext('2d');
     const tempChart = new Chart(ctx, {
       type: 'line',
@@ -127,7 +162,7 @@
         datasets: [
           {
             label: 'SONDA 1 (°C)',
-            borderColor: '#38bdf8',
+            borderColor: '#38bdf8', // Azul Sky
             backgroundColor: 'rgba(56, 189, 248, 0.05)',
             data: [],
             borderWidth: 2,
@@ -137,8 +172,8 @@
           },
           {
             label: 'SONDA 2 (°C)',
-            borderColor: '#34d399',
-            backgroundColor: 'rgba(52, 211, 153, 0.05)',
+            borderColor: '#f87171', // Rojo Rose
+            backgroundColor: 'rgba(248, 113, 113, 0.05)',
             data: [],
             borderWidth: 2,
             tension: 0.2,
@@ -165,8 +200,19 @@
       }
     });
 
+    // Alternar inversión de sondas con cambio de color del botón
     function toggleInvert() {
       isInverted = !isInverted;
+      const btn = document.getElementById('btn-invert');
+
+      if (isInverted) {
+        // Estado Invertido: Color Naranja / Ámbar llamativo
+        btn.className = "p-2 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/60 transition-all shadow-md active:scale-90 ring-2 ring-amber-500/30";
+      } else {
+        // Estado Normal: Color Azul
+        btn.className = "p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition-all shadow-md active:scale-90";
+      }
+
       renderData();
     }
 
@@ -175,24 +221,36 @@
       const raw2 = row.temp2;
       const s1 = isInverted ? raw2 : raw1;
       const s2 = isInverted ? raw1 : raw2;
+      
+      // Diferencial siempre positivo (Valor absoluto)
       const delta = (s1 !== null && s2 !== null) ? Math.abs(s1 - s2) : null;
+      
       const bateria = row.bateria !== undefined && row.bateria !== null ? row.bateria : null;
+      const wifi = row.wifi || row.ssid || null;
 
-      return { ...row, s1, s2, delta, bateria };
+      return { ...row, s1, s2, delta, bateria, wifi };
     }
 
     function updateCards(processedRow) {
       if (!processedRow) return;
 
-      document.getElementById('temp1-val').textContent = processedRow.s1 !== null ? `${processedRow.s1.toFixed(2)} °C` : "DESC";
-      document.getElementById('temp2-val').textContent = processedRow.s2 !== null ? `${processedRow.s2.toFixed(2)} °C` : "DESC";
+      const s1Val = processedRow.s1;
+      const s2Val = processedRow.s2;
+
+      document.getElementById('temp1-val').textContent = s1Val !== null ? `${s1Val.toFixed(2)} °C` : "DESC";
+      document.getElementById('temp2-val').textContent = s2Val !== null ? `${s2Val.toFixed(2)} °C` : "DESC";
       document.getElementById('delta-val').textContent = processedRow.delta !== null ? `${processedRow.delta.toFixed(2)} °C` : "--.- °C";
       
       const formattedTime = new Date(processedRow.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       document.getElementById('temp1-time').textContent = `Lectura: ${formattedTime}`;
       document.getElementById('temp2-time').textContent = `Lectura: ${formattedTime}`;
 
-      // Actualizar Batería
+      // Nombre de Red Wifi
+      if (processedRow.wifi) {
+        document.getElementById('wifi-val').textContent = `Wifi: "${processedRow.wifi}"`;
+      }
+
+      // Batería
       if (processedRow.bateria !== null) {
         const bat = Math.max(0, Math.min(100, processedRow.bateria));
         const bar = document.getElementById('bat-bar');
@@ -203,12 +261,35 @@
         else if (bat > 20) bar.className = "bg-amber-500 h-full transition-all duration-500";
         else bar.className = "bg-rose-500 h-full transition-all duration-500";
       }
+
+      // Control de Alertas por Temperatura Máxima
+      const alarm1 = parseFloat(document.getElementById('alarm1-input').value) || 999;
+      const alarm2 = parseFloat(document.getElementById('alarm2-input').value) || 999;
+
+      const cardS1 = document.getElementById('card-s1');
+      const cardS2 = document.getElementById('card-s2');
+
+      if (s1Val !== null && s1Val >= alarm1) {
+        cardS1.className = "bg-slate-800 border-2 border-rose-500 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all animate-pulse";
+      } else {
+        cardS1.className = "bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all";
+      }
+
+      if (s2Val !== null && s2Val >= alarm2) {
+        cardS2.className = "bg-slate-800 border-2 border-rose-500 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all animate-pulse";
+      } else {
+        cardS2.className = "bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all";
+      }
     }
 
+    // Cálculo y renderizado de Mínimos/Máximos y Gráfica
     function renderData() {
       tempChart.data.labels = [];
       tempChart.data.datasets[0].data = [];
       tempChart.data.datasets[1].data = [];
+
+      let s1Vals = [];
+      let s2Vals = [];
 
       rawData.forEach(row => {
         const p = processRow(row);
@@ -217,7 +298,28 @@
         tempChart.data.labels.push(timeLabel);
         tempChart.data.datasets[0].data.push(p.s1);
         tempChart.data.datasets[1].data.push(p.s2);
+
+        if (p.s1 !== null && p.s1 !== undefined) s1Vals.push(p.s1);
+        if (p.s2 !== null && p.s2 !== undefined) s2Vals.push(p.s2);
       });
+
+      // Actualizar Mín/Máx Sonda 1
+      if (s1Vals.length > 0) {
+        document.getElementById('s1-min').textContent = Math.min(...s1Vals).toFixed(1);
+        document.getElementById('s1-max').textContent = Math.max(...s1Vals).toFixed(1);
+      } else {
+        document.getElementById('s1-min').textContent = "--.-";
+        document.getElementById('s1-max').textContent = "--.-";
+      }
+
+      // Actualizar Mín/Máx Sonda 2
+      if (s2Vals.length > 0) {
+        document.getElementById('s2-min').textContent = Math.min(...s2Vals).toFixed(1);
+        document.getElementById('s2-max').textContent = Math.max(...s2Vals).toFixed(1);
+      } else {
+        document.getElementById('s2-min').textContent = "--.-";
+        document.getElementById('s2-max').textContent = "--.-";
+      }
 
       tempChart.update();
 
@@ -233,7 +335,6 @@
 
       const windowStartTime = new Date(windowEndTime.getTime() - TWO_HOURS_MS);
 
-      // Deshabilitar botón "Adelante" si estamos en el presente
       const btnNext = document.getElementById('btn-next');
       btnNext.disabled = (windowEndTime >= new Date());
 
@@ -280,7 +381,7 @@
       fetchWindowData();
     }
 
-    // Suscripción Realtime
+    // Suscripción Realtime Supabase
     supabaseClient
       .channel('schema-db-changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lecturas_temperatura' }, payload => {
