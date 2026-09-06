@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Telemetría HVAC - Monitor en Tiempo Real</title>
+  <title>Monitor Temperatura</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Chart.js -->
@@ -47,11 +47,10 @@
 
     <!-- Título Principal -->
     <header class="text-center py-1">
-      <h1 class="text-xl font-bold text-sky-400">Panel de Monitoreo HVAC</h1>
-      <p class="text-[11px] text-slate-400">Telemetría de temperatura en vivo</p>
+      <h1 class="text-2xl font-bold text-sky-400">Monitor Temperatura</h1>
     </header>
 
-    <!-- Bloque de Lecturas (Ajustado y Centrado) -->
+    <!-- Bloque de Lecturas -->
     <div class="space-y-2">
       
       <!-- SONDA 1 (Azul) -->
@@ -60,11 +59,11 @@
           <span>SONDA 1</span>
           <div class="flex items-center gap-1 text-[9px] text-slate-400">
             <span>Alarma Max:</span>
-            <input type="number" id="alarm1-input" value="40" onchange="renderData()" class="w-10 bg-slate-900 border border-slate-700 text-sky-400 text-center rounded focus:outline-none py-0.5">
+            <input type="number" id="alarm1-input" value="40" min="-50" max="100" onchange="validateAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-sky-400 text-center rounded focus:outline-none py-0.5">
             <span>°C</span>
           </div>
         </div>
-        <div id="temp1-val" class="text-2xl font-extrabold text-sky-400 mt-0.5">--.- °C</div>
+        <div id="temp1-val" class="text-2xl font-extrabold text-sky-400 mt-0.5 transition-colors">--.- °C</div>
         
         <!-- Mínimo y Máximo Sonda 1 -->
         <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-1">
@@ -89,11 +88,11 @@
           <span>SONDA 2</span>
           <div class="flex items-center gap-1 text-[9px] text-slate-400">
             <span>Alarma Max:</span>
-            <input type="number" id="alarm2-input" value="40" onchange="renderData()" class="w-10 bg-slate-900 border border-slate-700 text-rose-400 text-center rounded focus:outline-none py-0.5">
+            <input type="number" id="alarm2-input" value="40" min="-50" max="100" onchange="validateAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-rose-400 text-center rounded focus:outline-none py-0.5">
             <span>°C</span>
           </div>
         </div>
-        <div id="temp2-val" class="text-2xl font-extrabold text-rose-400 mt-0.5">--.- °C</div>
+        <div id="temp2-val" class="text-2xl font-extrabold text-rose-400 mt-0.5 transition-colors">--.- °C</div>
         
         <!-- Mínimo y Máximo Sonda 2 -->
         <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-1">
@@ -103,10 +102,17 @@
         <div id="temp2-time" class="text-[9px] text-slate-500 mt-0.5">Esperando...</div>
       </div>
 
-      <!-- DIFERENCIAL (ΔT - Siempre Positivo) -->
+      <!-- DIFERENCIAL (ΔT) con Alarma Limitada a 0 - 50 °C -->
       <div class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center">
-        <div class="text-[10px] font-bold text-amber-400 uppercase tracking-wider">DIFERENCIAL (ΔT)</div>
-        <div id="delta-val" class="text-2xl font-extrabold text-amber-400 mt-0.5">--.- °C</div>
+        <div class="flex justify-between items-center text-[10px] font-bold text-amber-400 uppercase tracking-wider px-1">
+          <span>DIFERENCIAL (ΔT)</span>
+          <div class="flex items-center gap-1 text-[9px] text-slate-400">
+            <span>Alarma Max:</span>
+            <input type="number" id="alarmDelta-input" value="10" min="0" max="50" onchange="validateAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-amber-400 text-center rounded focus:outline-none py-0.5">
+            <span>°C</span>
+          </div>
+        </div>
+        <div id="delta-val" class="text-2xl font-extrabold text-amber-400 mt-0.5 transition-colors">--.- °C</div>
         <div class="text-[9px] text-slate-500 mt-0.5">|SONDA 1 - SONDA 2|</div>
       </div>
 
@@ -153,7 +159,7 @@
     let rawData = [];
     let isInverted = false;
 
-    // Configuración Chart.js con Sonda 1 (Azul) y Sonda 2 (Rojo)
+    // Configuración Chart.js
     const ctx = document.getElementById('tempChart').getContext('2d');
     const tempChart = new Chart(ctx, {
       type: 'line',
@@ -162,7 +168,7 @@
         datasets: [
           {
             label: 'SONDA 1 (°C)',
-            borderColor: '#38bdf8', // Azul Sky
+            borderColor: '#38bdf8',
             backgroundColor: 'rgba(56, 189, 248, 0.05)',
             data: [],
             borderWidth: 2,
@@ -172,7 +178,7 @@
           },
           {
             label: 'SONDA 2 (°C)',
-            borderColor: '#f87171', // Rojo Rose
+            borderColor: '#f87171',
             backgroundColor: 'rgba(248, 113, 113, 0.05)',
             data: [],
             borderWidth: 2,
@@ -200,16 +206,34 @@
       }
     });
 
-    // Alternar inversión de sondas con cambio de color del botón
+    // Validar y limitar rangos dinámicamente
+    function sanitizeAlarmInput(inputId, minVal, maxVal) {
+      const input = document.getElementById(inputId);
+      let val = parseFloat(input.value);
+
+      if (isNaN(val)) return maxVal;
+
+      if (val < minVal) val = minVal;
+      if (val > maxVal) val = maxVal;
+
+      input.value = val;
+      return val;
+    }
+
+    function validateAndRender() {
+      sanitizeAlarmInput('alarm1-input', -50, 100);
+      sanitizeAlarmInput('alarm2-input', -50, 100);
+      sanitizeAlarmInput('alarmDelta-input', 0, 50);
+      renderData();
+    }
+
     function toggleInvert() {
       isInverted = !isInverted;
       const btn = document.getElementById('btn-invert');
 
       if (isInverted) {
-        // Estado Invertido: Color Naranja / Ámbar llamativo
         btn.className = "p-2 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/60 transition-all shadow-md active:scale-90 ring-2 ring-amber-500/30";
       } else {
-        // Estado Normal: Color Azul
         btn.className = "p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition-all shadow-md active:scale-90";
       }
 
@@ -221,10 +245,7 @@
       const raw2 = row.temp2;
       const s1 = isInverted ? raw2 : raw1;
       const s2 = isInverted ? raw1 : raw2;
-      
-      // Diferencial siempre positivo (Valor absoluto)
       const delta = (s1 !== null && s2 !== null) ? Math.abs(s1 - s2) : null;
-      
       const bateria = row.bateria !== undefined && row.bateria !== null ? row.bateria : null;
       const wifi = row.wifi || row.ssid || null;
 
@@ -236,21 +257,24 @@
 
       const s1Val = processedRow.s1;
       const s2Val = processedRow.s2;
+      const deltaVal = processedRow.delta;
 
-      document.getElementById('temp1-val').textContent = s1Val !== null ? `${s1Val.toFixed(2)} °C` : "DESC";
-      document.getElementById('temp2-val').textContent = s2Val !== null ? `${s2Val.toFixed(2)} °C` : "DESC";
-      document.getElementById('delta-val').textContent = processedRow.delta !== null ? `${processedRow.delta.toFixed(2)} °C` : "--.- °C";
+      const temp1El = document.getElementById('temp1-val');
+      const temp2El = document.getElementById('temp2-val');
+      const deltaEl = document.getElementById('delta-val');
+
+      temp1El.textContent = s1Val !== null ? `${s1Val.toFixed(2)} °C` : "DESC";
+      temp2El.textContent = s2Val !== null ? `${s2Val.toFixed(2)} °C` : "DESC";
+      deltaEl.textContent = deltaVal !== null ? `${deltaVal.toFixed(2)} °C` : "--.- °C";
       
       const formattedTime = new Date(processedRow.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       document.getElementById('temp1-time').textContent = `Lectura: ${formattedTime}`;
       document.getElementById('temp2-time').textContent = `Lectura: ${formattedTime}`;
 
-      // Nombre de Red Wifi
       if (processedRow.wifi) {
         document.getElementById('wifi-val').textContent = `Wifi: "${processedRow.wifi}"`;
       }
 
-      // Batería
       if (processedRow.bateria !== null) {
         const bat = Math.max(0, Math.min(100, processedRow.bateria));
         const bar = document.getElementById('bat-bar');
@@ -262,27 +286,33 @@
         else bar.className = "bg-rose-500 h-full transition-all duration-500";
       }
 
-      // Control de Alertas por Temperatura Máxima
-      const alarm1 = parseFloat(document.getElementById('alarm1-input').value) || 999;
-      const alarm2 = parseFloat(document.getElementById('alarm2-input').value) || 999;
+      // Evaluación de Alarmas
+      const alarm1 = sanitizeAlarmInput('alarm1-input', -50, 100);
+      const alarm2 = sanitizeAlarmInput('alarm2-input', -50, 100);
+      const alarmDelta = sanitizeAlarmInput('alarmDelta-input', 0, 50);
 
-      const cardS1 = document.getElementById('card-s1');
-      const cardS2 = document.getElementById('card-s2');
-
+      // Alarma Sonda 1
       if (s1Val !== null && s1Val >= alarm1) {
-        cardS1.className = "bg-slate-800 border-2 border-rose-500 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all animate-pulse";
+        temp1El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
       } else {
-        cardS1.className = "bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all";
+        temp1El.className = "text-2xl font-extrabold text-sky-400 mt-0.5 transition-colors";
       }
 
+      // Alarma Sonda 2
       if (s2Val !== null && s2Val >= alarm2) {
-        cardS2.className = "bg-slate-800 border-2 border-rose-500 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all animate-pulse";
+        temp2El.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
       } else {
-        cardS2.className = "bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all";
+        temp2El.className = "text-2xl font-extrabold text-rose-400 mt-0.5 transition-colors";
+      }
+
+      // Alarma Diferencial (ΔT)
+      if (deltaVal !== null && deltaVal >= alarmDelta) {
+        deltaEl.className = "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5 transition-colors";
+      } else {
+        deltaEl.className = "text-2xl font-extrabold text-amber-400 mt-0.5 transition-colors";
       }
     }
 
-    // Cálculo y renderizado de Mínimos/Máximos y Gráfica
     function renderData() {
       tempChart.data.labels = [];
       tempChart.data.datasets[0].data = [];
@@ -303,7 +333,6 @@
         if (p.s2 !== null && p.s2 !== undefined) s2Vals.push(p.s2);
       });
 
-      // Actualizar Mín/Máx Sonda 1
       if (s1Vals.length > 0) {
         document.getElementById('s1-min').textContent = Math.min(...s1Vals).toFixed(1);
         document.getElementById('s1-max').textContent = Math.max(...s1Vals).toFixed(1);
@@ -312,7 +341,6 @@
         document.getElementById('s1-max').textContent = "--.-";
       }
 
-      // Actualizar Mín/Máx Sonda 2
       if (s2Vals.length > 0) {
         document.getElementById('s2-min').textContent = Math.min(...s2Vals).toFixed(1);
         document.getElementById('s2-max').textContent = Math.max(...s2Vals).toFixed(1);
