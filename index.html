@@ -300,7 +300,7 @@
       return { ...row, s1, s2, delta, bateria, wifi };
     }
 
-    function updateCards(processedRow) {
+function updateCards(processedRow) {
   if (!processedRow) return;
 
   const now = new Date().getTime();
@@ -308,36 +308,21 @@
   const diffSeconds = (now - lastReadingTime) / 1000;
   const badge = document.getElementById('status-badge');
 
-  // Si pasaron más de 30 segundos sin datos nuevos (en modo En Vivo)
-  if (isLive && diffSeconds > 30) {
-    badge.textContent = "Wemos Offline";
-    badge.className = "px-2 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse";
+  // 1. Estado del Wemos: Online (Verde) / Offline (Rojo) / Historial (Amarillo)
+  const isWemosOnline = isLive && diffSeconds <= 30;
 
-    const temp1El = document.getElementById('temp1-val');
-    const temp2El = document.getElementById('temp2-val');
-    const deltaEl = document.getElementById('delta-val');
-
-    temp1El.textContent = "OFFLINE";
-    temp1El.className = "text-2xl font-extrabold text-slate-500 mt-0.5";
-
-    temp2El.textContent = "OFFLINE";
-    temp2El.className = "text-2xl font-extrabold text-slate-500 mt-0.5";
-
-    deltaEl.textContent = "--.- °C";
-    deltaEl.className = "text-2xl font-extrabold text-slate-500 mt-0.5";
-
-    const formattedTime = new Date(processedRow.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    document.getElementById('temp1-time').textContent = `Última: ${formattedTime}`;
-    document.getElementById('temp2-time').textContent = `Última: ${formattedTime}`;
-    return;
+  if (isWemosOnline) {
+    badge.textContent = "Online";
+    badge.className = "px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse";
+  } else if (isLive) {
+    badge.textContent = "Offline";
+    badge.className = "px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40";
+  } else {
+    badge.textContent = "Historial";
+    badge.className = "px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40";
   }
 
-  // Si el Wemos está activo (menos de 30s de inactividad)
-  if (isLive) {
-    badge.textContent = "Sistema En Vivo";
-    badge.className = "px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-  }
-
+  // 2. Mantener las últimas mediciones en las tarjetas
   const s1Val = processedRow.s1;
   const s2Val = processedRow.s2;
   const deltaVal = processedRow.delta;
@@ -346,19 +331,22 @@
   const temp2El = document.getElementById('temp2-val');
   const deltaEl = document.getElementById('delta-val');
 
-  temp1El.textContent = s1Val !== null ? `${s1Val.toFixed(2)} °C` : "DESC";
-  temp2El.textContent = s2Val !== null ? `${s2Val.toFixed(2)} °C` : "DESC";
-  deltaEl.textContent = deltaVal !== null ? `${deltaVal.toFixed(2)} °C` : "--.- °C";
+  temp1El.textContent = s1Val !== null ? `${s1Val.toFixed(1)} °C` : "DESC";
+  temp2El.textContent = s2Val !== null ? `${s2Val.toFixed(1)} °C` : "DESC";
+  deltaEl.textContent = deltaVal !== null ? `${deltaVal.toFixed(1)} °C` : "--.- °C";
   
   const formattedTime = new Date(processedRow.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   document.getElementById('temp1-time').textContent = `Lectura: ${formattedTime}`;
   document.getElementById('temp2-time').textContent = `Lectura: ${formattedTime}`;
 
+  // 3. Información de Red Wi-Fi y Batería
   if (processedRow.wifi) {
     document.getElementById('wifi-val').textContent = `Wifi: "${processedRow.wifi}"`;
+  } else {
+    document.getElementById('wifi-val').textContent = `Wifi: "Desconectado"`;
   }
 
-  if (processedRow.bateria !== null) {
+  if (processedRow.bateria !== null && processedRow.bateria !== undefined) {
     const bat = Math.max(0, Math.min(100, processedRow.bateria));
     const bar = document.getElementById('bat-bar');
     document.getElementById('bat-val').textContent = `${bat.toFixed(0)}%`;
@@ -369,7 +357,7 @@
     else bar.className = "bg-rose-500 h-full transition-all duration-500";
   }
 
-  // Evaluación de Alarmas
+  // 4. Evaluación de Alarmas por Umbral
   const alarm1 = sanitizeAlarmInput('alarm1-input', -50, 100);
   const alarm2 = sanitizeAlarmInput('alarm2-input', -50, 100);
   const alarmDelta = sanitizeAlarmInput('alarmDelta-input', 0, 50);
@@ -392,7 +380,6 @@
     deltaEl.className = "text-2xl font-extrabold text-amber-400 mt-0.5 transition-colors";
   }
 }
-
     function renderData() {
       tempChart.data.labels = [];
       tempChart.data.datasets[0].data = [];
@@ -518,8 +505,8 @@
       .subscribe();
 
     fetchWindowData();
-  </script>
-</body>
+
+    </body>
 </html>
 
 // Verificar cada 5 segundos si el dispositivo se ha desconectado
@@ -528,3 +515,5 @@ setInterval(() => {
     updateCards(processRow(rawData[rawData.length - 1]));
   }
 }, 5000);
+
+  </script>
