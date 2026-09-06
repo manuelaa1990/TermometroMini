@@ -11,97 +11,95 @@
   <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
+<body class="bg-slate-900 text-slate-100 min-h-screen p-3 md:p-6">
 
-  <div class="max-w-6xl mx-auto space-y-5">
+  <div class="max-w-md md:max-w-3xl mx-auto space-y-3">
     
-    <!-- Barra Superior: Batería discreta en esquina superior izquierda | Estado a la derecha -->
-    <div class="flex justify-between items-center bg-slate-800/60 border border-slate-700/50 px-4 py-2 rounded-xl text-xs">
-      <!-- BATERÍA (Esquina superior izquierda, bajo perfil) -->
+    <!-- Barra Superior Discreta -->
+    <div class="flex justify-between items-center bg-slate-800/60 border border-slate-700/50 px-3 py-1.5 rounded-xl text-xs">
       <div class="flex items-center gap-2 text-slate-400">
-        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
         </svg>
-        <span class="font-medium text-slate-300" id="bat-val">--%</span>
-        <div class="w-12 bg-slate-700 h-1.5 rounded-full overflow-hidden">
+        <span class="font-medium text-slate-300 text-[11px]" id="bat-val">--%</span>
+        <div class="w-10 bg-slate-700 h-1.5 rounded-full overflow-hidden">
           <div id="bat-bar" class="bg-emerald-500 h-full transition-all duration-500" style="width: 0%"></div>
         </div>
       </div>
 
-      <!-- ESTADO DE CONEXIÓN -->
-      <div id="status-badge" class="px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+      <div id="status-badge" class="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
         Conectando...
       </div>
     </div>
 
     <!-- Título Principal -->
-    <header class="text-center sm:text-left">
-      <h1 class="text-2xl font-bold text-sky-400">Panel de Monitoreo HVAC</h1>
-      <p class="text-xs text-slate-400">Telemetría de temperatura en vivo</p>
+    <header class="text-center py-1">
+      <h1 class="text-xl font-bold text-sky-400">Panel de Monitoreo HVAC</h1>
+      <p class="text-[11px] text-slate-400">Telemetría de temperatura en vivo</p>
     </header>
 
-    <!-- Tarjetas de Lectura con Botón de Invertir (Flechas) en el centro -->
-    <div class="grid grid-cols-1 md:grid-cols-11 gap-3 items-center">
+    <!-- Bloque de Lecturas Estrecho y Centrado -->
+    <div class="space-y-2">
       
       <!-- SONDA 1 -->
-      <div class="md:col-span-3 bg-slate-800 border border-slate-700/60 p-4 rounded-xl shadow-md">
-        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">SONDA 1</div>
-        <div id="temp1-val" class="text-3xl font-extrabold text-sky-400 mt-1">--.- °C</div>
-        <div id="temp1-time" class="text-[10px] text-slate-500 mt-1">Esperando...</div>
+      <div class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">SONDA 1</div>
+        <div id="temp1-val" class="text-2xl font-extrabold text-sky-400 mt-0.5">--.- °C</div>
+        <div id="temp1-time" class="text-[9px] text-slate-500 mt-0.5">Esperando...</div>
       </div>
 
-      <!-- BOTÓN INVERTIR SONDAS (Sólo 2 flechas en el centro) -->
-      <div class="md:col-span-1 flex justify-center py-1 md:py-0">
-        <button onclick="toggleInvert()" title="Invertir Sondas" class="p-3 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition-all shadow-md active:scale-95 hover:scale-110">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+      <!-- BOTÓN INVERTIR (Flechas Verticales en el centro) -->
+      <div class="flex justify-center -my-1">
+        <button onclick="toggleInvert()" title="Invertir Sondas" class="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition-all shadow-md active:scale-90">
+          <!-- SVG Flechas Verticales (Arriba / Abajo) -->
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
           </svg>
         </button>
       </div>
 
       <!-- SONDA 2 -->
-      <div class="md:col-span-3 bg-slate-800 border border-slate-700/60 p-4 rounded-xl shadow-md">
-        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">SONDA 2</div>
-        <div id="temp2-val" class="text-3xl font-extrabold text-emerald-400 mt-1">--.- °C</div>
-        <div id="temp2-time" class="text-[10px] text-slate-500 mt-1">Esperando...</div>
+      <div class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">SONDA 2</div>
+        <div id="temp2-val" class="text-2xl font-extrabold text-emerald-400 mt-0.5">--.- °C</div>
+        <div id="temp2-time" class="text-[9px] text-slate-500 mt-0.5">Esperando...</div>
       </div>
 
       <!-- DIFERENCIAL (ΔT) -->
-      <div class="md:col-span-4 bg-slate-800 border border-slate-700/60 p-4 rounded-xl shadow-md">
-        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">DIFERENCIAL (ΔT)</div>
-        <div id="delta-val" class="text-3xl font-extrabold text-amber-400 mt-1">--.- °C</div>
-        <div class="text-[10px] text-slate-500 mt-1">|SONDA 1 - SONDA 2|</div>
+      <div class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">DIFERENCIAL (ΔT)</div>
+        <div id="delta-val" class="text-2xl font-extrabold text-amber-400 mt-0.5">--.- °C</div>
+        <div class="text-[9px] text-slate-500 mt-0.5">|SONDA 1 - SONDA 2|</div>
       </div>
 
     </div>
 
-    <!-- Navegación por Botones de Ventana de 2 Horas -->
-    <div class="bg-slate-800 border border-slate-700/60 p-3 rounded-xl shadow-md flex flex-col sm:flex-row items-center justify-between gap-3">
-      <button onclick="navigateWindow(-2)" class="w-full sm:w-auto px-4 py-2 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition flex items-center justify-center gap-1.5">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-        2h Anteriores
+    <!-- Navegación Simplificada de Gráfica (Sin horas ni fechas) -->
+    <div class="bg-slate-800 border border-slate-700/60 p-2 rounded-xl shadow-md flex items-center justify-center gap-3">
+      <!-- Botón Atrás -->
+      <button onclick="navigateWindow(-2)" title="Atrás" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition active:scale-95">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
       </button>
 
-      <div class="text-center">
-        <span class="text-[10px] uppercase tracking-wider text-slate-400 block">Ventana Visualizada</span>
-        <span id="window-label" class="text-xs font-mono font-bold text-sky-400">Cargando...</span>
-      </div>
+      <!-- Botón Actual / En Vivo -->
+      <button onclick="goLive()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition flex items-center gap-1.5 active:scale-95">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        Actual
+      </button>
 
-      <div class="flex items-center gap-2 w-full sm:w-auto">
-        <button id="btn-next" onclick="navigateWindow(2)" class="flex-1 sm:flex-none px-4 py-2 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition flex items-center justify-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed">
-          2h Siguientes
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-        </button>
-        <button onclick="goLive()" class="px-3 py-2 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition flex items-center gap-1">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          En Vivo
-        </button>
-      </div>
+      <!-- Botón Adelante -->
+      <button id="btn-next" onclick="navigateWindow(2)" title="Adelante" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+      </button>
     </div>
 
     <!-- Gráfica Histórica Escala -50°C a 100°C -->
-    <div class="bg-slate-800 border border-slate-700/60 p-5 rounded-xl shadow-md">
-      <div class="relative h-80">
+    <div class="bg-slate-800 border border-slate-700/60 p-3 rounded-xl shadow-md">
+      <div class="relative h-64 md:h-80">
         <canvas id="tempChart"></canvas>
       </div>
     </div>
@@ -120,7 +118,7 @@
     let rawData = [];
     let isInverted = false;
 
-    // Chart.js con escala fija de -50 °C a 100 °C
+    // Chart.js con escala de -50 °C a 100 °C
     const ctx = document.getElementById('tempChart').getContext('2d');
     const tempChart = new Chart(ctx, {
       type: 'line',
@@ -134,7 +132,7 @@
             data: [],
             borderWidth: 2,
             tension: 0.2,
-            pointRadius: 1.5,
+            pointRadius: 1,
             fill: true
           },
           {
@@ -144,7 +142,7 @@
             data: [],
             borderWidth: 2,
             tension: 0.2,
-            pointRadius: 1.5,
+            pointRadius: 1,
             fill: true
           }
         ]
@@ -153,17 +151,16 @@
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+          x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#334155' } },
           y: { 
             min: -50,
             max: 100,
-            ticks: { color: '#94a3b8', stepSize: 25 }, 
-            grid: { color: '#334155' },
-            title: { display: true, text: 'Temperatura (°C)', color: '#64748b' }
+            ticks: { color: '#94a3b8', stepSize: 25, font: { size: 10 } }, 
+            grid: { color: '#334155' }
           }
         },
         plugins: {
-          legend: { labels: { color: '#f1f5f9' } }
+          legend: { labels: { color: '#f1f5f9', font: { size: 11 } } }
         }
       }
     });
@@ -191,11 +188,11 @@
       document.getElementById('temp2-val').textContent = processedRow.s2 !== null ? `${processedRow.s2.toFixed(2)} °C` : "DESC";
       document.getElementById('delta-val').textContent = processedRow.delta !== null ? `${processedRow.delta.toFixed(2)} °C` : "--.- °C";
       
-      const formattedTime = new Date(processedRow.created_at).toLocaleTimeString();
+      const formattedTime = new Date(processedRow.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       document.getElementById('temp1-time').textContent = `Lectura: ${formattedTime}`;
       document.getElementById('temp2-time').textContent = `Lectura: ${formattedTime}`;
 
-      // Actualizar Batería discreta en top-left
+      // Actualizar Batería
       if (processedRow.bateria !== null) {
         const bat = Math.max(0, Math.min(100, processedRow.bateria));
         const bar = document.getElementById('bat-bar');
@@ -215,7 +212,7 @@
 
       rawData.forEach(row => {
         const p = processRow(row);
-        const timeLabel = new Date(p.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const timeLabel = new Date(p.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
         tempChart.data.labels.push(timeLabel);
         tempChart.data.datasets[0].data.push(p.s1);
@@ -229,7 +226,6 @@
       }
     }
 
-    // Consulta de ventana de 2 horas
     async function fetchWindowData() {
       if (isLive) {
         windowEndTime = new Date();
@@ -237,14 +233,7 @@
 
       const windowStartTime = new Date(windowEndTime.getTime() - TWO_HOURS_MS);
 
-      // Formato para la etiqueta textual del rango
-      const fmtOptions = { hour: '2-digit', minute: '2-digit' };
-      const startStr = windowStartTime.toLocaleTimeString([], fmtOptions);
-      const endStr = windowEndTime.toLocaleTimeString([], fmtOptions);
-      const dateStr = windowStartTime.toLocaleDateString([], { month: 'short', day: 'numeric' });
-      document.getElementById('window-label').textContent = `${dateStr} | ${startStr} - ${endStr}`;
-
-      // Deshabilitar botón "Siguiente" si estamos en el presente
+      // Deshabilitar botón "Adelante" si estamos en el presente
       const btnNext = document.getElementById('btn-next');
       btnNext.disabled = (windowEndTime >= new Date());
 
@@ -266,10 +255,10 @@
       const badge = document.getElementById('status-badge');
       if (isLive) {
         badge.textContent = "Sistema En Vivo";
-        badge.className = "px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+        badge.className = "px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
       } else {
         badge.textContent = "Navegando Historial";
-        badge.className = "px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20";
+        badge.className = "px-2 py-0.5 text-[10px] font-semibold rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20";
       }
     }
 
@@ -277,7 +266,6 @@
       isLive = false;
       windowEndTime = new Date(windowEndTime.getTime() + (hoursOffset * 60 * 60 * 1000));
       
-      // Si se avanza más allá del momento actual, volver a Live
       if (windowEndTime >= new Date()) {
         goLive();
         return;
@@ -292,13 +280,12 @@
       fetchWindowData();
     }
 
-    // Suscripción Realtime para nuevas lecturas
+    // Suscripción Realtime
     supabaseClient
       .channel('schema-db-changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lecturas_temperatura' }, payload => {
         if (isLive) {
           rawData.push(payload.new);
-          // Mantener sólo las lecturas de las últimas 2 horas
           const cutoff = new Date(Date.now() - TWO_HOURS_MS).toISOString();
           rawData = rawData.filter(r => r.created_at >= cutoff);
           renderData();
