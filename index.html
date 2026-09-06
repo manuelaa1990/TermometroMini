@@ -56,7 +56,10 @@
       <!-- SONDA 1 (Azul) -->
       <div id="card-s1" class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all">
         <div class="flex justify-between items-center text-[10px] font-bold text-sky-400 uppercase tracking-wider px-1">
-          <span>SONDA 1</span>
+          <div class="flex items-center gap-1.5">
+            <input type="checkbox" id="chk-s1" checked onchange="updateChartVisibility()" class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0 cursor-pointer" title="Mostrar/Ocultar en Gráfica">
+            <span>SONDA 1</span>
+          </div>
           <div class="flex items-center gap-1 text-[9px] text-slate-400">
             <span>Alarma Max:</span>
             <input type="number" id="alarm1-input" value="40" min="-50" max="100" onchange="validateAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-sky-400 text-center rounded focus:outline-none py-0.5">
@@ -85,7 +88,10 @@
       <!-- SONDA 2 (Rojo) -->
       <div id="card-s2" class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all">
         <div class="flex justify-between items-center text-[10px] font-bold text-rose-400 uppercase tracking-wider px-1">
-          <span>SONDA 2</span>
+          <div class="flex items-center gap-1.5">
+            <input type="checkbox" id="chk-s2" checked onchange="updateChartVisibility()" class="rounded bg-slate-900 border-slate-700 text-rose-500 focus:ring-0 cursor-pointer" title="Mostrar/Ocultar en Gráfica">
+            <span>SONDA 2</span>
+          </div>
           <div class="flex items-center gap-1 text-[9px] text-slate-400">
             <span>Alarma Max:</span>
             <input type="number" id="alarm2-input" value="40" min="-50" max="100" onchange="validateAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-rose-400 text-center rounded focus:outline-none py-0.5">
@@ -102,10 +108,13 @@
         <div id="temp2-time" class="text-[9px] text-slate-500 mt-0.5">Esperando...</div>
       </div>
 
-      <!-- DIFERENCIAL (ΔT) con Alarma Limitada a 0 - 50 °C -->
+      <!-- DIFERENCIAL (ΔT) -->
       <div class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center">
         <div class="flex justify-between items-center text-[10px] font-bold text-amber-400 uppercase tracking-wider px-1">
-          <span>DIFERENCIAL (ΔT)</span>
+          <div class="flex items-center gap-1.5">
+            <input type="checkbox" id="chk-delta" checked onchange="updateChartVisibility()" class="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0 cursor-pointer" title="Mostrar/Ocultar en Gráfica">
+            <span>DIFERENCIAL (ΔT)</span>
+          </div>
           <div class="flex items-center gap-1 text-[9px] text-slate-400">
             <span>Alarma Max:</span>
             <input type="number" id="alarmDelta-input" value="10" min="0" max="50" onchange="validateAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-amber-400 text-center rounded focus:outline-none py-0.5">
@@ -113,6 +122,12 @@
           </div>
         </div>
         <div id="delta-val" class="text-2xl font-extrabold text-amber-400 mt-0.5 transition-colors">--.- °C</div>
+        
+        <!-- Mínimo y Máximo Diferencial -->
+        <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-1">
+          <span>Mín: <strong id="delta-min" class="text-slate-200">--.-</strong> °C</span>
+          <span>Máx: <strong id="delta-max" class="text-slate-200">--.-</strong> °C</span>
+        </div>
         <div class="text-[9px] text-slate-500 mt-0.5">|SONDA 1 - SONDA 2|</div>
       </div>
 
@@ -159,7 +174,7 @@
     let rawData = [];
     let isInverted = false;
 
-    // Configuración Chart.js
+    // Configuración Chart.js con 3 Datasets
     const ctx = document.getElementById('tempChart').getContext('2d');
     const tempChart = new Chart(ctx, {
       type: 'line',
@@ -185,6 +200,16 @@
             tension: 0.2,
             pointRadius: 1,
             fill: true
+          },
+          {
+            label: 'DIFERENCIAL ΔT (°C)',
+            borderColor: '#fbbf24',
+            backgroundColor: 'rgba(251, 191, 36, 0.05)',
+            data: [],
+            borderWidth: 2,
+            tension: 0.2,
+            pointRadius: 1,
+            fill: true
           }
         ]
       },
@@ -205,6 +230,18 @@
         }
       }
     });
+
+    // Control de Visibilidad de Trazos en la Gráfica
+    function updateChartVisibility() {
+      const s1Vis = document.getElementById('chk-s1').checked;
+      const s2Vis = document.getElementById('chk-s2').checked;
+      const deltaVis = document.getElementById('chk-delta').checked;
+
+      tempChart.setDatasetVisibility(0, s1Vis);
+      tempChart.setDatasetVisibility(1, s2Vis);
+      tempChart.setDatasetVisibility(2, deltaVis);
+      tempChart.update();
+    }
 
     // Validar y limitar rangos dinámicamente
     function sanitizeAlarmInput(inputId, minVal, maxVal) {
@@ -317,9 +354,11 @@
       tempChart.data.labels = [];
       tempChart.data.datasets[0].data = [];
       tempChart.data.datasets[1].data = [];
+      tempChart.data.datasets[2].data = [];
 
       let s1Vals = [];
       let s2Vals = [];
+      let deltaVals = [];
 
       rawData.forEach(row => {
         const p = processRow(row);
@@ -328,11 +367,14 @@
         tempChart.data.labels.push(timeLabel);
         tempChart.data.datasets[0].data.push(p.s1);
         tempChart.data.datasets[1].data.push(p.s2);
+        tempChart.data.datasets[2].data.push(p.delta);
 
         if (p.s1 !== null && p.s1 !== undefined) s1Vals.push(p.s1);
         if (p.s2 !== null && p.s2 !== undefined) s2Vals.push(p.s2);
+        if (p.delta !== null && p.delta !== undefined) deltaVals.push(p.delta);
       });
 
+      // Mínimos y Máximos Sonda 1
       if (s1Vals.length > 0) {
         document.getElementById('s1-min').textContent = Math.min(...s1Vals).toFixed(1);
         document.getElementById('s1-max').textContent = Math.max(...s1Vals).toFixed(1);
@@ -341,6 +383,7 @@
         document.getElementById('s1-max').textContent = "--.-";
       }
 
+      // Mínimos y Máximos Sonda 2
       if (s2Vals.length > 0) {
         document.getElementById('s2-min').textContent = Math.min(...s2Vals).toFixed(1);
         document.getElementById('s2-max').textContent = Math.max(...s2Vals).toFixed(1);
@@ -349,7 +392,16 @@
         document.getElementById('s2-max').textContent = "--.-";
       }
 
-      tempChart.update();
+      // Mínimos y Máximos Diferencial (ΔT)
+      if (deltaVals.length > 0) {
+        document.getElementById('delta-min').textContent = Math.min(...deltaVals).toFixed(1);
+        document.getElementById('delta-max').textContent = Math.max(...deltaVals).toFixed(1);
+      } else {
+        document.getElementById('delta-min').textContent = "--.-";
+        document.getElementById('delta-max').textContent = "--.-";
+      }
+
+      updateChartVisibility();
 
       if (rawData.length > 0) {
         updateCards(processRow(rawData[rawData.length - 1]));
