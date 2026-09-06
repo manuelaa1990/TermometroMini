@@ -1,286 +1,158 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>HVAC Cloud Monitor</title>
-
-  <!-- Cargar librería de Supabase -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<script>
-  const SUPABASE_URL = 'https://tu-proyecto.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // Es seguro poner la anonKey aquí
-
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  // Ejemplo de consulta para traer los últimos datos
-  async function obtenerDatos() {
-    const { data, error } = await supabase
-      .from('lecturas_termometro') // Nombre de tu tabla
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (error) {
-      console.error('Error al consultar Supabase:', error);
-    } else {
-      console.log('Datos recibidos:', data);
-    }
-  }
-
-  obtenerDatos();
-</script>
-  
-  <!-- SDK Telegram & Chart.js -->
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telemetría HVAC - Monitor en Tiempo Real</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <style>
-    :root {
-      --bg-color: var(--tg-theme-bg-color, #f8fafc);
-      --text-color: var(--tg-theme-text-color, #0f172a);
-      --card-bg: var(--tg-theme-secondary-bg-color, #ffffff);
-      --hint-color: var(--tg-theme-hint-color, #64748b);
-      --button-color: var(--tg-theme-button-color, #2563eb);
-      --button-text: var(--tg-theme-button-text-color, #ffffff);
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-color);
-      padding: 12px;
-      text-align: center;
-    }
-
-    .container { max-width: 500px; margin: 0 auto; }
-    
-    .card {
-      background: var(--card-bg);
-      padding: 16px;
-      border-radius: 16px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-      margin-bottom: 12px;
-      border: 1px solid rgba(0,0,0,0.05);
-    }
-
-    .status-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--hint-color);
-    }
-
-    .status-item { display: flex; align-items: center; gap: 4px; }
-
-    .temp-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin: 12px 0;
-    }
-
-    .temp-box {
-      background: rgba(0,0,0,0.03);
-      border-radius: 12px;
-      padding: 12px;
-    }
-
-    .temp-label { font-size: 12px; color: var(--hint-color); font-weight: 600; margin-bottom: 4px; }
-    .temp-val { font-size: 26px; font-weight: 800; }
-    .s1-color { color: #dc2626; }
-    .s2-color { color: #2563eb; }
-
-    .dt-box {
-      font-size: 20px;
-      font-weight: 800;
-      color: #059669;
-      padding: 12px;
-      border-radius: 12px;
-      background: rgba(5, 150, 105, 0.1);
-      margin-bottom: 12px;
-    }
-    
-    .dt-alert {
-      color: #ffffff !important;
-      background-color: #dc2626 !important;
-    }
-
-    .btn-group { display: flex; gap: 8px; justify-content: center; }
-    .btn {
-      flex: 1;
-      background-color: var(--button-color);
-      color: var(--button-text);
-      border: none;
-      padding: 12px;
-      font-size: 13px;
-      font-weight: 600;
-      border-radius: 10px;
-      cursor: pointer;
-    }
-
-    .btn-swap { background-color: #7c3aed; }
-
-    .chart-container {
-      position: relative;
-      height: 280px;
-      width: 100%;
-      background: var(--card-bg);
-      padding: 12px;
-      border-radius: 16px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-      border: 1px solid rgba(0,0,0,0.05);
-    }
-
-    .time-tag {
-      font-size: 11px;
-      color: var(--hint-color);
-      margin-top: 6px;
-    }
-  </style>
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8">
 
-  <div class="container">
-    <!-- Estado General -->
-    <div class="card">
-      <div class="status-bar">
-        <div class="status-item">
-          <span>📶 Red:</span> <span id="wifi-ssid">Cargando...</span>
-        </div>
-        <div class="status-item">
-          <span>🔋 Batería:</span> <span id="bat-val">--</span>%
-        </div>
+  <div class="max-w-5xl mx-auto space-y-6">
+    <!-- Encabezado -->
+    <header class="flex justify-between items-center border-b border-slate-800 pb-4">
+      <div>
+        <h1 class="text-2xl font-bold text-sky-400">Panel de Monitoreo HVAC</h1>
+        <p class="text-sm text-slate-400">Sistema de telemetría de temperatura en tiempo real</p>
       </div>
-      <div class="time-tag">🕒 Última lectura: <span id="last-update">--</span></div>
-    </div>
+      <div id="status-badge" class="px-3 py-1 text-xs font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+        Conectando...
+      </div>
+    </header>
 
-    <!-- Panel de Lecturas -->
-    <div class="card">
-      <div class="temp-grid">
-        <div class="temp-box">
-          <div class="temp-label">SONDA 1 (Entrada)</div>
-          <div class="temp-val s1-color"><span id="s1">--</span> °C</div>
-        </div>
-        <div class="temp-box">
-          <div class="temp-label">SONDA 2 (Salida)</div>
-          <div class="temp-val s2-color"><span id="s2">--</span> °C</div>
-        </div>
+    <!-- Tarjetas de Lectura Actual -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="bg-slate-800 border border-slate-700/60 p-5 rounded-xl shadow-lg">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Sonda 1 (Temp 1)</div>
+        <div id="temp1-val" class="text-4xl font-extrabold text-sky-400 mt-2">--.- °C</div>
+        <div id="temp1-time" class="text-xs text-slate-500 mt-1">Esperando datos...</div>
       </div>
 
-      <div id="dt-box" class="dt-box">
-        &Delta;T: <span id="dt">--</span> &deg;C <span id="alert-tag"></span>
-      </div>
-
-      <div class="btn-group">
-        <button class="btn btn-swap" onclick="toggleInvertirSondas()">🔄 Invertir Sondas</button>
-        <button class="btn" onclick="fetchDataFromCloud()">🔄 Actualizar</button>
+      <div class="bg-slate-800 border border-slate-700/60 p-5 rounded-xl shadow-lg">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Sonda 2 (Temp 2)</div>
+        <div id="temp2-val" class="text-4xl font-extrabold text-emerald-400 mt-2">--.- °C</div>
+        <div id="temp2-time" class="text-xs text-slate-500 mt-1">Esperando datos...</div>
       </div>
     </div>
 
     <!-- Gráfica Histórica -->
-    <div class="chart-container">
-      <canvas id="tempChart"></canvas>
+    <div class="bg-slate-800 border border-slate-700/60 p-5 rounded-xl shadow-lg">
+      <h2 class="text-sm font-medium text-slate-300 mb-4">Historial Reciente (Últimas 20 lecturas)</h2>
+      <div class="relative h-72">
+        <canvas id="tempChart"></canvas>
+      </div>
     </div>
   </div>
 
   <script>
-    // Inicializar Telegram WebApp
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
-
-    // CREDENCIALES INTEGRADAS
     const SUPABASE_URL = "https://ovaqbqkahttkmmtlmxha.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92YXFicWthaHR0a21tdGxteGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2NDYxOTMsImV4cCI6MjEwNDIyMjE5M30.PpXfbHxW1-4ArrKuod0LLh8TZbjLO091r4DwkMNs3m8";
 
-    let sondasInvertidas = false;
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    function toggleInvertirSondas() {
-      sondasInvertidas = !sondasInvertidas;
-      if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-      fetchDataFromCloud();
-    }
-
-    // Configuración de Gráfica Chart.js
+    // Inicialización de la gráfica
     const ctx = document.getElementById('tempChart').getContext('2d');
-    const chart = new Chart(ctx, {
+    const tempChart = new Chart(ctx, {
       type: 'line',
       data: {
         labels: [],
         datasets: [
-          { label: 'Sonda 1 (°C)', borderColor: '#dc2626', data: [], fill: false, tension: 0.3 },
-          { label: 'Sonda 2 (°C)', borderColor: '#2563eb', data: [], fill: false, tension: 0.3 }
+          {
+            label: 'Temp 1 (°C)',
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+            data: [],
+            borderWidth: 2,
+            tension: 0.3,
+            fill: true
+          },
+          {
+            label: 'Temp 2 (°C)',
+            borderColor: '#34d399',
+            backgroundColor: 'rgba(52, 211, 153, 0.1)',
+            data: [],
+            borderWidth: 2,
+            tension: 0.3,
+            fill: true
+          }
         ]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        scales: { y: { suggestedMin: 0, suggestedMax: 40 } }
+        scales: {
+          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+        },
+        plugins: {
+          legend: { labels: { color: '#f1f5f9' } }
+        }
       }
     });
 
-    // Consultar datos de Supabase desde cualquier lugar
-    function fetchDataFromCloud() {
-      const endpoint = `${SUPABASE_URL}/rest/v1/lecturas?select=*&order=created_at.desc&limit=20`;
+    // Cargar historial inicial
+    async function fetchInitialData() {
+      const { data, error } = await supabaseClient
+        .from('lecturas_temperatura')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
 
-      fetch(endpoint, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
-      })
-      .then(res => res.json())
-      .then(rows => {
-        if (!rows || rows.length === 0) return;
+      if (error) {
+        console.error('Error al obtener datos:', error);
+        return;
+      }
 
-        const latest = rows[0];
-
-        let valS1 = sondasInvertidas ? latest.t2 : latest.t1;
-        let valS2 = sondasInvertidas ? latest.t1 : latest.t2;
-
-        document.getElementById('s1').innerText = valS1 ?? '--';
-        document.getElementById('s2').innerText = valS2 ?? '--';
-        document.getElementById('dt').innerText = latest.dt ?? '--';
-        document.getElementById('wifi-ssid').innerText = latest.ssid || 'Online';
-        document.getElementById('bat-val').innerText = latest.bat ?? '--';
-
-        if (latest.created_at) {
-          const d = new Date(latest.created_at);
-          document.getElementById('last-update').innerText = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
-        }
-
-        // Alerta Delta T
-        const dtBox = document.getElementById('dt-box');
-        if (latest.dt >= 20.0) {
-          dtBox.className = "dt-box dt-alert";
-          document.getElementById('alert-tag').innerText = " (ALTO)";
-        } else {
-          dtBox.className = "dt-box";
-          document.getElementById('alert-tag').innerText = "";
-        }
-
-        // Cargar historial en la gráfica
-        const history = [...rows].reverse();
-        const labels = history.map(r => new Date(r.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
-        const h1 = history.map(r => sondasInvertidas ? r.t2 : r.t1);
-        const h2 = history.map(r => sondasInvertidas ? r.t1 : r.t2);
-
-        chart.data.labels = labels;
-        chart.data.datasets[0].data = h1;
-        chart.data.datasets[1].data = h2;
-        chart.update();
-      })
-      .catch(err => console.error("Error conectando a Supabase:", err));
+      if (data && data.length > 0) {
+        const reversed = data.reverse();
+        reversed.forEach(row => addRowToChart(row));
+        updateCards(reversed[reversed.length - 1]);
+      }
+      
+      const badge = document.getElementById('status-badge');
+      badge.textContent = "Sistema En Vivo";
+      badge.className = "px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
     }
 
-    // Auto-consultar datos cada 10 segundos
-    setInterval(fetchDataFromCloud, 10000);
-    fetchDataFromCloud();
+    function addRowToChart(row) {
+      const timeLabel = new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      
+      tempChart.data.labels.push(timeLabel);
+      tempChart.data.datasets[0].data.push(row.temp1);
+      tempChart.data.datasets[1].data.push(row.temp2);
+
+      if (tempChart.data.labels.length > 20) {
+        tempChart.data.labels.shift();
+        tempChart.data.datasets[0].data.shift();
+        tempChart.data.datasets[1].data.shift();
+      }
+      tempChart.update();
+    }
+
+    function updateCards(row) {
+      document.getElementById('temp1-val').textContent = row.temp1 !== null ? `${row.temp1.toFixed(2)} °C` : "DESC";
+      document.getElementById('temp2-val').textContent = row.temp2 !== null ? `${row.temp2.toFixed(2)} °C` : "DESC";
+      
+      const formattedTime = new Date(row.created_at).toLocaleString();
+      document.getElementById('temp1-time').textContent = `Última lectura: ${formattedTime}`;
+      document.getElementById('temp2-time').textContent = `Última lectura: ${formattedTime}`;
+    }
+
+    // Suscripción Realtime a inserciones en tiempo real
+    supabaseClient
+      .channel('schema-db-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lecturas_temperatura' }, payload => {
+        addRowToChart(payload.new);
+        updateCards(payload.new);
+      })
+      .subscribe();
+
+    fetchInitialData();
   </script>
 </body>
 </html>
