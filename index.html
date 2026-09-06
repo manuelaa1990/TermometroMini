@@ -11,102 +11,101 @@
   <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8">
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
 
-  <div class="max-w-6xl mx-auto space-y-6">
-    <!-- Encabezado y Controles Principales -->
-    <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-4">
-      <div>
-        <h1 class="text-2xl font-bold text-sky-400">Panel de Monitoreo HVAC</h1>
-        <p class="text-sm text-slate-400">Sistema de telemetría de temperatura en tiempo real</p>
-      </div>
-      
-      <div class="flex flex-wrap items-center gap-3">
-        <!-- Botón para invertir sondas -->
-        <button id="btn-invert" onclick="toggleInvert()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
-          <span id="invert-label">Sondas: Normales</span>
-        </button>
-
-        <!-- Insignia de Estado -->
-        <div id="status-badge" class="px-3 py-1.5 text-xs font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-          Conectando...
+  <div class="max-w-6xl mx-auto space-y-5">
+    
+    <!-- Barra Superior: Batería discreta en esquina superior izquierda | Estado a la derecha -->
+    <div class="flex justify-between items-center bg-slate-800/60 border border-slate-700/50 px-4 py-2 rounded-xl text-xs">
+      <!-- BATERÍA (Esquina superior izquierda, bajo perfil) -->
+      <div class="flex items-center gap-2 text-slate-400">
+        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        <span class="font-medium text-slate-300" id="bat-val">--%</span>
+        <div class="w-12 bg-slate-700 h-1.5 rounded-full overflow-hidden">
+          <div id="bat-bar" class="bg-emerald-500 h-full transition-all duration-500" style="width: 0%"></div>
         </div>
       </div>
+
+      <!-- ESTADO DE CONEXIÓN -->
+      <div id="status-badge" class="px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+        Conectando...
+      </div>
+    </div>
+
+    <!-- Título Principal -->
+    <header class="text-center sm:text-left">
+      <h1 class="text-2xl font-bold text-sky-400">Panel de Monitoreo HVAC</h1>
+      <p class="text-xs text-slate-400">Telemetría de temperatura en vivo</p>
     </header>
 
-    <!-- Tarjetas de Lectura Actual -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Tarjetas de Lectura con Botón de Invertir (Flechas) en el centro -->
+    <div class="grid grid-cols-1 md:grid-cols-11 gap-3 items-center">
       
       <!-- SONDA 1 -->
-      <div class="bg-slate-800 border border-slate-700/60 p-5 rounded-xl shadow-lg">
-        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">SONDA 1</div>
-        <div id="temp1-val" class="text-3xl font-extrabold text-sky-400 mt-2">--.- °C</div>
-        <div id="temp1-time" class="text-[10px] text-slate-500 mt-2">Esperando datos...</div>
+      <div class="md:col-span-3 bg-slate-800 border border-slate-700/60 p-4 rounded-xl shadow-md">
+        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">SONDA 1</div>
+        <div id="temp1-val" class="text-3xl font-extrabold text-sky-400 mt-1">--.- °C</div>
+        <div id="temp1-time" class="text-[10px] text-slate-500 mt-1">Esperando...</div>
+      </div>
+
+      <!-- BOTÓN INVERTIR SONDAS (Sólo 2 flechas en el centro) -->
+      <div class="md:col-span-1 flex justify-center py-1 md:py-0">
+        <button onclick="toggleInvert()" title="Invertir Sondas" class="p-3 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition-all shadow-md active:scale-95 hover:scale-110">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+          </svg>
+        </button>
       </div>
 
       <!-- SONDA 2 -->
-      <div class="bg-slate-800 border border-slate-700/60 p-5 rounded-xl shadow-lg">
-        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">SONDA 2</div>
-        <div id="temp2-val" class="text-3xl font-extrabold text-emerald-400 mt-2">--.- °C</div>
-        <div id="temp2-time" class="text-[10px] text-slate-500 mt-2">Esperando datos...</div>
+      <div class="md:col-span-3 bg-slate-800 border border-slate-700/60 p-4 rounded-xl shadow-md">
+        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">SONDA 2</div>
+        <div id="temp2-val" class="text-3xl font-extrabold text-emerald-400 mt-1">--.- °C</div>
+        <div id="temp2-time" class="text-[10px] text-slate-500 mt-1">Esperando...</div>
       </div>
 
-      <!-- DIFERENCIAL DE TEMPERATURA -->
-      <div class="bg-slate-800 border border-slate-700/60 p-5 rounded-xl shadow-lg">
-        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">DIFERENCIAL (ΔT)</div>
-        <div id="delta-val" class="text-3xl font-extrabold text-amber-400 mt-2">--.- °C</div>
-        <div class="text-[10px] text-slate-500 mt-2">|SONDA 1 - SONDA 2|</div>
-      </div>
-
-      <!-- BATERÍA PIN A0 -->
-      <div class="bg-slate-800 border border-slate-700/60 p-5 rounded-xl shadow-lg flex flex-col justify-between">
-        <div>
-          <div class="flex justify-between items-center">
-            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">BATERÍA (A0)</span>
-            <span id="bat-val" class="text-sm font-bold text-slate-200">--%</span>
-          </div>
-          <div class="w-full bg-slate-700 rounded-full h-3.5 mt-3 overflow-hidden border border-slate-600">
-            <div id="bat-bar" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
-          </div>
-        </div>
-        <div id="bat-voltage" class="text-[10px] text-slate-500 mt-2">Nivel de carga del equipo</div>
+      <!-- DIFERENCIAL (ΔT) -->
+      <div class="md:col-span-4 bg-slate-800 border border-slate-700/60 p-4 rounded-xl shadow-md">
+        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">DIFERENCIAL (ΔT)</div>
+        <div id="delta-val" class="text-3xl font-extrabold text-amber-400 mt-1">--.- °C</div>
+        <div class="text-[10px] text-slate-500 mt-1">|SONDA 1 - SONDA 2|</div>
       </div>
 
     </div>
 
-    <!-- Filtro de Búsqueda de Historial -->
-    <div class="bg-slate-800 border border-slate-700/60 p-4 rounded-xl shadow-lg">
-      <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-        <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider">Consulta de Historial</h2>
-        
-        <div class="flex flex-wrap items-center gap-3">
-          <div class="flex items-center gap-2">
-            <label class="text-xs text-slate-400">Desde:</label>
-            <input type="datetime-local" id="start-date" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-lg p-2 focus:ring-1 focus:ring-sky-500 outline-none">
-          </div>
-          
-          <div class="flex items-center gap-2">
-            <label class="text-xs text-slate-400">Hasta:</label>
-            <input type="datetime-local" id="end-date" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-lg p-2 focus:ring-1 focus:ring-sky-500 outline-none">
-          </div>
+    <!-- Navegación por Botones de Ventana de 2 Horas -->
+    <div class="bg-slate-800 border border-slate-700/60 p-3 rounded-xl shadow-md flex flex-col sm:flex-row items-center justify-between gap-3">
+      <button onclick="navigateWindow(-2)" class="w-full sm:w-auto px-4 py-2 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition flex items-center justify-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        2h Anteriores
+      </button>
 
-          <button onclick="filterHistory()" class="px-3 py-2 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition">
-            Buscar
-          </button>
-          <button onclick="loadDefaultTwoHours()" class="px-3 py-2 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition">
-            Últimas 2h
-          </button>
-        </div>
+      <div class="text-center">
+        <span class="text-[10px] uppercase tracking-wider text-slate-400 block">Ventana Visualizada</span>
+        <span id="window-label" class="text-xs font-mono font-bold text-sky-400">Cargando...</span>
+      </div>
+
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <button id="btn-next" onclick="navigateWindow(2)" class="flex-1 sm:flex-none px-4 py-2 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition flex items-center justify-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed">
+          2h Siguientes
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <button onclick="goLive()" class="px-3 py-2 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          En Vivo
+        </button>
       </div>
     </div>
 
-    <!-- Gráfica Histórica -->
-    <div class="bg-slate-800 border border-slate-700/60 p-5 rounded-xl shadow-lg">
+    <!-- Gráfica Histórica Escala -50°C a 100°C -->
+    <div class="bg-slate-800 border border-slate-700/60 p-5 rounded-xl shadow-md">
       <div class="relative h-80">
         <canvas id="tempChart"></canvas>
       </div>
     </div>
+
   </div>
 
   <script>
@@ -115,10 +114,13 @@
 
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    let windowEndTime = new Date();
+    let isLive = true;
     let rawData = [];
     let isInverted = false;
 
-    // Inicialización de Gráfica con Rango -50°C a 100°C
+    // Chart.js con escala fija de -50 °C a 100 °C
     const ctx = document.getElementById('tempChart').getContext('2d');
     const tempChart = new Chart(ctx, {
       type: 'line',
@@ -132,7 +134,7 @@
             data: [],
             borderWidth: 2,
             tension: 0.2,
-            pointRadius: 1,
+            pointRadius: 1.5,
             fill: true
           },
           {
@@ -142,7 +144,7 @@
             data: [],
             borderWidth: 2,
             tension: 0.2,
-            pointRadius: 1,
+            pointRadius: 1.5,
             fill: true
           }
         ]
@@ -155,7 +157,7 @@
           y: { 
             min: -50,
             max: 100,
-            ticks: { color: '#94a3b8', stepSize: 15 }, 
+            ticks: { color: '#94a3b8', stepSize: 25 }, 
             grid: { color: '#334155' },
             title: { display: true, text: 'Temperatura (°C)', color: '#64748b' }
           }
@@ -168,7 +170,6 @@
 
     function toggleInvert() {
       isInverted = !isInverted;
-      document.getElementById('invert-label').textContent = isInverted ? "Sondas: Invertidas" : "Sondas: Normales";
       renderData();
     }
 
@@ -178,8 +179,6 @@
       const s1 = isInverted ? raw2 : raw1;
       const s2 = isInverted ? raw1 : raw2;
       const delta = (s1 !== null && s2 !== null) ? Math.abs(s1 - s2) : null;
-      
-      // Manejo de lectura de batería si existe la columna "bateria"
       const bateria = row.bateria !== undefined && row.bateria !== null ? row.bateria : null;
 
       return { ...row, s1, s2, delta, bateria };
@@ -192,24 +191,20 @@
       document.getElementById('temp2-val').textContent = processedRow.s2 !== null ? `${processedRow.s2.toFixed(2)} °C` : "DESC";
       document.getElementById('delta-val').textContent = processedRow.delta !== null ? `${processedRow.delta.toFixed(2)} °C` : "--.- °C";
       
-      const formattedTime = new Date(processedRow.created_at).toLocaleString();
-      document.getElementById('temp1-time').textContent = `Última lectura: ${formattedTime}`;
-      document.getElementById('temp2-time').textContent = `Última lectura: ${formattedTime}`;
+      const formattedTime = new Date(processedRow.created_at).toLocaleTimeString();
+      document.getElementById('temp1-time').textContent = `Lectura: ${formattedTime}`;
+      document.getElementById('temp2-time').textContent = `Lectura: ${formattedTime}`;
 
-      // Actualización Barra de Batería (0-100%)
+      // Actualizar Batería discreta en top-left
       if (processedRow.bateria !== null) {
         const bat = Math.max(0, Math.min(100, processedRow.bateria));
         const bar = document.getElementById('bat-bar');
         document.getElementById('bat-val').textContent = `${bat.toFixed(0)}%`;
         bar.style.width = `${bat}%`;
 
-        if (bat > 50) {
-          bar.className = "bg-emerald-500 h-full rounded-full transition-all duration-500";
-        } else if (bat > 20) {
-          bar.className = "bg-amber-500 h-full rounded-full transition-all duration-500";
-        } else {
-          bar.className = "bg-rose-500 h-full rounded-full transition-all duration-500";
-        }
+        if (bat > 50) bar.className = "bg-emerald-500 h-full transition-all duration-500";
+        else if (bat > 20) bar.className = "bg-amber-500 h-full transition-all duration-500";
+        else bar.className = "bg-rose-500 h-full transition-all duration-500";
       }
     }
 
@@ -234,18 +229,34 @@
       }
     }
 
-    // Carga de las últimas 2 horas de datos por defecto
-    async function loadDefaultTwoHours() {
-      const twoHoursAgo = new Date(Date.now() - (2 * 60 * 60 * 1000)).toISOString();
+    // Consulta de ventana de 2 horas
+    async function fetchWindowData() {
+      if (isLive) {
+        windowEndTime = new Date();
+      }
+
+      const windowStartTime = new Date(windowEndTime.getTime() - TWO_HOURS_MS);
+
+      // Formato para la etiqueta textual del rango
+      const fmtOptions = { hour: '2-digit', minute: '2-digit' };
+      const startStr = windowStartTime.toLocaleTimeString([], fmtOptions);
+      const endStr = windowEndTime.toLocaleTimeString([], fmtOptions);
+      const dateStr = windowStartTime.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      document.getElementById('window-label').textContent = `${dateStr} | ${startStr} - ${endStr}`;
+
+      // Deshabilitar botón "Siguiente" si estamos en el presente
+      const btnNext = document.getElementById('btn-next');
+      btnNext.disabled = (windowEndTime >= new Date());
 
       const { data, error } = await supabaseClient
         .from('lecturas_temperatura')
         .select('*')
-        .gte('created_at', twoHoursAgo)
+        .gte('created_at', windowStartTime.toISOString())
+        .lte('created_at', windowEndTime.toISOString())
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.error('Error cargando 2h:', error);
+        console.error('Error al cargar datos:', error);
         return;
       }
 
@@ -253,50 +264,49 @@
       renderData();
 
       const badge = document.getElementById('status-badge');
-      badge.textContent = "Sistema En Vivo";
-      badge.className = "px-3 py-1.5 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+      if (isLive) {
+        badge.textContent = "Sistema En Vivo";
+        badge.className = "px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+      } else {
+        badge.textContent = "Navegando Historial";
+        badge.className = "px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20";
+      }
     }
 
-    // Filtro por rango de fecha personalizado
-    async function filterHistory() {
-      const startVal = document.getElementById('start-date').value;
-      const endVal = document.getElementById('end-date').value;
-
-      if (!startVal || !endVal) {
-        alert("Por favor selecciona ambas fechas (Desde y Hasta).");
+    function navigateWindow(hoursOffset) {
+      isLive = false;
+      windowEndTime = new Date(windowEndTime.getTime() + (hoursOffset * 60 * 60 * 1000));
+      
+      // Si se avanza más allá del momento actual, volver a Live
+      if (windowEndTime >= new Date()) {
+        goLive();
         return;
       }
 
-      const startISO = new Date(startVal).toISOString();
-      const endISO = new Date(endVal).toISOString();
-
-      const { data, error } = await supabaseClient
-        .from('lecturas_temperatura')
-        .select('*')
-        .gte('created_at', startISO)
-        .lte('created_at', endISO)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        console.error('Error buscando historial:', error);
-        return;
-      }
-
-      rawData = data || [];
-      renderData();
+      fetchWindowData();
     }
 
-    // Suscripción Realtime para nuevas inserciones
+    function goLive() {
+      isLive = true;
+      windowEndTime = new Date();
+      fetchWindowData();
+    }
+
+    // Suscripción Realtime para nuevas lecturas
     supabaseClient
       .channel('schema-db-changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lecturas_temperatura' }, payload => {
-        rawData.push(payload.new);
-        if (rawData.length > 720) rawData.shift(); // Mantener buffer
-        renderData();
+        if (isLive) {
+          rawData.push(payload.new);
+          // Mantener sólo las lecturas de las últimas 2 horas
+          const cutoff = new Date(Date.now() - TWO_HOURS_MS).toISOString();
+          rawData = rawData.filter(r => r.created_at >= cutoff);
+          renderData();
+        }
       })
       .subscribe();
 
-    loadDefaultTwoHours();
+    fetchWindowData();
   </script>
 </body>
 </html>
