@@ -13,37 +13,97 @@
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8">
 
-  <div class="max-w-5xl mx-auto space-y-6">
-    <!-- Encabezado -->
-    <header class="flex justify-between items-center border-b border-slate-800 pb-4">
+  <div class="max-w-6xl mx-auto space-y-6">
+    <!-- Encabezado y Controles Principales -->
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-4">
       <div>
         <h1 class="text-2xl font-bold text-sky-400">Panel de Monitoreo HVAC</h1>
         <p class="text-sm text-slate-400">Sistema de telemetría de temperatura en tiempo real</p>
       </div>
-      <div id="status-badge" class="px-3 py-1 text-xs font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-        Conectando...
+      
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- Botón para invertir sondas -->
+        <button id="btn-invert" onclick="toggleInvert()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+          <span id="invert-label">Sondas: Normales</span>
+        </button>
+
+        <!-- Insignia de Estado -->
+        <div id="status-badge" class="px-3 py-1.5 text-xs font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+          Conectando...
+        </div>
       </div>
     </header>
 
     <!-- Tarjetas de Lectura Actual -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- SONDA 1 -->
       <div class="bg-slate-800 border border-slate-700/60 p-5 rounded-xl shadow-lg">
-        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Sonda 1 (Temp 1)</div>
-        <div id="temp1-val" class="text-4xl font-extrabold text-sky-400 mt-2">--.- °C</div>
-        <div id="temp1-time" class="text-xs text-slate-500 mt-1">Esperando datos...</div>
+        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">SONDA 1</div>
+        <div id="temp1-val" class="text-3xl font-extrabold text-sky-400 mt-2">--.- °C</div>
+        <div id="temp1-time" class="text-[10px] text-slate-500 mt-2">Esperando datos...</div>
       </div>
 
+      <!-- SONDA 2 -->
       <div class="bg-slate-800 border border-slate-700/60 p-5 rounded-xl shadow-lg">
-        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Sonda 2 (Temp 2)</div>
-        <div id="temp2-val" class="text-4xl font-extrabold text-emerald-400 mt-2">--.- °C</div>
-        <div id="temp2-time" class="text-xs text-slate-500 mt-1">Esperando datos...</div>
+        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">SONDA 2</div>
+        <div id="temp2-val" class="text-3xl font-extrabold text-emerald-400 mt-2">--.- °C</div>
+        <div id="temp2-time" class="text-[10px] text-slate-500 mt-2">Esperando datos...</div>
+      </div>
+
+      <!-- DIFERENCIAL DE TEMPERATURA -->
+      <div class="bg-slate-800 border border-slate-700/60 p-5 rounded-xl shadow-lg">
+        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">DIFERENCIAL (ΔT)</div>
+        <div id="delta-val" class="text-3xl font-extrabold text-amber-400 mt-2">--.- °C</div>
+        <div class="text-[10px] text-slate-500 mt-2">|SONDA 1 - SONDA 2|</div>
+      </div>
+
+      <!-- BATERÍA PIN A0 -->
+      <div class="bg-slate-800 border border-slate-700/60 p-5 rounded-xl shadow-lg flex flex-col justify-between">
+        <div>
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">BATERÍA (A0)</span>
+            <span id="bat-val" class="text-sm font-bold text-slate-200">--%</span>
+          </div>
+          <div class="w-full bg-slate-700 rounded-full h-3.5 mt-3 overflow-hidden border border-slate-600">
+            <div id="bat-bar" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+        <div id="bat-voltage" class="text-[10px] text-slate-500 mt-2">Nivel de carga del equipo</div>
+      </div>
+
+    </div>
+
+    <!-- Filtro de Búsqueda de Historial -->
+    <div class="bg-slate-800 border border-slate-700/60 p-4 rounded-xl shadow-lg">
+      <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+        <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider">Consulta de Historial</h2>
+        
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400">Desde:</label>
+            <input type="datetime-local" id="start-date" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-lg p-2 focus:ring-1 focus:ring-sky-500 outline-none">
+          </div>
+          
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400">Hasta:</label>
+            <input type="datetime-local" id="end-date" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-lg p-2 focus:ring-1 focus:ring-sky-500 outline-none">
+          </div>
+
+          <button onclick="filterHistory()" class="px-3 py-2 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition">
+            Buscar
+          </button>
+          <button onclick="loadDefaultTwoHours()" class="px-3 py-2 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition">
+            Últimas 2h
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- Gráfica Histórica -->
     <div class="bg-slate-800 border border-slate-700/60 p-5 rounded-xl shadow-lg">
-      <h2 class="text-sm font-medium text-slate-300 mb-4">Historial Reciente (Últimas 20 lecturas)</h2>
-      <div class="relative h-72">
+      <div class="relative h-80">
         <canvas id="tempChart"></canvas>
       </div>
     </div>
@@ -55,7 +115,10 @@
 
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Inicialización de la gráfica
+    let rawData = [];
+    let isInverted = false;
+
+    // Inicialización de Gráfica con Rango -50°C a 100°C
     const ctx = document.getElementById('tempChart').getContext('2d');
     const tempChart = new Chart(ctx, {
       type: 'line',
@@ -63,21 +126,23 @@
         labels: [],
         datasets: [
           {
-            label: 'Temp 1 (°C)',
+            label: 'SONDA 1 (°C)',
             borderColor: '#38bdf8',
-            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+            backgroundColor: 'rgba(56, 189, 248, 0.05)',
             data: [],
             borderWidth: 2,
-            tension: 0.3,
+            tension: 0.2,
+            pointRadius: 1,
             fill: true
           },
           {
-            label: 'Temp 2 (°C)',
+            label: 'SONDA 2 (°C)',
             borderColor: '#34d399',
-            backgroundColor: 'rgba(52, 211, 153, 0.1)',
+            backgroundColor: 'rgba(52, 211, 153, 0.05)',
             data: [],
             borderWidth: 2,
-            tension: 0.3,
+            tension: 0.2,
+            pointRadius: 1,
             fill: true
           }
         ]
@@ -87,7 +152,13 @@
         maintainAspectRatio: false,
         scales: {
           x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+          y: { 
+            min: -50,
+            max: 100,
+            ticks: { color: '#94a3b8', stepSize: 15 }, 
+            grid: { color: '#334155' },
+            title: { display: true, text: 'Temperatura (°C)', color: '#64748b' }
+          }
         },
         plugins: {
           legend: { labels: { color: '#f1f5f9' } }
@@ -95,64 +166,137 @@
       }
     });
 
-    // Cargar historial inicial
-    async function fetchInitialData() {
+    function toggleInvert() {
+      isInverted = !isInverted;
+      document.getElementById('invert-label').textContent = isInverted ? "Sondas: Invertidas" : "Sondas: Normales";
+      renderData();
+    }
+
+    function processRow(row) {
+      const raw1 = row.temp1;
+      const raw2 = row.temp2;
+      const s1 = isInverted ? raw2 : raw1;
+      const s2 = isInverted ? raw1 : raw2;
+      const delta = (s1 !== null && s2 !== null) ? Math.abs(s1 - s2) : null;
+      
+      // Manejo de lectura de batería si existe la columna "bateria"
+      const bateria = row.bateria !== undefined && row.bateria !== null ? row.bateria : null;
+
+      return { ...row, s1, s2, delta, bateria };
+    }
+
+    function updateCards(processedRow) {
+      if (!processedRow) return;
+
+      document.getElementById('temp1-val').textContent = processedRow.s1 !== null ? `${processedRow.s1.toFixed(2)} °C` : "DESC";
+      document.getElementById('temp2-val').textContent = processedRow.s2 !== null ? `${processedRow.s2.toFixed(2)} °C` : "DESC";
+      document.getElementById('delta-val').textContent = processedRow.delta !== null ? `${processedRow.delta.toFixed(2)} °C` : "--.- °C";
+      
+      const formattedTime = new Date(processedRow.created_at).toLocaleString();
+      document.getElementById('temp1-time').textContent = `Última lectura: ${formattedTime}`;
+      document.getElementById('temp2-time').textContent = `Última lectura: ${formattedTime}`;
+
+      // Actualización Barra de Batería (0-100%)
+      if (processedRow.bateria !== null) {
+        const bat = Math.max(0, Math.min(100, processedRow.bateria));
+        const bar = document.getElementById('bat-bar');
+        document.getElementById('bat-val').textContent = `${bat.toFixed(0)}%`;
+        bar.style.width = `${bat}%`;
+
+        if (bat > 50) {
+          bar.className = "bg-emerald-500 h-full rounded-full transition-all duration-500";
+        } else if (bat > 20) {
+          bar.className = "bg-amber-500 h-full rounded-full transition-all duration-500";
+        } else {
+          bar.className = "bg-rose-500 h-full rounded-full transition-all duration-500";
+        }
+      }
+    }
+
+    function renderData() {
+      tempChart.data.labels = [];
+      tempChart.data.datasets[0].data = [];
+      tempChart.data.datasets[1].data = [];
+
+      rawData.forEach(row => {
+        const p = processRow(row);
+        const timeLabel = new Date(p.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        
+        tempChart.data.labels.push(timeLabel);
+        tempChart.data.datasets[0].data.push(p.s1);
+        tempChart.data.datasets[1].data.push(p.s2);
+      });
+
+      tempChart.update();
+
+      if (rawData.length > 0) {
+        updateCards(processRow(rawData[rawData.length - 1]));
+      }
+    }
+
+    // Carga de las últimas 2 horas de datos por defecto
+    async function loadDefaultTwoHours() {
+      const twoHoursAgo = new Date(Date.now() - (2 * 60 * 60 * 1000)).toISOString();
+
       const { data, error } = await supabaseClient
         .from('lecturas_temperatura')
         .select('*')
-        .order('created_at', { ascending: false })
-        .limit(20);
+        .gte('created_at', twoHoursAgo)
+        .order('created_at', { ascending: true });
 
       if (error) {
-        console.error('Error al obtener datos:', error);
+        console.error('Error cargando 2h:', error);
         return;
       }
 
-      if (data && data.length > 0) {
-        const reversed = data.reverse();
-        reversed.forEach(row => addRowToChart(row));
-        updateCards(reversed[reversed.length - 1]);
-      }
-      
+      rawData = data || [];
+      renderData();
+
       const badge = document.getElementById('status-badge');
       badge.textContent = "Sistema En Vivo";
-      badge.className = "px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+      badge.className = "px-3 py-1.5 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
     }
 
-    function addRowToChart(row) {
-      const timeLabel = new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      
-      tempChart.data.labels.push(timeLabel);
-      tempChart.data.datasets[0].data.push(row.temp1);
-      tempChart.data.datasets[1].data.push(row.temp2);
+    // Filtro por rango de fecha personalizado
+    async function filterHistory() {
+      const startVal = document.getElementById('start-date').value;
+      const endVal = document.getElementById('end-date').value;
 
-      if (tempChart.data.labels.length > 20) {
-        tempChart.data.labels.shift();
-        tempChart.data.datasets[0].data.shift();
-        tempChart.data.datasets[1].data.shift();
+      if (!startVal || !endVal) {
+        alert("Por favor selecciona ambas fechas (Desde y Hasta).");
+        return;
       }
-      tempChart.update();
+
+      const startISO = new Date(startVal).toISOString();
+      const endISO = new Date(endVal).toISOString();
+
+      const { data, error } = await supabaseClient
+        .from('lecturas_temperatura')
+        .select('*')
+        .gte('created_at', startISO)
+        .lte('created_at', endISO)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error buscando historial:', error);
+        return;
+      }
+
+      rawData = data || [];
+      renderData();
     }
 
-    function updateCards(row) {
-      document.getElementById('temp1-val').textContent = row.temp1 !== null ? `${row.temp1.toFixed(2)} °C` : "DESC";
-      document.getElementById('temp2-val').textContent = row.temp2 !== null ? `${row.temp2.toFixed(2)} °C` : "DESC";
-      
-      const formattedTime = new Date(row.created_at).toLocaleString();
-      document.getElementById('temp1-time').textContent = `Última lectura: ${formattedTime}`;
-      document.getElementById('temp2-time').textContent = `Última lectura: ${formattedTime}`;
-    }
-
-    // Suscripción Realtime a inserciones en tiempo real
+    // Suscripción Realtime para nuevas inserciones
     supabaseClient
       .channel('schema-db-changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lecturas_temperatura' }, payload => {
-        addRowToChart(payload.new);
-        updateCards(payload.new);
+        rawData.push(payload.new);
+        if (rawData.length > 720) rawData.shift(); // Mantener buffer
+        renderData();
       })
       .subscribe();
 
-    fetchInitialData();
+    loadDefaultTwoHours();
   </script>
 </body>
 </html>
