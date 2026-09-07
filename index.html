@@ -447,15 +447,19 @@
         temp2El.className = "text-2xl font-extrabold text-rose-400 mt-0.5 transition-colors";
       }
 
-      if (deltaVal !== null && deltaVal <= alarmDeltaMin) {
-        deltaEl.className = "text-2xl font-extrabold bg-rose-600 text-white animate-pulse rounded my-1 mx-8 py-0.5 transition-colors shadow-lg shadow-rose-600/50";
-        deltaMsgEl.textContent = "⚠️ ALERTA: ΔT MUY BAJO - POSIBLE RETORNO DE LÍQUIDO";
-        deltaMsgEl.className = "text-[10px] text-rose-400 font-bold mt-0.5 animate-pulse";
+// CÓDIGO ACTUALIZADO:
+const isDeltaVisible = document.getElementById('chk-delta').checked;
 
-        if (isLive) {
-          triggerPhoneVibration();
-        }
-      } else {
+// La alarma de vibración solo se dispara si el ΔT está visible/activo
+if (isDeltaVisible && deltaVal !== null && deltaVal <= alarmDeltaMin) {
+  deltaEl.className = "text-2xl font-extrabold bg-rose-600 text-white animate-pulse rounded my-1 mx-8 py-0.5 transition-colors shadow-lg shadow-rose-600/50";
+  deltaMsgEl.textContent = "⚠️ ALERTA: ΔT MUY BAJO - POSIBLE RETORNO DE LÍQUIDO";
+  deltaMsgEl.className = "text-[10px] text-rose-400 font-bold mt-0.5 animate-pulse";
+
+  if (isLive) {
+    triggerPhoneVibration();
+  }
+} else {
         deltaEl.className = "text-2xl font-extrabold text-amber-400 mt-0.5 transition-colors";
         deltaMsgEl.textContent = "|SONDA 1 - SONDA 2|";
         deltaMsgEl.className = "text-[9px] text-slate-500 mt-0.5";
