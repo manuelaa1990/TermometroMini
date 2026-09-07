@@ -19,12 +19,76 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Estilos para Modo ePaper (Alto Contraste Monocromático) -->
+  <style>
+    body.epaper-mode {
+      background-color: #ffffff !important;
+      color: #000000 !important;
+      font-weight: 600;
+    }
+    body.epaper-mode .bg-slate-900,
+    body.epaper-mode .bg-slate-800,
+    body.epaper-mode .bg-slate-700,
+    body.epaper-mode .bg-slate-900\/70,
+    body.epaper-mode .bg-slate-800\/60,
+    body.epaper-mode .bg-slate-500 {
+      background-color: #ffffff !important;
+      border-color: #000000 !important;
+      color: #000000 !important;
+      box-shadow: none !important;
+    }
+    body.epaper-mode div, 
+    body.epaper-mode header, 
+    body.epaper-mode h1, 
+    body.epaper-mode span, 
+    body.epaper-mode strong {
+      color: #000000 !important;
+    }
+    body.epaper-mode input {
+      background-color: #ffffff !important;
+      color: #000000 !important;
+      border: 2px solid #000000 !important;
+      font-weight: bold;
+    }
+    body.epaper-mode button {
+      background-color: #ffffff !important;
+      color: #000000 !important;
+      border: 2px solid #000000 !important;
+    }
+    body.epaper-mode button:active {
+      background-color: #000000 !important;
+      color: #ffffff !important;
+    }
+    body.epaper-mode .border,
+    body.epaper-mode .border-slate-700,
+    body.epaper-mode .border-slate-700\/50,
+    body.epaper-mode .border-slate-700\/60 {
+      border-width: 2px !important;
+      border-color: #000000 !important;
+    }
+    /* Inactivación de animaciones para evitar refrescos en e-Ink */
+    body.epaper-mode .animate-pulse {
+      animation: none !important;
+    }
+    /* Alertas en ePaper */
+    body.epaper-mode .bg-yellow-500,
+    body.epaper-mode .bg-rose-600 {
+      background-color: #000000 !important;
+      color: #ffffff !important;
+      border: 2px solid #000000 !important;
+    }
+    body.epaper-mode .bg-yellow-500 *,
+    body.epaper-mode .bg-rose-600 * {
+      color: #ffffff !important;
+    }
+  </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen p-3 md:p-6">
 
   <div class="max-w-md md:max-w-3xl mx-auto space-y-3">
     
-    <!-- Barra Superior Discreta: Batería, WiFi y Estado -->
+    <!-- Barra Superior Discreta: Batería, WiFi, ePaper y Estado -->
     <div class="flex flex-wrap justify-between items-center bg-slate-800/60 border border-slate-700/50 px-3 py-1.5 rounded-xl text-xs gap-2">
       <div class="flex items-center gap-3 text-slate-400">
         <!-- Batería -->
@@ -47,9 +111,18 @@
         </div>
       </div>
 
-      <!-- Estado de Conexión -->
-      <div id="status-badge" class="px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-        Conectando...
+      <!-- Botón Modo ePaper + Estado de Conexión -->
+      <div class="flex items-center gap-2">
+        <button id="btn-epaper" onclick="toggleEPaperMode()" title="Modo Alto Contraste / ePaper" class="px-2 py-0.5 text-[10px] font-bold rounded border border-slate-600 bg-slate-800 text-slate-300 hover:text-white transition active:scale-95 flex items-center gap-1">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+          <span id="epaper-btn-text">ePaper</span>
+        </button>
+
+        <div id="status-badge" class="px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+          Conectando...
+        </div>
       </div>
     </div>
 
@@ -164,19 +237,19 @@
       <div class="flex justify-around items-center bg-slate-900/70 border border-slate-700/50 py-1.5 px-2 rounded-lg text-xs">
         <label class="flex items-center gap-1.5 cursor-pointer select-none">
           <input type="checkbox" id="chk-s1" checked onchange="updateChartVisibility()" class="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0 w-3.5 h-3.5">
-          <span class="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block border border-black"></span>
           <span class="text-slate-200 font-medium text-[11px]">Sonda 1</span>
         </label>
 
         <label class="flex items-center gap-1.5 cursor-pointer select-none">
           <input type="checkbox" id="chk-s2" checked onchange="updateChartVisibility()" class="rounded bg-slate-800 border-slate-700 text-rose-500 focus:ring-0 w-3.5 h-3.5">
-          <span class="w-2.5 h-2.5 rounded-full bg-rose-400 inline-block"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-rose-400 inline-block border border-black"></span>
           <span class="text-slate-200 font-medium text-[11px]">Sonda 2</span>
         </label>
 
         <label class="flex items-center gap-1.5 cursor-pointer select-none">
           <input type="checkbox" id="chk-delta" checked onchange="toggleDeltaT(this.checked)" class="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-0 w-3.5 h-3.5">
-          <span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block border border-black"></span>
           <span class="text-slate-200 font-medium text-[11px]">ΔT</span>
         </label>
       </div>
@@ -202,6 +275,7 @@
     let lastGlobalRecord = null;
     let isInverted = false;
     let lastVibrationTime = 0;
+    let isEPaper = false;
 
     // Configuración Chart.js
     const ctx = document.getElementById('tempChart').getContext('2d');
@@ -262,6 +336,82 @@
       }
     });
 
+    // Cambiar entre Modo Oscuro Estándar y Modo ePaper (Alto Contraste)
+    function toggleEPaperMode() {
+      isEPaper = !isEPaper;
+      localStorage.setItem('epaper-mode', isEPaper ? 'true' : 'false');
+      applyEPaperState();
+    }
+
+    function applyEPaperState() {
+      const btnText = document.getElementById('epaper-btn-text');
+      const btnEPaper = document.getElementById('btn-epaper');
+
+      if (isEPaper) {
+        document.body.classList.add('epaper-mode');
+        if (btnText) btnText.textContent = "Modo Color";
+        if (btnEPaper) btnEPaper.className = "px-2 py-0.5 text-[10px] font-bold rounded border-2 border-black bg-black text-white transition flex items-center gap-1";
+
+        // Estilos de gráfica ePaper (B&N, líneas discontínuas para diferenciar)
+        tempChart.options.scales.x.ticks.color = '#000000';
+        tempChart.options.scales.x.ticks.font = { weight: 'bold', size: 10 };
+        tempChart.options.scales.x.grid.color = '#e2e8f0';
+
+        tempChart.options.scales.y.ticks.color = '#000000';
+        tempChart.options.scales.y.ticks.font = { weight: 'bold', size: 10 };
+        tempChart.options.scales.y.grid.color = '#e2e8f0';
+
+        // Sonda 1: Línea continua negra gruesa
+        tempChart.data.datasets[0].borderColor = '#000000';
+        tempChart.data.datasets[0].backgroundColor = 'transparent';
+        tempChart.data.datasets[0].borderWidth = 3;
+        tempChart.data.datasets[0].borderDash = [];
+
+        // Sonda 2: Línea discontinua negra
+        tempChart.data.datasets[1].borderColor = '#000000';
+        tempChart.data.datasets[1].backgroundColor = 'transparent';
+        tempChart.data.datasets[1].borderWidth = 3;
+        tempChart.data.datasets[1].borderDash = [6, 4];
+
+        // Delta T: Línea punteada negra
+        tempChart.data.datasets[2].borderColor = '#000000';
+        tempChart.data.datasets[2].backgroundColor = 'transparent';
+        tempChart.data.datasets[2].borderWidth = 2;
+        tempChart.data.datasets[2].borderDash = [2, 2];
+      } else {
+        document.body.classList.remove('epaper-mode');
+        if (btnText) btnText.textContent = "ePaper";
+        if (btnEPaper) btnEPaper.className = "px-2 py-0.5 text-[10px] font-bold rounded border border-slate-600 bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-1";
+
+        // Estilos de gráfica Estándar (Dark)
+        tempChart.options.scales.x.ticks.color = '#94a3b8';
+        tempChart.options.scales.x.ticks.font = { size: 10 };
+        tempChart.options.scales.x.grid.color = '#334155';
+
+        tempChart.options.scales.y.ticks.color = '#94a3b8';
+        tempChart.options.scales.y.ticks.font = { size: 10 };
+        tempChart.options.scales.y.grid.color = '#334155';
+
+        tempChart.data.datasets[0].borderColor = '#38bdf8';
+        tempChart.data.datasets[0].backgroundColor = 'rgba(56, 189, 248, 0.05)';
+        tempChart.data.datasets[0].borderWidth = 2;
+        tempChart.data.datasets[0].borderDash = [];
+
+        tempChart.data.datasets[1].borderColor = '#f87171';
+        tempChart.data.datasets[1].backgroundColor = 'rgba(248, 113, 113, 0.05)';
+        tempChart.data.datasets[1].borderWidth = 2;
+        tempChart.data.datasets[1].borderDash = [];
+
+        tempChart.data.datasets[2].borderColor = '#fbbf24';
+        tempChart.data.datasets[2].backgroundColor = 'rgba(251, 191, 36, 0.05)';
+        tempChart.data.datasets[2].borderWidth = 2;
+        tempChart.data.datasets[2].borderDash = [];
+      }
+
+      tempChart.update();
+      renderData();
+    }
+
     // Función para mostrar/ocultar ΔT en Tarjeta y Gráfica
     function toggleDeltaT(showState) {
       const chkDelta = document.getElementById('chk-delta');
@@ -309,6 +459,12 @@
 
       const savedDeltaMin = localStorage.getItem('alarmDeltaMin-input');
       if (savedDeltaMin !== null && savedDeltaMin !== '') document.getElementById('alarmDeltaMin-input').value = savedDeltaMin;
+
+      const savedEPaper = localStorage.getItem('epaper-mode');
+      if (savedEPaper === 'true') {
+        isEPaper = true;
+        applyEPaperState();
+      }
     }
 
     function saveAndRender() {
@@ -447,19 +603,17 @@
         temp2El.className = "text-2xl font-extrabold text-rose-400 mt-0.5 transition-colors";
       }
 
-// CÓDIGO ACTUALIZADO:
-const isDeltaVisible = document.getElementById('chk-delta').checked;
+      const isDeltaVisible = document.getElementById('chk-delta').checked;
 
-// La alarma de vibración solo se dispara si el ΔT está visible/activo
-if (isDeltaVisible && deltaVal !== null && deltaVal <= alarmDeltaMin) {
-  deltaEl.className = "text-2xl font-extrabold bg-rose-600 text-white animate-pulse rounded my-1 mx-8 py-0.5 transition-colors shadow-lg shadow-rose-600/50";
-  deltaMsgEl.textContent = "⚠️ ALERTA: ΔT MUY BAJO - POSIBLE RETORNO DE LÍQUIDO";
-  deltaMsgEl.className = "text-[10px] text-rose-400 font-bold mt-0.5 animate-pulse";
+      if (isDeltaVisible && deltaVal !== null && deltaVal <= alarmDeltaMin) {
+        deltaEl.className = "text-2xl font-extrabold bg-rose-600 text-white animate-pulse rounded my-1 mx-8 py-0.5 transition-colors shadow-lg shadow-rose-600/50";
+        deltaMsgEl.textContent = "⚠️ ALERTA: ΔT MUY BAJO - POSIBLE RETORNO DE LÍQUIDO";
+        deltaMsgEl.className = "text-[10px] text-rose-400 font-bold mt-0.5 animate-pulse";
 
-  if (isLive) {
-    triggerPhoneVibration();
-  }
-} else {
+        if (isLive) {
+          triggerPhoneVibration();
+        }
+      } else {
         deltaEl.className = "text-2xl font-extrabold text-amber-400 mt-0.5 transition-colors";
         deltaMsgEl.textContent = "|SONDA 1 - SONDA 2|";
         deltaMsgEl.className = "text-[9px] text-slate-500 mt-0.5";
