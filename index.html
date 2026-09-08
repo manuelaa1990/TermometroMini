@@ -6,202 +6,85 @@
 
   <title>Monitor Temperatura HVAC V2</title>
 
-  <link rel="icon" type="image/svg+xml" href="icono.svg">
-  <link rel="apple-touch-icon" href="icono.png">
-  <link rel="manifest" href="manifest.json">
-
-  <meta name="theme-color" content="#0f172a">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
-    body.epaper-mode {
-      background:#fff !important;
-      color:#000 !important;
-      font-weight:600;
+    body {
+      background: #020617;
+      color: #e2e8f0;
+      font-family: Arial, sans-serif;
     }
 
-    body.epaper-mode .bg-slate-900,
-    body.epaper-mode .bg-slate-800,
-    body.epaper-mode .bg-slate-700,
-    body.epaper-mode .bg-slate-900\/70,
-    body.epaper-mode .bg-slate-800\/60 {
-      background:#fff !important;
-      color:#000 !important;
-      border-color:#000 !important;
-      box-shadow:none !important;
+    .card {
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid rgba(51, 65, 85, 0.65);
+      border-radius: 14px;
     }
 
-    body.epaper-mode div,
-    body.epaper-mode header,
-    body.epaper-mode h1,
-    body.epaper-mode span,
-    body.epaper-mode strong {
-      color:#000 !important;
+    .value {
+      font-family: monospace;
     }
 
-    body.epaper-mode input {
-      background:#fff !important;
-      color:#000 !important;
-      border:2px solid #000 !important;
-      font-weight:bold;
-    }
-
-    body.epaper-mode button {
-      background:#fff !important;
-      color:#000 !important;
-      border:2px solid #000 !important;
-    }
-
-    body.epaper-mode button:active {
-      background:#000 !important;
-      color:#fff !important;
-    }
-
-    body.epaper-mode .border,
-    body.epaper-mode .border-slate-700,
-    body.epaper-mode .border-slate-700\/50,
-    body.epaper-mode .border-slate-700\/60 {
-      border-width:2px !important;
-      border-color:#000 !important;
-    }
-
-    body.epaper-mode .animate-pulse {
-      animation:none !important;
-    }
-
-    body.epaper-mode .bg-yellow-500,
-    body.epaper-mode .bg-rose-600 {
-      background:#000 !important;
-      color:#fff !important;
-      border:2px solid #000 !important;
-    }
-
-    body.epaper-mode .bg-yellow-500 *,
-    body.epaper-mode .bg-rose-600 * {
-      color:#fff !important;
+    canvas {
+      max-width: 100%;
     }
   </style>
 </head>
 
-<body class="bg-slate-900 text-slate-100 min-h-screen p-3 md:p-6">
+<body class="min-h-screen">
 
-<div class="max-w-md md:max-w-3xl mx-auto space-y-3">
+<div class="max-w-5xl mx-auto px-3 py-3">
 
   <!-- =========================================================
        BARRA SUPERIOR
   ========================================================== -->
 
-  <div class="flex flex-wrap justify-between items-center
-              bg-slate-800/60 border border-slate-700/50
-              px-3 py-1.5 rounded-xl text-xs gap-2">
+  <div class="flex items-center justify-between mb-4">
 
-    <div class="flex items-center gap-3 text-slate-400">
+    <div class="flex items-center gap-2">
 
-      <!-- BATERÍA -->
-      <div class="flex items-center gap-1.5">
-
-        <svg class="w-3.5 h-3.5 text-emerald-400"
-             fill="none"
-             stroke="currentColor"
-             viewBox="0 0 24 24">
-
-          <path stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M13 10V3L4 14h7v7l9-11h-7z"/>
-
-        </svg>
-
-        <span id="bat-val"
-              class="font-medium text-slate-300 text-[11px]">
+      <div class="text-xs text-slate-400">
+        Batería
+        <span id="batteryValue" class="text-slate-200 font-bold">
           --%
         </span>
-
-        <div class="w-8 bg-slate-700 h-1.5 rounded-full overflow-hidden">
-          <div id="bat-bar"
-               class="bg-emerald-500 h-full transition-all duration-500"
-               style="width:0%">
-          </div>
-        </div>
-
       </div>
 
-      <!-- WIFI -->
-      <div class="flex items-center gap-1 text-[11px]
-                  text-slate-300 border-l border-slate-700 pl-2.5">
-
-        <svg class="w-3.5 h-3.5 text-sky-400"
-             fill="none"
-             stroke="currentColor"
-             viewBox="0 0 24 24">
-
-          <path stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M8.111 16.404a5.5 5.5 0 017.778 0
-                   M12 20h.01
-                   m-7.08-7.071a10 10 0 0114.142 0
-                   M1.42 9.428a16 16 0 0121.16 0"/>
-
-        </svg>
-
-        <span id="wifi-val">
-          Wifi: "Sin conexión"
+      <div class="text-xs text-slate-400">
+        WiFi
+        <span id="wifiValue" class="text-slate-200 font-bold">
+          --
         </span>
-
       </div>
 
     </div>
 
     <div class="flex items-center gap-2">
 
-      <!-- EPAPER -->
-      <button id="btn-epaper"
-              onclick="toggleEPaperMode()"
-              title="Modo Sol / Alto Contraste"
-              class="px-2 py-0.5 text-[10px] font-bold rounded
-                     border border-slate-600 bg-slate-800
-                     text-slate-300 transition
-                     active:scale-95 flex items-center gap-1">
-
-        <svg class="w-3 h-3"
-             fill="none"
-             stroke="currentColor"
-             viewBox="0 0 24 24">
-
-          <path stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 3v1m0 16v1m9-9h-1M4 12H3
-                   m15.364 6.364l-.707-.707
-                   M6.343 6.343l-.707-.707
-                   m12.728 0l-.707.707
-                   M6.343 17.657l-.707.707
-                   M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-
-        </svg>
-
-        <span id="epaper-btn-text">ePaper</span>
-
+      <button
+        id="epaperBtn"
+        onclick="toggleEPaper()"
+        class="px-2 py-1 rounded-lg
+               bg-slate-800
+               border border-slate-700
+               text-[10px] text-slate-300">
+        ePaper
       </button>
 
-      <!-- ESTADO -->
-      <div id="status-badge"
-           class="px-2.5 py-0.5 text-[10px]
-                  font-semibold rounded-full
-                  bg-amber-500/10 text-amber-400
-                  border border-amber-500/20">
-
-        Conectando...
-
+      <div
+        id="onlineStatus"
+        class="px-2 py-1 rounded-lg
+               bg-emerald-500/10
+               border border-emerald-500/30
+               text-emerald-400
+               text-[10px] font-bold">
+        ● ONLINE
       </div>
 
     </div>
+
   </div>
 
 
@@ -209,89 +92,84 @@
        TITULO
   ========================================================== -->
 
-  <header class="text-center py-1">
+  <div class="mb-4">
 
-    <h1 class="text-2xl font-bold text-sky-400">
+    <h1 class="text-xl font-bold text-white">
       Monitor Temperatura HVAC
     </h1>
 
-    <div class="text-[9px] text-slate-500 font-medium">
-      V2 • Monitor de campo
+    <div class="text-xs text-slate-500 mt-1">
+      Monitor V2 · Temperatura de campo
     </div>
 
-  </header>
+  </div>
 
 
   <!-- =========================================================
        SONDA 1
   ========================================================== -->
 
-  <div id="card-s1"
-       class="bg-slate-800 border border-slate-700/60
-              py-2.5 px-3 rounded-xl shadow-md
-              text-center relative transition-all">
+  <div class="card p-4 mb-3">
 
-    <div class="flex justify-between items-center
-                text-[10px] font-bold text-sky-400
-                uppercase tracking-wider px-1">
+    <div class="flex items-center justify-between mb-3">
 
-      <span>SONDA 1</span>
+      <div>
 
-      <div class="flex items-center gap-1
-                  text-[9px] text-slate-400">
+        <div class="text-xs text-slate-400 uppercase tracking-wider">
+          Sonda 1
+        </div>
 
-        <span>Alarma:</span>
+        <div
+          id="s1AlarmText"
+          class="text-[10px] text-slate-500 mt-1">
+          Alarma: -- °C
+        </div>
 
-        <input type="number"
-               id="alarm1-input"
-               value="40"
-               min="-50"
-               max="100"
-               step="0.5"
-               oninput="saveAndRender()"
-               class="w-12 bg-slate-900
-                      border border-slate-700
-                      text-sky-400 text-center
-                      rounded focus:outline-none py-0.5">
+      </div>
 
-        <span>°C</span>
-
+      <div
+        id="s1Current"
+        class="text-3xl font-bold value text-sky-400">
+        --.-°
       </div>
 
     </div>
 
-    <div id="temp1-val"
-         class="text-2xl font-extrabold
-                text-sky-400 mt-0.5">
 
-      --.- °C
+    <div class="grid grid-cols-3 gap-2">
 
-    </div>
+      <div class="bg-slate-900/70 rounded-lg p-2">
+        <div class="text-[9px] text-slate-500 uppercase">
+          Mín
+        </div>
+        <div
+          id="s1Min"
+          class="value text-sm text-slate-300">
+          --.-°
+        </div>
+      </div>
 
-    <div class="flex justify-center gap-4
-                text-[10px] font-mono
-                text-slate-400 mt-1">
+      <div class="bg-slate-900/70 rounded-lg p-2">
+        <div class="text-[9px] text-slate-500 uppercase">
+          Máx
+        </div>
+        <div
+          id="s1Max"
+          class="value text-sm text-slate-300">
+          --.-°
+        </div>
+      </div>
 
-      <span>
-        Mín:
-        <strong id="s1-min"
-                class="text-slate-200">--.-</strong>
-        °C
-      </span>
-
-      <span>
-        Máx:
-        <strong id="s1-max"
-                class="text-slate-200">--.-</strong>
-        °C
-      </span>
-
-    </div>
-
-    <div id="temp1-time"
-         class="text-[9px] text-slate-500 mt-0.5">
-
-      Esperando...
+      <div class="bg-slate-900/70 rounded-lg p-2">
+        <div class="text-[9px] text-slate-500 uppercase">
+          Lectura
+        </div>
+        <div
+          id="s1Time"
+          class="value text-sm text-slate-300">
+          --:--
+        </div>
+      </div>
 
     </div>
 
@@ -299,32 +177,20 @@
 
 
   <!-- =========================================================
-       INVERTIR
+       BOTON INVERTIR
   ========================================================== -->
 
-  <div class="flex justify-center -my-1">
+  <div class="flex justify-center mb-3">
 
-    <button id="btn-invert"
-            onclick="toggleInvert()"
-            title="Invertir Sondas"
-            class="p-2 rounded-full bg-slate-800
-                   hover:bg-slate-700 text-sky-400
-                   border border-sky-500/30
-                   transition-all shadow-md
-                   active:scale-90">
+    <button
+      onclick="invertProbes()"
+      class="px-4 py-2 rounded-xl
+             bg-slate-800
+             border border-slate-700
+             text-xs text-slate-300
+             hover:bg-slate-700">
 
-      <svg class="w-4 h-4"
-           fill="none"
-           stroke="currentColor"
-           viewBox="0 0 24 24">
-
-        <path stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M7 16V4m0 0L3 8m4-4l4 4
-                 m6 0v12m0 0l4-4m-4 4l-4-4"/>
-
-      </svg>
+      ⇄ Invertir sondas
 
     </button>
 
@@ -335,72 +201,67 @@
        SONDA 2
   ========================================================== -->
 
-  <div id="card-s2"
-       class="bg-slate-800 border border-slate-700/60
-              py-2.5 px-3 rounded-xl shadow-md
-              text-center relative transition-all">
+  <div class="card p-4 mb-3">
 
-    <div class="flex justify-between items-center
-                text-[10px] font-bold text-rose-400
-                uppercase tracking-wider px-1">
+    <div class="flex items-center justify-between mb-3">
 
-      <span>SONDA 2</span>
+      <div>
 
-      <div class="flex items-center gap-1
-                  text-[9px] text-slate-400">
+        <div class="text-xs text-slate-400 uppercase tracking-wider">
+          Sonda 2
+        </div>
 
-        <span>Alarma:</span>
+        <div
+          id="s2AlarmText"
+          class="text-[10px] text-slate-500 mt-1">
+          Alarma: -- °C
+        </div>
 
-        <input type="number"
-               id="alarm2-input"
-               value="40"
-               min="-50"
-               max="100"
-               step="0.5"
-               oninput="saveAndRender()"
-               class="w-12 bg-slate-900
-                      border border-slate-700
-                      text-rose-400 text-center
-                      rounded focus:outline-none py-0.5">
+      </div>
 
-        <span>°C</span>
-
+      <div
+        id="s2Current"
+        class="text-3xl font-bold value text-orange-400">
+        --.-°
       </div>
 
     </div>
 
-    <div id="temp2-val"
-         class="text-2xl font-extrabold
-                text-rose-400 mt-0.5">
 
-      --.- °C
+    <div class="grid grid-cols-3 gap-2">
 
-    </div>
+      <div class="bg-slate-900/70 rounded-lg p-2">
+        <div class="text-[9px] text-slate-500 uppercase">
+          Mín
+        </div>
+        <div
+          id="s2Min"
+          class="value text-sm text-slate-300">
+          --.-°
+        </div>
+      </div>
 
-    <div class="flex justify-center gap-4
-                text-[10px] font-mono
-                text-slate-400 mt-1">
+      <div class="bg-slate-900/70 rounded-lg p-2">
+        <div class="text-[9px] text-slate-500 uppercase">
+          Máx
+        </div>
+        <div
+          id="s2Max"
+          class="value text-sm text-slate-300">
+          --.-°
+        </div>
+      </div>
 
-      <span>
-        Mín:
-        <strong id="s2-min"
-                class="text-slate-200">--.-</strong>
-        °C
-      </span>
-
-      <span>
-        Máx:
-        <strong id="s2-max"
-                class="text-slate-200">--.-</strong>
-        °C
-      </span>
-
-    </div>
-
-    <div id="temp2-time"
-         class="text-[9px] text-slate-500 mt-0.5">
-
-      Esperando...
+      <div class="bg-slate-900/70 rounded-lg p-2">
+        <div class="text-[9px] text-slate-500 uppercase">
+          Lectura
+        </div>
+        <div
+          id="s2Time"
+          class="value text-sm text-slate-300">
+          --:--
+        </div>
+      </div>
 
     </div>
 
@@ -411,87 +272,70 @@
        DELTA T
   ========================================================== -->
 
-  <div id="card-delta"
-       class="bg-slate-800 border border-slate-700/60
-              py-2.5 px-3 rounded-xl shadow-md
-              text-center transition-all">
+  <div class="card p-4 mb-3">
 
-    <div class="flex justify-between items-center
-                text-[10px] font-bold text-amber-400
-                uppercase tracking-wider px-1">
+    <div class="flex items-center justify-between">
 
-      <div class="flex items-center gap-1.5">
+      <div>
 
-        <span>ΔT</span>
+        <div class="text-xs text-slate-400 uppercase tracking-wider">
+          ΔT
+        </div>
 
-        <button onclick="toggleDeltaT(false)"
-                title="Ocultar ΔT"
-                class="text-slate-500
-                       hover:text-amber-400 p-0.5">
-
-          ×
-
-        </button>
+        <div
+          id="deltaStatus"
+          class="text-[10px] text-slate-500 mt-1">
+          Esperando datos...
+        </div>
 
       </div>
 
-      <div class="flex items-center gap-1
-                  text-[9px] text-slate-400">
-
-        <span class="text-rose-400 font-semibold">
-          Alarma:
-        </span>
-
-        <input type="number"
-               id="alarmDeltaMin-input"
-               value="0.5"
-               min="0"
-               max="20"
-               step="0.1"
-               oninput="saveAndRender()"
-               class="w-12 bg-slate-900
-                      border border-slate-700
-                      text-rose-400 text-center
-                      rounded focus:outline-none py-0.5 font-bold">
-
-        <span>°C</span>
-
+      <div
+        id="deltaCurrent"
+        class="text-3xl font-bold value text-emerald-400">
+        --.-°
       </div>
 
     </div>
 
-    <div id="delta-val"
-         class="text-2xl font-extrabold
-                text-amber-400 mt-0.5">
 
-      --.- °C
+    <div class="grid grid-cols-3 gap-2 mt-3">
 
-    </div>
+      <div class="bg-slate-900/70 rounded-lg p-2">
+        <div class="text-[9px] text-slate-500 uppercase">
+          Mín
+        </div>
+        <div
+          id="deltaMin"
+          class="value text-sm text-slate-300">
+          --.-°
+        </div>
+      </div>
 
-    <div class="flex justify-center gap-4
-                text-[10px] font-mono
-                text-slate-400 mt-1">
+      <div class="bg-slate-900/70 rounded-lg p-2">
+        <div class="text-[9px] text-slate-500 uppercase">
+          Máx
+        </div>
+        <div
+          id="deltaMax"
+          class="value text-sm text-slate-300">
+          --.-°
+        </div>
+      </div>
 
-      <span>
-        Mín:
-        <strong id="delta-min"
-                class="text-slate-200">--.-</strong>
-        °C
-      </span>
+      <div class="bg-slate-900/70 rounded-lg p-2">
 
-      <span>
-        Máx:
-        <strong id="delta-max"
-                class="text-slate-200">--.-</strong>
-        °C
-      </span>
+        <div class="text-[9px] text-slate-500 uppercase">
+          Alarma
+        </div>
 
-    </div>
+        <div
+          id="deltaAlarmText"
+          class="value text-sm text-slate-300">
+          --.-°
+        </div>
 
-    <div id="delta-status-msg"
-         class="text-[9px] text-slate-500 mt-0.5">
-
-      Esperando datos...
+      </div>
 
     </div>
 
@@ -502,154 +346,135 @@
        SUGERENCIA
   ========================================================== -->
 
-  <div id="suggestion-card"
-       class="bg-slate-800 border border-slate-700/60
-              rounded-xl p-3 shadow-md">
+  <div class="card p-4 mb-4">
 
-    <div class="flex items-start gap-2">
+    <div class="text-[10px] text-slate-500 uppercase tracking-wider mb-2">
+      Sugerencia
+    </div>
 
-      <div id="suggestion-icon"
-           class="text-lg leading-none">
-        💡
-      </div>
-
-      <div class="flex-1">
-
-        <div id="suggestion-title"
-             class="text-xs font-bold text-sky-400">
-
-          SUGERENCIA
-
-        </div>
-
-        <div id="suggestion-text"
-             class="text-[11px] text-slate-300 mt-0.5">
-
-          Esperando suficientes lecturas para analizar
-          la tendencia...
-
-        </div>
-
-      </div>
-
+    <div
+      id="suggestionText"
+      class="text-sm text-slate-300">
+      Esperando suficientes mediciones para analizar...
     </div>
 
   </div>
 
 
   <!-- =========================================================
-       NAVEGACIÓN
+       NAVEGACION HISTORIAL
   ========================================================== -->
 
-  <div class="bg-slate-800 border border-slate-700/60
-              p-2 rounded-xl shadow-md
-              flex items-center justify-center gap-3">
+  <div class="flex justify-center items-center gap-2 mb-3">
 
-    <button onclick="navigateWindow(-2)"
-            title="Atrás 2 Horas"
-            class="p-2 px-4 text-xs font-semibold
-                   rounded-lg bg-slate-700
-                   hover:bg-slate-600
-                   text-slate-200 transition
-                   active:scale-95">
-
+    <button
+      onclick="navigateWindow(-2)"
+      class="px-4 py-2 rounded-lg
+             bg-slate-800
+             border border-slate-700
+             text-slate-300">
       ‹
-
     </button>
 
-    <button onclick="goLive()"
-            class="px-4 py-2 text-xs font-semibold
-                   rounded-lg bg-sky-600
-                   hover:bg-sky-500 text-white
-                   transition flex items-center gap-1.5">
-
-      <span class="w-2 h-2 rounded-full
-                   bg-emerald-400 animate-pulse"></span>
-
+    <button
+      onclick="goLive()"
+      class="px-5 py-2 rounded-lg
+             bg-sky-600
+             text-white
+             text-xs font-bold">
       Actual
-
     </button>
 
-    <button id="btn-next"
-            onclick="navigateWindow(2)"
-            title="Adelante 2 Horas"
-            class="p-2 px-4 text-xs font-semibold
-                   rounded-lg bg-slate-700
-                   hover:bg-slate-600
-                   text-slate-200 transition
-                   disabled:opacity-30">
-
+    <button
+      onclick="navigateWindow(2)"
+      class="px-4 py-2 rounded-lg
+             bg-slate-800
+             border border-slate-700
+             text-slate-300">
       ›
-
     </button>
 
   </div>
 
 
   <!-- =========================================================
-       SELECTORES GRÁFICA
+       SELECTOR DEL GRAFICO
   ========================================================== -->
 
-  <div class="bg-slate-800 border border-slate-700/60
-              p-3 rounded-xl shadow-md space-y-2.5">
+  <div class="flex justify-center gap-2 mb-3">
 
-    <div class="flex justify-around items-center
-                bg-slate-900/70
-                border border-slate-700/50
-                py-1.5 px-2 rounded-lg text-xs">
+    <button
+      id="btnS1"
+      onclick="setChartMode('s1')"
+      class="chartSelector px-3 py-1.5 rounded-lg
+             bg-sky-600 text-white text-xs">
+      S1
+    </button>
 
-      <label class="flex items-center gap-1.5 cursor-pointer">
+    <button
+      id="btnS2"
+      onclick="setChartMode('s2')"
+      class="chartSelector px-3 py-1.5 rounded-lg
+             bg-slate-800 text-slate-300 text-xs">
+      S2
+    </button>
 
-        <input type="checkbox"
-               id="chk-s1"
-               checked
-               onchange="updateChartVisibility()">
+    <button
+      id="btnDelta"
+      onclick="setChartMode('delta')"
+      class="chartSelector px-3 py-1.5 rounded-lg
+             bg-slate-800 text-slate-300 text-xs">
+      ΔT
+    </button>
 
-        <span class="w-2.5 h-2.5 rounded-full
-                     bg-sky-400 inline-block"></span>
+  </div>
 
-        <span class="text-[11px]">
-          Sonda 1
-        </span>
 
-      </label>
+  <!-- =========================================================
+       GRAFICO
+  ========================================================== -->
 
-      <label class="flex items-center gap-1.5 cursor-pointer">
+  <div class="card p-3">
 
-        <input type="checkbox"
-               id="chk-s2"
-               checked
-               onchange="updateChartVisibility()">
+    <!-- NUEVO: PERIODO EXACTO DEL GRAFICO -->
 
-        <span class="w-2.5 h-2.5 rounded-full
-                     bg-rose-400 inline-block"></span>
+    <div
+      class="flex items-center justify-between
+             bg-slate-900/70
+             border border-slate-700/50
+             px-2.5 py-1.5
+             rounded-lg mb-2">
 
-        <span class="text-[11px]">
-          Sonda 2
-        </span>
+      <div>
 
-      </label>
+        <div
+          id="chart-period-status"
+          class="text-[9px] font-bold
+                 text-sky-400
+                 uppercase tracking-wider">
+          EN VIVO
+        </div>
 
-      <label class="flex items-center gap-1.5 cursor-pointer">
+        <div
+          id="chart-period"
+          class="text-[10px]
+                 text-slate-300
+                 font-mono mt-0.5">
+          Cargando período...
+        </div>
 
-        <input type="checkbox"
-               id="chk-delta"
-               checked
-               onchange="toggleDeltaT(this.checked)">
+      </div>
 
-        <span class="w-2.5 h-2.5 rounded-full
-                     bg-amber-400 inline-block"></span>
-
-        <span class="text-[11px]">
-          ΔT
-        </span>
-
-      </label>
+      <div
+        id="chart-period-duration"
+        class="text-[9px] text-slate-500">
+        2 horas
+      </div>
 
     </div>
 
 
-    <!-- GRÁFICA -->
+    <!-- CANVAS -->
 
     <div class="relative h-64 md:h-80">
 
@@ -664,1679 +489,1586 @@
 
 <script>
 
-  /* ==========================================================
-     CONFIGURACIÓN SUPABASE
-  ========================================================== */
+/* =========================================================
+   CONFIGURACION SUPABASE
+========================================================= */
 
-  const SUPABASE_URL =
-    "https://ovaqbqkahttkmmtlmxha.supabase.co";
+const SUPABASE_URL = "TU_SUPABASE_URL";
+const SUPABASE_ANON_KEY = "TU_SUPABASE_ANON_KEY";
 
-  const SUPABASE_KEY =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92YXFicWthaHR0a21tdGxteGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2NDYxOTMsImV4cCI6MjEwNDIyMjE5M30.PpXfbHxW1-4ArrKuod0LLh8TZbjLO091r4DwkMNs3m8";
-
-  const supabaseClient =
-    supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_KEY
-    );
+const supabaseClient = supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
 
 
-  /* ==========================================================
-     VARIABLES
-  ========================================================== */
+/* =========================================================
+   VARIABLES
+========================================================= */
 
-  const TWO_HOURS_MS =
-    2 * 60 * 60 * 1000;
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
-  let windowEndTime = new Date();
+let rawData = [];
 
-  let isLive = true;
+let lastGlobalRecord = null;
 
-  let rawData = [];
+let windowEndTime = new Date();
 
-  let lastGlobalRecord = null;
+let isLive = true;
 
-  let isInverted = false;
+let isInverted = false;
 
-  let lastVibrationTime = 0;
+let isEPaper = false;
 
-  let isEPaper = false;
+let chartMode = "s1";
 
-
-  /* ==========================================================
-     GRÁFICA
-  ========================================================== */
-
-  const ctx =
-    document.getElementById("tempChart")
-    .getContext("2d");
-
-  const tempChart =
-    new Chart(ctx, {
-
-      type:"line",
-
-      data:{
-
-        labels:[],
-
-        datasets:[
-
-          {
-            label:"SONDA 1",
-            borderColor:"#38bdf8",
-            backgroundColor:"rgba(56,189,248,.05)",
-            data:[],
-            borderWidth:2,
-            tension:.2,
-            pointRadius:1,
-            fill:true
-          },
-
-          {
-            label:"SONDA 2",
-            borderColor:"#f87171",
-            backgroundColor:"rgba(248,113,113,.05)",
-            data:[],
-            borderWidth:2,
-            tension:.2,
-            pointRadius:1,
-            fill:true
-          },
-
-          {
-            label:"ΔT",
-            borderColor:"#fbbf24",
-            backgroundColor:"rgba(251,191,36,.05)",
-            data:[],
-            borderWidth:2,
-            tension:.2,
-            pointRadius:1,
-            fill:true
-          }
-
-        ]
-
-      },
-
-      options:{
-
-        responsive:true,
-
-        maintainAspectRatio:false,
-
-        interaction:{
-          mode:"index",
-          intersect:false
-        },
-
-        scales:{
-
-          x:{
-            ticks:{
-              color:"#94a3b8",
-              font:{size:10},
-              maxTicksLimit:8
-            },
-            grid:{
-              color:"#334155"
-            }
-          },
-
-          y:{
-            grace:"5%",
-            ticks:{
-              color:"#94a3b8",
-              font:{size:10}
-            },
-            grid:{
-              color:"#334155"
-            }
-          }
-
-        },
-
-        plugins:{
-
-          legend:{
-            display:false
-          },
-
-          tooltip:{
-            callbacks:{
-              label:function(context){
-
-                const value =
-                  context.parsed.y;
-
-                if(value === null ||
-                   value === undefined){
-
-                  return context.dataset.label +
-                         ": DESC";
-
-                }
-
-                return context.dataset.label +
-                       ": " +
-                       value.toFixed(1) +
-                       " °C";
-              }
-            }
-          }
-
-        }
-
-      }
-
-    });
+let tempChart = null;
 
 
-  /* ==========================================================
-     EPAPER
-  ========================================================== */
+/*
+   NUEVO
 
-  function toggleEPaperMode(){
+   Guarda el timestamp real de cada punto
+   del gráfico.
 
-    isEPaper = !isEPaper;
+   Esto permite que el tooltip muestre
+   la fecha y hora exacta.
+*/
 
-    localStorage.setItem(
-      "epaper-mode",
-      isEPaper ? "true" : "false"
-    );
+let chartTimes = [];
 
-    applyEPaperState();
 
+/* =========================================================
+   FORMATEO
+========================================================= */
+
+function formatTemperature(value) {
+
+  if (value === null || value === undefined || isNaN(value)) {
+    return "--.-°";
   }
 
-
-  function applyEPaperState(){
-
-    const btnText =
-      document.getElementById("epaper-btn-text");
-
-    const btnEPaper =
-      document.getElementById("btn-epaper");
+  return Number(value).toFixed(1) + "°";
+}
 
 
-    if(isEPaper){
+function formatTime(date) {
 
-      document.body.classList.add(
-        "epaper-mode"
-      );
-
-      btnText.textContent =
-        "Modo Color";
-
-      btnEPaper.className =
-        "px-2 py-0.5 text-[10px] font-bold rounded border-2 border-black bg-black text-white transition flex items-center gap-1";
-
-
-      tempChart.options.scales.x.ticks.color =
-        "#000";
-
-      tempChart.options.scales.x.grid.color =
-        "#cbd5e1";
-
-      tempChart.options.scales.y.ticks.color =
-        "#000";
-
-      tempChart.options.scales.y.grid.color =
-        "#cbd5e1";
-
-
-      tempChart.data.datasets[0].borderColor =
-        "#0284c7";
-
-      tempChart.data.datasets[0].backgroundColor =
-        "transparent";
-
-      tempChart.data.datasets[0].borderWidth =
-        3;
-
-
-      tempChart.data.datasets[1].borderColor =
-        "#be123c";
-
-      tempChart.data.datasets[1].backgroundColor =
-        "transparent";
-
-      tempChart.data.datasets[1].borderWidth =
-        3;
-
-      tempChart.data.datasets[1].borderDash =
-        [7,4];
-
-
-      tempChart.data.datasets[2].borderColor =
-        "#b45309";
-
-      tempChart.data.datasets[2].backgroundColor =
-        "transparent";
-
-      tempChart.data.datasets[2].borderWidth =
-        2.5;
-
-      tempChart.data.datasets[2].borderDash =
-        [3,3];
-
-    }else{
-
-      document.body.classList.remove(
-        "epaper-mode"
-      );
-
-      btnText.textContent =
-        "ePaper";
-
-      btnEPaper.className =
-        "px-2 py-0.5 text-[10px] font-bold rounded border border-slate-600 bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-1";
-
-
-      tempChart.options.scales.x.ticks.color =
-        "#94a3b8";
-
-      tempChart.options.scales.x.grid.color =
-        "#334155";
-
-      tempChart.options.scales.y.ticks.color =
-        "#94a3b8";
-
-      tempChart.options.scales.y.grid.color =
-        "#334155";
-
-
-      tempChart.data.datasets[0].borderColor =
-        "#38bdf8";
-
-      tempChart.data.datasets[0].backgroundColor =
-        "rgba(56,189,248,.05)";
-
-      tempChart.data.datasets[0].borderWidth =
-        2;
-
-      tempChart.data.datasets[0].borderDash =
-        [];
-
-
-      tempChart.data.datasets[1].borderColor =
-        "#f87171";
-
-      tempChart.data.datasets[1].backgroundColor =
-        "rgba(248,113,113,.05)";
-
-      tempChart.data.datasets[1].borderWidth =
-        2;
-
-      tempChart.data.datasets[1].borderDash =
-        [];
-
-
-      tempChart.data.datasets[2].borderColor =
-        "#fbbf24";
-
-      tempChart.data.datasets[2].backgroundColor =
-        "rgba(251,191,36,.05)";
-
-      tempChart.data.datasets[2].borderWidth =
-        2;
-
-      tempChart.data.datasets[2].borderDash =
-        [];
-
+  return new Date(date).toLocaleTimeString(
+    "es-ES",
+    {
+      hour: "2-digit",
+      minute: "2-digit"
     }
+  );
+}
 
-    tempChart.update();
 
-    renderData();
+function formatDate(date) {
 
+  return new Date(date).toLocaleDateString(
+    "es-ES",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    }
+  );
+}
+
+
+function formatChartDateTime(date) {
+
+  return new Date(date).toLocaleString(
+    "es-ES",
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    }
+  );
+}
+
+
+function formatShortDate(date) {
+
+  return new Date(date).toLocaleDateString(
+    "es-ES",
+    {
+      day: "2-digit",
+      month: "short"
+    }
+  ).toUpperCase();
+}
+
+
+/* =========================================================
+   OBTENER VALORES
+========================================================= */
+
+function getS1(row) {
+
+  const value =
+    row.temperatura_s1 ??
+    row.sonda1 ??
+    row.temp_s1 ??
+    row.temperature_1;
+
+  return Number(value);
+}
+
+
+function getS2(row) {
+
+  const value =
+    row.temperatura_s2 ??
+    row.sonda2 ??
+    row.temp_s2 ??
+    row.temperature_2;
+
+  return Number(value);
+}
+
+
+function getDelta(row) {
+
+  const s1 = getS1(row);
+  const s2 = getS2(row);
+
+  if (
+    !Number.isFinite(s1) ||
+    !Number.isFinite(s2)
+  ) {
+    return NaN;
   }
 
+  return Math.abs(s1 - s2);
+}
 
-  /* ==========================================================
-     MOSTRAR / OCULTAR DELTA
-  ========================================================== */
 
-  function toggleDeltaT(showState){
+/* =========================================================
+   CARGAR DATOS
+========================================================= */
 
-    const checkbox =
-      document.getElementById("chk-delta");
+async function fetchWindowData() {
 
-    const card =
-      document.getElementById("card-delta");
+  try {
 
-
-    if(typeof showState !== "boolean"){
-
-      showState =
-        checkbox.checked;
-
-    }else{
-
-      checkbox.checked =
-        showState;
-
-    }
-
-
-    if(showState)
-      card.classList.remove("hidden");
-    else
-      card.classList.add("hidden");
-
-
-    updateChartVisibility();
-
-  }
-
-
-  function updateChartVisibility(){
-
-    const s1 =
-      document.getElementById("chk-s1").checked;
-
-    const s2 =
-      document.getElementById("chk-s2").checked;
-
-    const delta =
-      document.getElementById("chk-delta").checked;
-
-
-    tempChart.setDatasetVisibility(
-      0,s1
-    );
-
-    tempChart.setDatasetVisibility(
-      1,s2
-    );
-
-    tempChart.setDatasetVisibility(
-      2,delta
-    );
-
-    tempChart.update();
-
-  }
-
-
-  /* ==========================================================
-     ALARMAS
-  ========================================================== */
-
-  function loadSavedAlarms(){
-
-    const a1 =
-      localStorage.getItem(
-        "alarm1-input"
-      );
-
-    const a2 =
-      localStorage.getItem(
-        "alarm2-input"
-      );
-
-    const ad =
-      localStorage.getItem(
-        "alarmDeltaMin-input"
-      );
-
-
-    if(a1 !== null)
-      document.getElementById(
-        "alarm1-input"
-      ).value = a1;
-
-
-    if(a2 !== null)
-      document.getElementById(
-        "alarm2-input"
-      ).value = a2;
-
-
-    if(ad !== null)
-      document.getElementById(
-        "alarmDeltaMin-input"
-      ).value = ad;
-
-
-    const savedEPaper =
-      localStorage.getItem(
-        "epaper-mode"
-      );
-
-    if(savedEPaper === "true"){
-
-      isEPaper = true;
-
-      applyEPaperState();
-
-    }
-
-  }
-
-
-  function saveAndRender(){
-
-    const a1 =
-      document.getElementById(
-        "alarm1-input"
-      ).value;
-
-    const a2 =
-      document.getElementById(
-        "alarm2-input"
-      ).value;
-
-    const ad =
-      document.getElementById(
-        "alarmDeltaMin-input"
-      ).value;
-
-
-    if(a1 !== "")
-      localStorage.setItem(
-        "alarm1-input",
-        a1
-      );
-
-    if(a2 !== "")
-      localStorage.setItem(
-        "alarm2-input",
-        a2
-      );
-
-    if(ad !== "")
-      localStorage.setItem(
-        "alarmDeltaMin-input",
-        ad
-      );
-
-
-    renderData();
-
-  }
-
-
-  function getAlarmValue(
-    inputId,
-    defaultVal
-  ){
-
-    const value =
-      parseFloat(
-        document.getElementById(
-          inputId
-        ).value
-      );
-
-    return isNaN(value)
-      ? defaultVal
-      : value;
-
-  }
-
-
-  /* ==========================================================
-     INVERTIR SONDAS
-  ========================================================== */
-
-  function toggleInvert(){
-
-    isInverted =
-      !isInverted;
-
-
-    const btn =
-      document.getElementById(
-        "btn-invert"
-      );
-
-
-    if(isInverted){
-
-      btn.className =
-        "p-2 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/60 transition-all shadow-md active:scale-90 ring-2 ring-amber-500/30";
-
-    }else{
-
-      btn.className =
-        "p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition-all shadow-md active:scale-90";
-
-    }
-
-
-    renderData();
-
-  }
-
-
-  /* ==========================================================
-     PROCESAR DATOS
-  ========================================================== */
-
-  function processRow(row){
-
-    if(!row)
-      return null;
-
-
-    const raw1 =
-      (
-        row.temp1 === null ||
-        row.temp1 <= -127 ||
-        row.temp1 < -50 ||
-        row.temp1 > 125
-      )
-      ? null
-      : Number(row.temp1);
-
-
-    const raw2 =
-      (
-        row.temp2 === null ||
-        row.temp2 <= -127 ||
-        row.temp2 < -50 ||
-        row.temp2 > 125
-      )
-      ? null
-      : Number(row.temp2);
-
-
-    const s1 =
-      isInverted
-        ? raw2
-        : raw1;
-
-    const s2 =
-      isInverted
-        ? raw1
-        : raw2;
-
-
-    const delta =
-      (
-        s1 !== null &&
-        s2 !== null
-      )
-      ? Math.abs(s1 - s2)
-      : null;
-
-
-    const deltaSigned =
-      (
-        s1 !== null &&
-        s2 !== null
-      )
-      ? s1 - s2
-      : null;
-
-
-    const bateria =
-      row.bateria !== undefined &&
-      row.bateria !== null
-        ? Number(row.bateria)
-        : null;
-
-
-    const wifi =
-      row.wifi ||
-      row.ssid ||
-      null;
-
-
-    return {
-      ...row,
-      s1,
-      s2,
-      delta,
-      deltaSigned,
-      bateria,
-      wifi
-    };
-
-  }
-
-
-  /* ==========================================================
-     VIBRACIÓN
-  ========================================================== */
-
-  function triggerPhoneVibration(){
-
-    const now =
-      Date.now();
-
-
-    if(
-      now - lastVibrationTime >
-      8000
-    ){
-
-      if(
-        "vibrate" in navigator
-      ){
-
-        navigator.vibrate(
-          [500,200,500]
-        );
-
-        lastVibrationTime =
-          now;
-
-      }
-
-    }
-
-  }
-
-
-  /* ==========================================================
-     ANÁLISIS DE TENDENCIA ΔT
-  ========================================================== */
-
-  function analyzeTrend(){
-
-    const valid =
-      rawData
-        .map(processRow)
-        .filter(
-          r =>
-            r &&
-            r.delta !== null
-        );
-
-
-    if(valid.length < 5){
-
-      return {
-        state:"insuficiente",
-        change:0,
-        average:0
-      };
-
-    }
-
-
-    /*
-      Usamos las últimas 10 lecturas
-      como ventana de análisis.
-    */
-
-    const sample =
-      valid.slice(-10);
-
-
-    const first =
-      sample[0].delta;
-
-    const last =
-      sample[sample.length - 1].delta;
-
-
-    const change =
-      last - first;
-
-
-    const average =
-      sample.reduce(
-        (sum,r) =>
-          sum + r.delta,
-        0
-      ) / sample.length;
-
-
-    /*
-      Umbral pequeño para evitar
-      reaccionar al ruido normal
-      de los DS18B20.
-    */
-
-    const THRESHOLD =
-      0.4;
-
-
-    let state =
-      "estable";
-
-
-    if(change >= THRESHOLD){
-
-      state =
-        "aumentando";
-
-    }else if(
-      change <= -THRESHOLD
-    ){
-
-      state =
-        "disminuyendo";
-
-    }
-
-
-    return {
-      state,
-      change,
-      average
-    };
-
-  }
-
-
-  /* ==========================================================
-     SUGERENCIAS
-  ========================================================== */
-
-  function updateSuggestion(){
-
-    const title =
-      document.getElementById(
-        "suggestion-title"
-      );
-
-    const text =
-      document.getElementById(
-        "suggestion-text"
-      );
-
-    const icon =
-      document.getElementById(
-        "suggestion-icon"
-      );
-
-
-    const p =
-      rawData.length
-        ? processRow(
-            rawData[rawData.length - 1]
-          )
-        : null;
-
-
-    if(!p){
-
-      title.textContent =
-        "SUGERENCIA";
-
-      text.textContent =
-        "Esperando lecturas...";
-
-      icon.textContent =
-        "💡";
-
-      return;
-
-    }
-
-
-    const alarm1 =
-      getAlarmValue(
-        "alarm1-input",
-        40
-      );
-
-    const alarm2 =
-      getAlarmValue(
-        "alarm2-input",
-        40
-      );
-
-    const alarmDelta =
-      getAlarmValue(
-        "alarmDeltaMin-input",
-        0.5
-      );
-
-
-    /*
-      PRIORIDAD 1:
-      ALARMAS
-    */
-
-    if(
-      p.s1 !== null &&
-      p.s1 >= alarm1
-    ){
-
-      title.textContent =
-        "ATENCIÓN";
-
-      text.textContent =
-        `Sonda 1 supera la alarma configurada (${alarm1.toFixed(1)} °C). Verifique la condición antes de continuar.`;
-
-      icon.textContent =
-        "⚠️";
-
-      return;
-
-    }
-
-
-    if(
-      p.s2 !== null &&
-      p.s2 >= alarm2
-    ){
-
-      title.textContent =
-        "ATENCIÓN";
-
-      text.textContent =
-        `Sonda 2 supera la alarma configurada (${alarm2.toFixed(1)} °C). Verifique la condición antes de continuar.`;
-
-      icon.textContent =
-        "⚠️";
-
-      return;
-
-    }
-
-
-    if(
-      p.delta !== null &&
-      p.delta <= alarmDelta
-    ){
-
-      title.textContent =
-        "ΔT MUY BAJO";
-
-      text.textContent =
-        `La diferencia entre las sondas es de ${p.delta.toFixed(1)} °C. Conviene verificar la posición de las sondas y observar si el valor continúa bajo.`;
-
-      icon.textContent =
-        "⚠️";
-
-      return;
-
-    }
-
-
-    /*
-      PRIORIDAD 2:
-      TENDENCIA
-    */
-
-    const trend =
-      analyzeTrend();
-
-
-    if(
-      trend.state ===
-      "insuficiente"
-    ){
-
-      title.textContent =
-        "SUGERENCIA";
-
-      text.textContent =
-        "Se necesitan algunas lecturas más para analizar la tendencia del ΔT.";
-
-      icon.textContent =
-        "💡";
-
-      return;
-
-    }
-
-
-    if(
-      trend.state ===
-      "disminuyendo"
-    ){
-
-      title.textContent =
-        "ΔT DESCENDIENDO";
-
-      text.textContent =
-        `El ΔT ha disminuido aproximadamente ${Math.abs(trend.change).toFixed(1)} °C en las últimas lecturas. Observe si la tendencia continúa.`;
-
-      icon.textContent =
-        "📉";
-
-      return;
-
-    }
-
-
-    if(
-      trend.state ===
-      "aumentando"
-    ){
-
-      title.textContent =
-        "ΔT AUMENTANDO";
-
-      text.textContent =
-        `El ΔT ha aumentado aproximadamente ${trend.change.toFixed(1)} °C en las últimas lecturas. El comportamiento se está separando progresivamente.`;
-
-      icon.textContent =
-        "📈";
-
-      return;
-
-    }
-
-
-    /*
-      ESTABLE
-    */
-
-    title.textContent =
-      "ΔT ESTABLE";
-
-    text.textContent =
-      `La diferencia entre las sondas se mantiene relativamente estable alrededor de ${trend.average.toFixed(1)} °C.`;
-
-    icon.textContent =
-      "✅";
-
-  }
-
-
-  /* ==========================================================
-     TARJETAS
-  ========================================================== */
-
-  function updateCards(p){
-
-    const badge =
-      document.getElementById(
-        "status-badge"
-      );
-
-    const wifiEl =
-      document.getElementById(
-        "wifi-val"
-      );
-
-
-    if(!p){
-
-      badge.textContent =
-        "Sin Datos";
-
-      badge.className =
-        "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-slate-800 text-slate-400 border border-slate-700";
-
-      wifiEl.textContent =
-        'Wifi: "Sin conexión"';
-
-      updateSuggestion();
-
-      return;
-
-    }
-
-
-    const now =
-      Date.now();
-
-    const readingTime =
-      new Date(
-        p.created_at
-      ).getTime();
-
-    const diffSeconds =
-      (now - readingTime) / 1000;
-
-
-    const online =
-      diffSeconds <= 30;
-
-
-    if(!isLive){
-
-      badge.textContent =
-        "Historial";
-
-      badge.className =
-        "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/40";
-
-    }else if(online){
-
-      badge.textContent =
-        "Online";
-
-      badge.className =
-        "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
-
-    }else{
-
-      badge.textContent =
-        "Offline";
-
-      badge.className =
-        "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse";
-
-    }
-
-
-    if(
-      online &&
-      p.wifi
-    ){
-
-      wifiEl.textContent =
-        `Wifi: "${p.wifi}"`;
-
-    }else{
-
-      wifiEl.textContent =
-        'Wifi: "Sin conexión"';
-
-    }
-
-
-    const s1 =
-      p.s1;
-
-    const s2 =
-      p.s2;
-
-    const delta =
-      p.delta;
-
-
-    document.getElementById(
-      "temp1-val"
-    ).textContent =
-      s1 !== null
-        ? `${s1.toFixed(1)} °C`
-        : "DESC";
-
-
-    document.getElementById(
-      "temp2-val"
-    ).textContent =
-      s2 !== null
-        ? `${s2.toFixed(1)} °C`
-        : "DESC";
-
-
-    document.getElementById(
-      "delta-val"
-    ).textContent =
-      delta !== null
-        ? `${delta.toFixed(1)} °C`
-        : "--.- °C";
-
-
-    const date =
-      new Date(
-        p.created_at
-      );
-
-
-    const today =
-      new Date().toDateString() ===
-      date.toDateString();
-
-
-    const time =
-      date.toLocaleTimeString(
-        [],
-        {
-          hour:"2-digit",
-          minute:"2-digit",
-          second:"2-digit"
-        }
-      );
-
-
-    const dateText =
-      today
-        ? ""
-        : `${date.getDate()}/${date.getMonth()+1} `;
-
-
-    document.getElementById(
-      "temp1-time"
-    ).textContent =
-      `Lectura: ${dateText}${time}`;
-
-
-    document.getElementById(
-      "temp2-time"
-    ).textContent =
-      `Lectura: ${dateText}${time}`;
-
-
-    /* BATERÍA */
-
-    if(
-      p.bateria !== null &&
-      !isNaN(p.bateria)
-    ){
-
-      const bat =
-        Math.max(
-          0,
-          Math.min(
-            100,
-            p.bateria
-          )
-        );
-
-
-      document.getElementById(
-        "bat-val"
-      ).textContent =
-        `${bat.toFixed(0)}%`;
-
-
-      const bar =
-        document.getElementById(
-          "bat-bar"
-        );
-
-
-      bar.style.width =
-        `${bat}%`;
-
-
-      if(bat > 50){
-
-        bar.className =
-          "bg-emerald-500 h-full transition-all duration-500";
-
-      }else if(bat > 20){
-
-        bar.className =
-          "bg-amber-500 h-full transition-all duration-500";
-
-      }else{
-
-        bar.className =
-          "bg-rose-500 h-full transition-all duration-500";
-
-      }
-
-    }
-
-
-    /* ALARMAS */
-
-    const alarm1 =
-      getAlarmValue(
-        "alarm1-input",
-        40
-      );
-
-    const alarm2 =
-      getAlarmValue(
-        "alarm2-input",
-        40
-      );
-
-    const alarmDelta =
-      getAlarmValue(
-        "alarmDeltaMin-input",
-        0.5
-      );
-
-
-    const t1 =
-      document.getElementById(
-        "temp1-val"
-      );
-
-    const t2 =
-      document.getElementById(
-        "temp2-val"
-      );
-
-    const d =
-      document.getElementById(
-        "delta-val"
-      );
-
-
-    if(
-      s1 !== null &&
-      s1 >= alarm1
-    ){
-
-      t1.className =
-        "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5";
-
-    }else{
-
-      t1.className =
-        "text-2xl font-extrabold text-sky-400 mt-0.5";
-
-    }
-
-
-    if(
-      s2 !== null &&
-      s2 >= alarm2
-    ){
-
-      t2.className =
-        "text-2xl font-extrabold bg-yellow-500 text-slate-900 animate-pulse rounded my-1 mx-8 py-0.5";
-
-    }else{
-
-      t2.className =
-        "text-2xl font-extrabold text-rose-400 mt-0.5";
-
-    }
-
-
-    if(
-      delta !== null &&
-      delta <= alarmDelta
-    ){
-
-      d.className =
-        "text-2xl font-extrabold bg-rose-600 text-white animate-pulse rounded my-1 mx-8 py-0.5 shadow-lg";
-
-      if(isLive)
-        triggerPhoneVibration();
-
-    }else{
-
-      d.className =
-        "text-2xl font-extrabold text-amber-400 mt-0.5";
-
-    }
-
-
-    updateDeltaMessage();
-
-    updateSuggestion();
-
-  }
-
-
-  /* ==========================================================
-     MENSAJE ΔT
-  ========================================================== */
-
-  function updateDeltaMessage(){
-
-    const msg =
-      document.getElementById(
-        "delta-status-msg"
-      );
-
-
-    const trend =
-      analyzeTrend();
-
-
-    if(
-      trend.state ===
-      "aumentando"
-    ){
-
-      msg.textContent =
-        `📈 ΔT aumentando (${trend.change >= 0 ? "+" : ""}${trend.change.toFixed(1)} °C)`;
-
-      msg.className =
-        "text-[9px] text-emerald-400 font-bold mt-0.5";
-
-    }else if(
-      trend.state ===
-      "disminuyendo"
-    ){
-
-      msg.textContent =
-        `📉 ΔT disminuyendo (${trend.change.toFixed(1)} °C)`;
-
-      msg.className =
-        "text-[9px] text-amber-400 font-bold mt-0.5";
-
-    }else if(
-      trend.state ===
-      "estable"
-    ){
-
-      msg.textContent =
-        `✓ ΔT estable (${trend.average.toFixed(1)} °C aprox.)`;
-
-      msg.className =
-        "text-[9px] text-slate-400 mt-0.5";
-
-    }else{
-
-      msg.textContent =
-        "|SONDA 1 - SONDA 2|";
-
-      msg.className =
-        "text-[9px] text-slate-500 mt-0.5";
-
-    }
-
-  }
-
-
-  /* ==========================================================
-     RENDER GRÁFICA
-  ========================================================== */
-
-  function renderData(){
-
-    tempChart.data.labels = [];
-
-    tempChart.data.datasets[0].data = [];
-
-    tempChart.data.datasets[1].data = [];
-
-    tempChart.data.datasets[2].data = [];
-
-
-    const s1Values = [];
-
-    const s2Values = [];
-
-    const deltaValues = [];
-
-
-    rawData.forEach(row => {
-
-      const p =
-        processRow(row);
-
-
-      if(!p)
-        return;
-
-
-      const time =
-        new Date(
-          p.created_at
-        ).toLocaleTimeString(
-          [],
-          {
-            hour:"2-digit",
-            minute:"2-digit"
-          }
-        );
-
-
-      tempChart.data.labels.push(
-        time
-      );
-
-
-      tempChart.data.datasets[0]
-        .data.push(p.s1);
-
-      tempChart.data.datasets[1]
-        .data.push(p.s2);
-
-      tempChart.data.datasets[2]
-        .data.push(p.delta);
-
-
-      if(p.s1 !== null)
-        s1Values.push(p.s1);
-
-      if(p.s2 !== null)
-        s2Values.push(p.s2);
-
-      if(p.delta !== null)
-        deltaValues.push(p.delta);
-
-    });
-
-
-    document.getElementById(
-      "s1-min"
-    ).textContent =
-      s1Values.length
-        ? Math.min(...s1Values).toFixed(1)
-        : "--.-";
-
-
-    document.getElementById(
-      "s1-max"
-    ).textContent =
-      s1Values.length
-        ? Math.max(...s1Values).toFixed(1)
-        : "--.-";
-
-
-    document.getElementById(
-      "s2-min"
-    ).textContent =
-      s2Values.length
-        ? Math.min(...s2Values).toFixed(1)
-        : "--.-";
-
-
-    document.getElementById(
-      "s2-max"
-    ).textContent =
-      s2Values.length
-        ? Math.max(...s2Values).toFixed(1)
-        : "--.-";
-
-
-    document.getElementById(
-      "delta-min"
-    ).textContent =
-      deltaValues.length
-        ? Math.min(...deltaValues).toFixed(1)
-        : "--.-";
-
-
-    document.getElementById(
-      "delta-max"
-    ).textContent =
-      deltaValues.length
-        ? Math.max(...deltaValues).toFixed(1)
-        : "--.-";
-
-
-    updateChartVisibility();
-
-
-    const active =
-      rawData.length
-        ? rawData[rawData.length-1]
-        : lastGlobalRecord;
-
-
-    updateCards(
-      processRow(active)
-    );
-
-  }
-
-
-  /* ==========================================================
-     SUPABASE
-  ========================================================== */
-
-  async function fetchWindowData(){
-
-    if(isLive)
-      windowEndTime =
-        new Date();
-
+    const windowEnd =
+      new Date(windowEndTime);
 
     const windowStart =
       new Date(
-        windowEndTime.getTime() -
-        TWO_HOURS_MS
+        windowEnd.getTime() - TWO_HOURS_MS
       );
 
 
-    document.getElementById(
-      "btn-next"
-    ).disabled =
-      windowEndTime >=
-      new Date();
-
-
-    const {
-      data,
-      error
-    } =
+    const { data, error } =
       await supabaseClient
-
-        .from(
-          "lecturas_temperatura"
-        )
-
+        .from("lecturas_temperatura")
         .select("*")
-
         .gte(
           "created_at",
           windowStart.toISOString()
         )
-
         .lte(
           "created_at",
-          windowEndTime.toISOString()
+          windowEnd.toISOString()
         )
-
         .order(
           "created_at",
           {
-            ascending:true
+            ascending: true
           }
         );
 
 
-    if(error){
-
-      console.error(
-        "Error:",
-        error
-      );
-
+    if (error) {
+      console.error(error);
       return;
-
     }
 
 
-    rawData =
-      data || [];
+    rawData = data || [];
 
 
-    if(
-      isLive &&
-      rawData.length === 0
-    ){
-
-      const {
-        data:latest
-      } =
-        await supabaseClient
-
-          .from(
-            "lecturas_temperatura"
-          )
-
-          .select("*")
-
-          .order(
-            "created_at",
-            {
-              ascending:false
-            }
-          )
-
-          .limit(1);
-
-
+    if (rawData.length > 0) {
       lastGlobalRecord =
-        latest &&
-        latest.length
-          ? latest[0]
-          : null;
-
-    }else if(
-      rawData.length
-    ){
-
-      lastGlobalRecord =
-        rawData[
-          rawData.length-1
-        ];
-
+        rawData[rawData.length - 1];
     }
 
 
     renderData();
 
+  } catch (error) {
+
+    console.error(
+      "Error cargando datos:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   RENDERIZAR DATOS
+========================================================= */
+
+function renderData() {
+
+  if (!rawData.length) {
+
+    updateChartPeriod();
+
+    updateChartVisibility();
+
+    return;
   }
 
 
-  /* ==========================================================
-     NAVEGACIÓN
-  ========================================================== */
+  /*
+     Estadisticas
+  */
 
-  function navigateWindow(
-    hoursOffset
-  ){
+  const s1Values = [];
 
-    isLive = false;
+  const s2Values = [];
+
+  const deltaValues = [];
 
 
-    windowEndTime =
-      new Date(
-        windowEndTime.getTime() +
+  rawData.forEach(row => {
+
+    const s1 = getS1(row);
+
+    const s2 = getS2(row);
+
+    const delta = getDelta(row);
+
+
+    if (Number.isFinite(s1)) {
+      s1Values.push(s1);
+    }
+
+    if (Number.isFinite(s2)) {
+      s2Values.push(s2);
+    }
+
+    if (Number.isFinite(delta)) {
+      deltaValues.push(delta);
+    }
+
+  });
+
+
+  /*
+     Ultima lectura
+  */
+
+  const last =
+    rawData[rawData.length - 1];
+
+
+  updateCards(
+    last,
+    s1Values,
+    s2Values,
+    deltaValues
+  );
+
+
+  /*
+     Grafico
+  */
+
+  const labels = [];
+
+  const values = [];
+
+  /*
+     NUEVO
+
+     Limpiamos timestamps reales
+     antes de reconstruir el gráfico.
+  */
+
+  chartTimes = [];
+
+
+  rawData.forEach(
+    (row, index) => {
+
+      const date =
+        new Date(row.created_at);
+
+      const time =
+        date.toLocaleTimeString(
+          "es-ES",
+          {
+            hour: "2-digit",
+            minute: "2-digit"
+          }
+        );
+
+
+      labels.push(time);
+
+
+      /*
+         Guardamos timestamp completo
+      */
+
+      chartTimes.push(
+        row.created_at
+      );
+
+
+      let value;
+
+
+      if (chartMode === "s1") {
+        value = getS1(row);
+      }
+
+      else if (chartMode === "s2") {
+        value = getS2(row);
+      }
+
+      else {
+        value = getDelta(row);
+      }
+
+
+      values.push(
+        Number.isFinite(value)
+          ? value
+          : null
+      );
+
+    }
+  );
+
+
+  updateChart(
+    labels,
+    values
+  );
+
+
+  /*
+     NUEVO
+
+     Actualiza la cabecera del gráfico
+     mostrando exactamente el periodo.
+  */
+
+  updateChartPeriod();
+
+
+  updateSuggestion();
+
+
+  updateChartVisibility();
+
+}
+
+
+/* =========================================================
+   ACTUALIZAR TARJETAS
+========================================================= */
+
+function updateCards(
+  last,
+  s1Values,
+  s2Values,
+  deltaValues
+) {
+
+  let s1 = getS1(last);
+
+  let s2 = getS2(last);
+
+
+  if (isInverted) {
+
+    const temp = s1;
+
+    s1 = s2;
+
+    s2 = temp;
+
+  }
+
+
+  const delta =
+    Number.isFinite(s1) &&
+    Number.isFinite(s2)
+      ? Math.abs(s1 - s2)
+      : NaN;
+
+
+  /*
+     S1
+  */
+
+  document.getElementById(
+    "s1Current"
+  ).textContent =
+    formatTemperature(s1);
+
+
+  document.getElementById(
+    "s1Min"
+  ).textContent =
+    formatTemperature(
+      Math.min(...s1Values)
+    );
+
+
+  document.getElementById(
+    "s1Max"
+  ).textContent =
+    formatTemperature(
+      Math.max(...s1Values)
+    );
+
+
+  document.getElementById(
+    "s1Time"
+  ).textContent =
+    formatTime(last.created_at);
+
+
+  /*
+     S2
+  */
+
+  document.getElementById(
+    "s2Current"
+  ).textContent =
+    formatTemperature(s2);
+
+
+  document.getElementById(
+    "s2Min"
+  ).textContent =
+    formatTemperature(
+      Math.min(...s2Values)
+    );
+
+
+  document.getElementById(
+    "s2Max"
+  ).textContent =
+    formatTemperature(
+      Math.max(...s2Values)
+    );
+
+
+  document.getElementById(
+    "s2Time"
+  ).textContent =
+    formatTime(last.created_at);
+
+
+  /*
+     Delta
+  */
+
+  document.getElementById(
+    "deltaCurrent"
+  ).textContent =
+    formatTemperature(delta);
+
+
+  document.getElementById(
+    "deltaMin"
+  ).textContent =
+    formatTemperature(
+      Math.min(...deltaValues)
+    );
+
+
+  document.getElementById(
+    "deltaMax"
+  ).textContent =
+    formatTemperature(
+      Math.max(...deltaValues)
+    );
+
+
+  document.getElementById(
+    "deltaStatus"
+  ).textContent =
+    getDeltaStatus(delta);
+
+
+  /*
+     Umbrales
+
+     Ajusta estos valores a los mismos
+     que utilizabas en tu versión anterior.
+  */
+
+  const S1_ALARM = 35;
+
+  const S2_ALARM = 35;
+
+  const DELTA_LOW_ALARM = 0.4;
+
+
+  document.getElementById(
+    "s1AlarmText"
+  ).textContent =
+    "Alarma: > " +
+    S1_ALARM +
+    " °C";
+
+
+  document.getElementById(
+    "s2AlarmText"
+  ).textContent =
+    "Alarma: > " +
+    S2_ALARM +
+    " °C";
+
+
+  document.getElementById(
+    "deltaAlarmText"
+  ).textContent =
+    "< " +
+    DELTA_LOW_ALARM +
+    " °C";
+
+
+  /*
+     Alarmas visuales
+  */
+
+  setAlarmStyle(
+    "s1Current",
+    Number.isFinite(s1) &&
+    s1 >= S1_ALARM
+  );
+
+
+  setAlarmStyle(
+    "s2Current",
+    Number.isFinite(s2) &&
+    s2 >= S2_ALARM
+  );
+
+
+  setAlarmStyle(
+    "deltaCurrent",
+    Number.isFinite(delta) &&
+    delta < DELTA_LOW_ALARM
+  );
+
+}
+
+
+/* =========================================================
+   ESTADO DELTA
+========================================================= */
+
+function getDeltaStatus(delta) {
+
+  if (!Number.isFinite(delta)) {
+    return "Sin datos";
+  }
+
+  if (delta < 0.4) {
+    return "ΔT bajo";
+  }
+
+  if (delta < 1.0) {
+    return "ΔT normal-bajo";
+  }
+
+  if (delta < 3.0) {
+    return "ΔT estable";
+  }
+
+  return "ΔT alto";
+}
+
+
+/* =========================================================
+   ALARMA VISUAL
+========================================================= */
+
+function setAlarmStyle(
+  elementId,
+  alarm
+) {
+
+  const element =
+    document.getElementById(
+      elementId
+    );
+
+  if (!element) return;
+
+
+  if (alarm) {
+
+    element.classList.remove(
+      "text-sky-400",
+      "text-orange-400",
+      "text-emerald-400"
+    );
+
+    element.classList.add(
+      "text-red-400"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   ANALISIS DE TENDENCIA
+========================================================= */
+
+function analyzeTrend() {
+
+  const deltas = [];
+
+
+  for (
+    let i = Math.max(
+      0,
+      rawData.length - 10
+    );
+
+    i < rawData.length;
+
+    i++
+  ) {
+
+    const delta =
+      getDelta(rawData[i]);
+
+
+    if (Number.isFinite(delta)) {
+      deltas.push(delta);
+    }
+
+  }
+
+
+  if (deltas.length < 3) {
+
+    return {
+      type: "insufficient",
+      text: "No hay suficientes datos para analizar tendencia."
+    };
+
+  }
+
+
+  const first =
+    deltas[0];
+
+  const last =
+    deltas[deltas.length - 1];
+
+
+  const difference =
+    last - first;
+
+
+  const threshold = 0.4;
+
+
+  if (difference > threshold) {
+
+    return {
+      type: "increasing",
+      text: "El ΔT está aumentando."
+    };
+
+  }
+
+
+  if (difference < -threshold) {
+
+    return {
+      type: "decreasing",
+      text: "El ΔT está disminuyendo."
+    };
+
+  }
+
+
+  return {
+    type: "stable",
+    text: "El ΔT se mantiene relativamente estable."
+  };
+
+}
+
+
+/* =========================================================
+   SUGERENCIA
+========================================================= */
+
+function updateSuggestion() {
+
+  const element =
+    document.getElementById(
+      "suggestionText"
+    );
+
+
+  if (!rawData.length) {
+
+    element.textContent =
+      "Esperando mediciones...";
+
+    return;
+
+  }
+
+
+  const last =
+    rawData[rawData.length - 1];
+
+
+  const s1 =
+    getS1(last);
+
+  const s2 =
+    getS2(last);
+
+  const delta =
+    getDelta(last);
+
+
+  const S1_ALARM = 35;
+
+  const S2_ALARM = 35;
+
+  const DELTA_LOW = 0.4;
+
+
+  /*
+     Prioridad 1:
+     alarmas
+  */
+
+  if (
+    Number.isFinite(s1) &&
+    s1 >= S1_ALARM
+  ) {
+
+    element.textContent =
+      "ADVERTENCIA: Sonda 1 por encima del límite configurado. Verificar condiciones del equipo.";
+
+    return;
+
+  }
+
+
+  if (
+    Number.isFinite(s2) &&
+    s2 >= S2_ALARM
+  ) {
+
+    element.textContent =
+      "ADVERTENCIA: Sonda 2 por encima del límite configurado. Verificar condiciones del equipo.";
+
+    return;
+
+  }
+
+
+  /*
+     Prioridad 2:
+     ΔT bajo
+  */
+
+  if (
+    Number.isFinite(delta) &&
+    delta < DELTA_LOW
+  ) {
+
+    element.textContent =
+      "ΔT bajo. Conviene verificar flujo de aire, intercambio térmico y ubicación de las sondas.";
+
+    return;
+
+  }
+
+
+  /*
+     Prioridad 3:
+     tendencia
+  */
+
+  const trend =
+    analyzeTrend();
+
+
+  if (trend.type === "increasing") {
+
+    element.textContent =
+      "El ΔT está aumentando. Observar la evolución antes de tomar una decisión.";
+
+    return;
+
+  }
+
+
+  if (trend.type === "decreasing") {
+
+    element.textContent =
+      "El ΔT está disminuyendo. La diferencia entre las sondas se está reduciendo.";
+
+    return;
+
+  }
+
+
+  if (trend.type === "stable") {
+
+    element.textContent =
+      "Las temperaturas se mantienen relativamente estables.";
+
+    return;
+
+  }
+
+
+  element.textContent =
+    "Continuar observando las temperaturas y el comportamiento del ΔT.";
+
+}
+
+
+/* =========================================================
+   GRAFICO
+========================================================= */
+
+function updateChart(
+  labels,
+  values
+) {
+
+  const canvas =
+    document.getElementById(
+      "tempChart"
+    );
+
+
+  if (tempChart) {
+    tempChart.destroy();
+  }
+
+
+  let label = "Sonda 1";
+
+  let unit = "°C";
+
+
+  if (chartMode === "s2") {
+    label = "Sonda 2";
+  }
+
+  if (chartMode === "delta") {
+    label = "ΔT";
+  }
+
+
+  /*
+     Detectar color visual dependiendo
+     del modo ePaper.
+  */
+
+  const lineColor =
+    isEPaper
+      ? "#000000"
+      : (
+          chartMode === "s1"
+            ? "#38bdf8"
+            : chartMode === "s2"
+              ? "#fb923c"
+              : "#34d399"
+        );
+
+
+  tempChart =
+    new Chart(
+      canvas,
+      {
+
+        type: "line",
+
+        data: {
+
+          labels: labels,
+
+          datasets: [
+
+            {
+
+              label: label,
+
+              data: values,
+
+              borderColor: lineColor,
+
+              backgroundColor:
+                "transparent",
+
+              borderWidth: 2,
+
+              pointRadius: 2,
+
+              pointHoverRadius: 5,
+
+              tension: 0.25,
+
+              spanGaps: true
+
+            }
+
+          ]
+
+        },
+
+
+        options: {
+
+          responsive: true,
+
+          maintainAspectRatio: false,
+
+
+          interaction: {
+
+            mode: "index",
+
+            intersect: false
+
+          },
+
+
+          plugins: {
+
+            legend: {
+
+              display: false
+
+            },
+
+
+            /*
+               NUEVO
+
+               Tooltip con fecha y hora
+               completas.
+            */
+
+            tooltip: {
+
+              callbacks: {
+
+                title: function(
+                  tooltipItems
+                ) {
+
+                  const index =
+                    tooltipItems[0].dataIndex;
+
+
+                  if (
+                    chartTimes[index]
+                  ) {
+
+                    return formatChartDateTime(
+                      chartTimes[index]
+                    );
+
+                  }
+
+
+                  return "";
+
+                },
+
+
+                label: function(
+                  context
+                ) {
+
+                  const value =
+                    context.parsed.y;
+
+
+                  if (
+                    value === null ||
+                    value === undefined
+                  ) {
+
+                    return "";
+
+                  }
+
+
+                  return (
+                    context.dataset.label +
+                    ": " +
+                    Number(value).toFixed(1) +
+                    " °C"
+                  );
+
+                }
+
+              }
+
+            }
+
+          },
+
+
+          scales: {
+
+            x: {
+
+              grid: {
+
+                color: isEPaper
+                  ? "#cccccc"
+                  : "rgba(71,85,105,0.25)"
+
+              },
+
+
+              ticks: {
+
+                color: isEPaper
+                  ? "#000000"
+                  : "#64748b",
+
+                maxTicksLimit: 8,
+
+                font: {
+                  size: 9
+                },
+
+
+                /*
+                   NUEVO
+
+                   Si un punto corresponde al
+                   cambio de día, muestra:
+
+                   00:15
+                   08 SEP
+                */
+
+                callback: function(
+                  value,
+                  index
+                ) {
+
+                  if (
+                    !chartTimes[index]
+                  ) {
+
+                    return labels[index];
+
+                  }
+
+
+                  const current =
+                    new Date(
+                      chartTimes[index]
+                    );
+
+
+                  const time =
+                    current.toLocaleTimeString(
+                      "es-ES",
+                      {
+                        hour: "2-digit",
+                        minute: "2-digit"
+                      }
+                    );
+
+
+                  if (index > 0) {
+
+                    const previous =
+                      new Date(
+                        chartTimes[index - 1]
+                      );
+
+
+                    const currentDay =
+                      current.toLocaleDateString(
+                        "es-ES"
+                      );
+
+
+                    const previousDay =
+                      previous.toLocaleDateString(
+                        "es-ES"
+                      );
+
+
+                    /*
+                       Cambio de día
+                    */
+
+                    if (
+                      currentDay !==
+                      previousDay
+                    ) {
+
+                      return [
+                        time,
+                        formatShortDate(
+                          current
+                        )
+                      ];
+
+                    }
+
+                  }
+
+
+                  return time;
+
+                }
+
+              }
+
+            },
+
+
+            y: {
+
+              grid: {
+
+                color: isEPaper
+                  ? "#cccccc"
+                  : "rgba(71,85,105,0.25)"
+
+              },
+
+
+              ticks: {
+
+                color: isEPaper
+                  ? "#000000"
+                  : "#64748b",
+
+                font: {
+                  size: 9
+                },
+
+
+                callback: function(
+                  value
+                ) {
+
+                  return (
+                    Number(value).toFixed(1) +
+                    "°"
+                  );
+
+                }
+
+              }
+
+            }
+
+          }
+
+        }
+
+      }
+    );
+
+}
+
+
+/* =========================================================
+   NUEVO:
+   CABECERA DEL PERIODO DEL GRAFICO
+========================================================= */
+
+function updateChartPeriod() {
+
+  const status =
+    document.getElementById(
+      "chart-period-status"
+    );
+
+  const period =
+    document.getElementById(
+      "chart-period"
+    );
+
+  const duration =
+    document.getElementById(
+      "chart-period-duration"
+    );
+
+
+  const periodEnd =
+    isLive
+      ? new Date()
+      : new Date(windowEndTime);
+
+
+  const periodStart =
+    new Date(
+      periodEnd.getTime() -
+      TWO_HOURS_MS
+    );
+
+
+  /*
+     EN VIVO
+  */
+
+  if (isLive) {
+
+    status.textContent =
+      "● EN VIVO";
+
+    status.className =
+      "text-[9px] font-bold " +
+      "text-emerald-400 " +
+      "uppercase tracking-wider";
+
+
+    period.textContent =
+      formatChartDateTime(
+        periodStart
+      ) +
+      " — " +
+      formatChartDateTime(
+        periodEnd
+      );
+
+
+    duration.textContent =
+      "Últimas 2 horas";
+
+  }
+
+
+  /*
+     HISTORIAL
+  */
+
+  else {
+
+    status.textContent =
+      "HISTORIAL";
+
+
+    status.className =
+      "text-[9px] font-bold " +
+      "text-amber-400 " +
+      "uppercase tracking-wider";
+
+
+    period.textContent =
+      formatChartDateTime(
+        periodStart
+      ) +
+      " — " +
+      formatChartDateTime(
+        periodEnd
+      );
+
+
+    duration.textContent =
+      "Período anterior";
+
+  }
+
+}
+
+
+/* =========================================================
+   CAMBIAR GRAFICO
+========================================================= */
+
+function setChartMode(mode) {
+
+  chartMode = mode;
+
+
+  document
+    .querySelectorAll(
+      ".chartSelector"
+    )
+    .forEach(button => {
+
+      button.classList.remove(
+        "bg-sky-600",
+        "text-white"
+      );
+
+      button.classList.add(
+        "bg-slate-800",
+        "text-slate-300"
+      );
+
+    });
+
+
+  let activeButton;
+
+
+  if (mode === "s1") {
+    activeButton =
+      document.getElementById(
+        "btnS1"
+      );
+  }
+
+  else if (mode === "s2") {
+    activeButton =
+      document.getElementById(
+        "btnS2"
+      );
+  }
+
+  else {
+    activeButton =
+      document.getElementById(
+        "btnDelta"
+      );
+  }
+
+
+  activeButton.classList.remove(
+    "bg-slate-800",
+    "text-slate-300"
+  );
+
+  activeButton.classList.add(
+    "bg-sky-600",
+    "text-white"
+  );
+
+
+  renderData();
+
+}
+
+
+/* =========================================================
+   NAVEGACION DE 2 HORAS
+========================================================= */
+
+function navigateWindow(
+  hoursOffset
+) {
+
+  isLive = false;
+
+
+  const newEnd =
+    new Date(
+      windowEndTime.getTime() +
+      (
         hoursOffset *
         60 *
         60 *
         1000
-      );
+      )
+    );
 
 
-    if(
-      windowEndTime >=
-      new Date()
-    ){
-
-      goLive();
-
-      return;
-
-    }
+  const now =
+    new Date();
 
 
-    fetchWindowData();
+  /*
+     Si el usuario vuelve hasta
+     el periodo actual, regresamos
+     a EN VIVO.
+  */
 
-  }
+  if (
+    newEnd.getTime() >=
+    now.getTime()
+  ) {
 
+    goLive();
 
-  function goLive(){
-
-    isLive = true;
-
-    windowEndTime =
-      new Date();
-
-    fetchWindowData();
+    return;
 
   }
 
 
-  /* ==========================================================
-     REALTIME
-  ========================================================== */
+  windowEndTime =
+    newEnd;
+
+
+  updateChartPeriod();
+
+  fetchWindowData();
+
+}
+
+
+/* =========================================================
+   VOLVER A EN VIVO
+========================================================= */
+
+function goLive() {
+
+  isLive = true;
+
+  windowEndTime =
+    new Date();
+
+
+  updateChartPeriod();
+
+  fetchWindowData();
+
+}
+
+
+/* =========================================================
+   INVERTIR SONDAS
+========================================================= */
+
+function invertProbes() {
+
+  isInverted =
+    !isInverted;
+
+
+  renderData();
+
+}
+
+
+/* =========================================================
+   EPAPER
+========================================================= */
+
+function toggleEPaper() {
+
+  isEPaper =
+    !isEPaper;
+
+
+  const button =
+    document.getElementById(
+      "epaperBtn"
+    );
+
+
+  if (isEPaper) {
+
+    button.textContent =
+      "ePaper ON";
+
+    document.body.style.background =
+      "#f8fafc";
+
+    document.body.style.color =
+      "#000000";
+
+  }
+
+  else {
+
+    button.textContent =
+      "ePaper";
+
+    document.body.style.background =
+      "#020617";
+
+    document.body.style.color =
+      "#e2e8f0";
+
+  }
+
+
+  renderData();
+
+}
+
+
+/* =========================================================
+   VISIBILIDAD DEL GRAFICO
+========================================================= */
+
+function updateChartVisibility() {
+
+  const canvas =
+    document.getElementById(
+      "tempChart"
+    );
+
+
+  if (!canvas) return;
+
+
+  if (!rawData.length) {
+
+    canvas.style.opacity =
+      "0.35";
+
+  }
+
+  else {
+
+    canvas.style.opacity =
+      "1";
+
+  }
+
+}
+
+
+/* =========================================================
+   REALTIME SUPABASE
+========================================================= */
+
+function setupRealtime() {
 
   supabaseClient
-
     .channel(
-      "temperatura-realtime"
+      "lecturas-temperatura-live"
     )
-
     .on(
       "postgres_changes",
       {
-        event:"INSERT",
-        schema:"public",
-        table:"lecturas_temperatura"
+        event: "INSERT",
+        schema: "public",
+        table: "lecturas_temperatura"
       },
-
       payload => {
 
-        if(!isLive)
+        /*
+           Solo agregamos automáticamente
+           lecturas nuevas cuando estamos
+           en EN VIVO.
+        */
+
+        if (!isLive) {
           return;
+        }
 
 
         rawData.push(
@@ -2344,81 +2076,87 @@
         );
 
 
-        lastGlobalRecord =
-          payload.new;
+        /*
+           Mantener únicamente las
+           últimas 2 horas.
+        */
 
-
-        const cutoff =
-          new Date(
-            Date.now() -
-            TWO_HOURS_MS
-          ).toISOString();
+        const limit =
+          new Date().getTime() -
+          TWO_HOURS_MS;
 
 
         rawData =
           rawData.filter(
-            r =>
-              r.created_at >=
-              cutoff
+            row =>
+              new Date(
+                row.created_at
+              ).getTime() >= limit
           );
+
+
+        windowEndTime =
+          new Date();
 
 
         renderData();
 
       }
-
     )
+    .subscribe(
+      status => {
 
-    .subscribe();
-
-
-  /* ==========================================================
-     INICIO
-  ========================================================== */
-
-  loadSavedAlarms();
-
-  fetchWindowData();
-
-
-  /* Refresco de datos */
-
-  setInterval(
-    () => {
-
-      if(isLive)
-        fetchWindowData();
-
-    },
-    10000
-  );
-
-
-  /* Refresco de estado */
-
-  setInterval(
-    () => {
-
-      if(isLive){
-
-        const active =
-          rawData.length
-            ? rawData[
-                rawData.length-1
-              ]
-            : lastGlobalRecord;
-
-
-        if(active)
-          updateCards(
-            processRow(active)
+        const element =
+          document.getElementById(
+            "onlineStatus"
           );
 
-      }
 
-    },
-    5000
-  );
+        if (
+          status ===
+          "SUBSCRIBED"
+        ) {
+
+          element.textContent =
+            "● ONLINE";
+
+          element.className =
+            "px-2 py-1 rounded-lg " +
+            "bg-emerald-500/10 " +
+            "border border-emerald-500/30 " +
+            "text-emerald-400 " +
+            "text-[10px] font-bold";
+
+        }
+
+      }
+    );
+
+}
+
+
+/* =========================================================
+   INICIO
+========================================================= */
+
+async function init() {
+
+  windowEndTime =
+    new Date();
+
+
+  updateChartPeriod();
+
+
+  await fetchWindowData();
+
+
+  setupRealtime();
+
+}
+
+
+init();
 
 </script>
 
