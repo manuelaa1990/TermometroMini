@@ -497,46 +497,6 @@
 
   </div>
 
-
-  <!-- =========================================================
-       SUGERENCIA
-  ========================================================== -->
-
-  <div id="suggestion-card"
-       class="bg-slate-800 border border-slate-700/60
-              rounded-xl p-3 shadow-md">
-
-    <div class="flex items-start gap-2">
-
-      <div id="suggestion-icon"
-           class="text-lg leading-none">
-        💡
-      </div>
-
-      <div class="flex-1">
-
-        <div id="suggestion-title"
-             class="text-xs font-bold text-sky-400">
-
-          SUGERENCIA
-
-        </div>
-
-        <div id="suggestion-text"
-             class="text-[11px] text-slate-300 mt-0.5">
-
-          Esperando suficientes lecturas para analizar
-          la tendencia...
-
-        </div>
-
-      </div>
-
-    </div>
-
-  </div>
-
-
   <!-- =========================================================
        NAVEGACIÓN
   ========================================================== -->
@@ -994,22 +954,8 @@
 
 
   /* ==========================================================
-     MOSTRAR / OCULTAR DELTA + DIAGNÓSTICO
-     El checkbox ΔT controla la visualización y la participación
-     del ΔT en el diagnóstico.
+     MOSTRAR / OCULTAR DELTA
   ========================================================== */
-
-  function isDeltaTEnabled(){
-
-    const checkbox =
-      document.getElementById("chk-delta");
-
-    return checkbox
-      ? checkbox.checked
-      : true;
-
-  }
-
 
   function toggleDeltaT(showState){
 
@@ -1018,9 +964,6 @@
 
     const card =
       document.getElementById("card-delta");
-
-    const suggestion =
-      document.getElementById("suggestion-card");
 
 
     if(typeof showState !== "boolean"){
@@ -1036,67 +979,13 @@
     }
 
 
-    /* Tarjeta ΔT */
     if(showState)
       card.classList.remove("hidden");
     else
       card.classList.add("hidden");
 
 
-    /*
-      SUGERENCIA / MOTOR DE DIAGNÓSTICO
-
-      La tarjeta se oculta junto con ΔT.
-      El motor NO se elimina: vuelve a funcionar
-      automáticamente al activar ΔT.
-    */
-    if(suggestion){
-
-      if(showState)
-        suggestion.classList.remove("hidden");
-      else
-        suggestion.classList.add("hidden");
-
-    }
-
-
     updateChartVisibility();
-
-
-    /* Refrescar inmediatamente */
-    if(showState){
-
-      updateDeltaMessage();
-      updateSuggestion();
-
-    }else{
-
-      const msg =
-        document.getElementById("delta-status-msg");
-
-      if(msg){
-
-        msg.textContent =
-          "ΔT desactivado";
-
-        msg.className =
-          "text-[9px] text-slate-500 mt-0.5";
-
-      }
-
-
-      /* Limpiar cualquier alarma visual previa de ΔT */
-      const d =
-        document.getElementById("delta-val");
-
-      if(d){
-
-        d.className =
-          "text-2xl font-extrabold text-amber-400 mt-0.5";
-
-      }
-
-    }
 
   }
 
@@ -1407,17 +1296,6 @@
 
   function analyzeTrend(){
 
-    if(!isDeltaTEnabled()){
-
-      return {
-        state:"deshabilitado",
-        change:0,
-        average:0
-      };
-
-    }
-
-
     const valid =
       rawData
         .map(processRow)
@@ -1504,233 +1382,6 @@
 
   }
 
-
-  /* ==========================================================
-     SUGERENCIAS
-  ========================================================== */
-
-  function updateSuggestion(){
-
-    const suggestion =
-      document.getElementById("suggestion-card");
-
-    if(!isDeltaTEnabled()){
-
-      if(suggestion)
-        suggestion.classList.add("hidden");
-
-      return;
-
-    }
-
-    if(suggestion)
-      suggestion.classList.remove("hidden");
-
-
-    const title =
-      document.getElementById(
-        "suggestion-title"
-      );
-
-    const text =
-      document.getElementById(
-        "suggestion-text"
-      );
-
-    const icon =
-      document.getElementById(
-        "suggestion-icon"
-      );
-
-
-    const p =
-      rawData.length
-        ? processRow(
-            rawData[rawData.length - 1]
-          )
-        : null;
-
-
-    if(!p){
-
-      title.textContent =
-        "SUGERENCIA";
-
-      text.textContent =
-        "Esperando lecturas...";
-
-      icon.textContent =
-        "💡";
-
-      return;
-
-    }
-
-
-    const alarm1 =
-      getAlarmValue(
-        "alarm1-input",
-        40
-      );
-
-    const alarm2 =
-      getAlarmValue(
-        "alarm2-input",
-        40
-      );
-
-    const alarmDelta =
-      getAlarmValue(
-        "alarmDeltaMin-input",
-        0.5
-      );
-
-
-    /*
-      PRIORIDAD 1:
-      ALARMAS
-    */
-
-    if(
-      p.s1 !== null &&
-      p.s1 >= alarm1
-    ){
-
-      title.textContent =
-        "ATENCIÓN";
-
-      text.textContent =
-        `Sonda 1 supera la alarma configurada (${alarm1.toFixed(1)} °C). Verifique la condición antes de continuar.`;
-
-      icon.textContent =
-        "⚠️";
-
-      return;
-
-    }
-
-
-    if(
-      p.s2 !== null &&
-      p.s2 >= alarm2
-    ){
-
-      title.textContent =
-        "ATENCIÓN";
-
-      text.textContent =
-        `Sonda 2 supera la alarma configurada (${alarm2.toFixed(1)} °C). Verifique la condición antes de continuar.`;
-
-      icon.textContent =
-        "⚠️";
-
-      return;
-
-    }
-
-
-    if(
-      isDeltaTEnabled() &&
-      p.delta !== null &&
-      p.delta <= alarmDelta
-    ){
-
-      title.textContent =
-        "ΔT MUY BAJO";
-
-      text.textContent =
-        `La diferencia entre las sondas es de ${p.delta.toFixed(1)} °C. Conviene verificar la posición de las sondas y observar si el valor continúa bajo.`;
-
-      icon.textContent =
-        "⚠️";
-
-      return;
-
-    }
-
-
-    /*
-      PRIORIDAD 2:
-      TENDENCIA
-    */
-
-    const trend =
-      analyzeTrend();
-
-
-    if(
-      trend.state ===
-      "insuficiente"
-    ){
-
-      title.textContent =
-        "SUGERENCIA";
-
-      text.textContent =
-        "Se necesitan algunas lecturas más para analizar la tendencia del ΔT.";
-
-      icon.textContent =
-        "💡";
-
-      return;
-
-    }
-
-
-    if(
-      trend.state ===
-      "disminuyendo"
-    ){
-
-      title.textContent =
-        "ΔT DESCENDIENDO";
-
-      text.textContent =
-        `El ΔT ha disminuido aproximadamente ${Math.abs(trend.change).toFixed(1)} °C en las últimas lecturas. Observe si la tendencia continúa.`;
-
-      icon.textContent =
-        "📉";
-
-      return;
-
-    }
-
-
-    if(
-      trend.state ===
-      "aumentando"
-    ){
-
-      title.textContent =
-        "ΔT AUMENTANDO";
-
-      text.textContent =
-        `El ΔT ha aumentado aproximadamente ${trend.change.toFixed(1)} °C en las últimas lecturas. El comportamiento se está separando progresivamente.`;
-
-      icon.textContent =
-        "📈";
-
-      return;
-
-    }
-
-
-    /*
-      ESTABLE
-    */
-
-    title.textContent =
-      "ΔT ESTABLE";
-
-    text.textContent =
-      `La diferencia entre las sondas se mantiene relativamente estable alrededor de ${trend.average.toFixed(1)} °C.`;
-
-    icon.textContent =
-      "✅";
-
-  }
-
-
   /* ==========================================================
      TARJETAS
   ========================================================== */
@@ -1758,8 +1409,6 @@
 
       wifiEl.textContent =
         'Wifi: "Sin conexión"';
-
-      updateSuggestion();
 
       return;
 
@@ -2022,7 +1671,6 @@
 
 
     if(
-      isDeltaTEnabled() &&
       delta !== null &&
       delta <= alarmDelta
     ){
@@ -2043,8 +1691,6 @@
 
     updateDeltaMessage();
 
-    updateSuggestion();
-
   }
 
 
@@ -2059,66 +1705,20 @@
         "delta-status-msg"
       );
 
-
-    if(!isDeltaTEnabled()){
-
-      msg.textContent =
-        "ΔT desactivado";
-
-      msg.className =
-        "text-[9px] text-slate-500 mt-0.5";
-
+    if(!msg)
       return;
 
-    }
+    const alarmDelta =
+      getAlarmValue(
+        "alarmDeltaMin-input",
+        0.5
+      );
 
+    msg.textContent =
+      `⚠ Alarma ΔT: ${alarmDelta.toFixed(1)} °C`;
 
-    const trend =
-      analyzeTrend();
-
-
-    if(
-      trend.state ===
-      "aumentando"
-    ){
-
-      msg.textContent =
-        `📈 ΔT aumentando (${trend.change >= 0 ? "+" : ""}${trend.change.toFixed(1)} °C)`;
-
-      msg.className =
-        "text-[9px] text-emerald-400 font-bold mt-0.5";
-
-    }else if(
-      trend.state ===
-      "disminuyendo"
-    ){
-
-      msg.textContent =
-        `📉 ΔT disminuyendo (${trend.change.toFixed(1)} °C)`;
-
-      msg.className =
-        "text-[9px] text-amber-400 font-bold mt-0.5";
-
-    }else if(
-      trend.state ===
-      "estable"
-    ){
-
-      msg.textContent =
-        `✓ ΔT estable (${trend.average.toFixed(1)} °C aprox.)`;
-
-      msg.className =
-        "text-[9px] text-slate-400 mt-0.5";
-
-    }else{
-
-      msg.textContent =
-        "|SONDA 1 - SONDA 2|";
-
-      msg.className =
-        "text-[9px] text-slate-500 mt-0.5";
-
-    }
+    msg.className =
+      "text-[9px] text-slate-400 font-bold mt-0.5";
 
   }
 
