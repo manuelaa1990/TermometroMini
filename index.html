@@ -100,7 +100,7 @@
         <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
         </svg>
-        <span id="bat-val" class="font-medium text-slate-300 text-[11px]">--%</span>
+        <span id="bat-val" title="Batería 18650" class="font-medium text-slate-300 text-[11px]">--% · --.--V</span>
         <div class="w-8 bg-slate-700 h-1.5 rounded-full overflow-hidden">
           <div id="bat-bar" class="bg-emerald-500 h-full transition-all duration-500" style="width:0%"></div>
         </div>
@@ -137,10 +137,24 @@
     <div class="text-[9px] text-slate-500 font-medium">V2 • Prueba de Presión con N₂</div>
   </header>
 
+  <!-- MODO DE TRABAJO -->
+  <div class="bg-slate-800 border border-slate-700/60 p-1 rounded-xl shadow-md">
+    <div class="grid grid-cols-2 gap-1 bg-slate-900/70 p-1 rounded-lg">
+      <button id="mode-thermometer" onclick="setWorkMode('thermometer')"
+        class="py-1.5 text-[10px] font-bold rounded-lg transition">
+        🌡 TERMÓMETRO
+      </button>
+      <button id="mode-ph" onclick="setWorkMode('ph')"
+        class="py-1.5 text-[10px] font-bold rounded-lg transition">
+        ⬡ P.H.
+      </button>
+    </div>
+  </div>
+
   <!-- SONDA 1 -->
   <div id="card-s1" class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all">
     <div class="flex justify-between items-center text-[10px] font-bold text-sky-400 uppercase tracking-wider px-1">
-      <span>SONDA 1 (Temp. Ambiente)</span>
+      <span id="s1-title">SONDA 1</span>
       <div class="flex items-center gap-1 text-[9px] text-slate-400">
         <span>Alarma:</span>
         <input type="number" id="alarm1-input" value="40" min="-50" max="100" step="0.5" oninput="saveAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-sky-400 text-center rounded focus:outline-none py-0.5">
@@ -167,7 +181,7 @@
   <!-- SONDA 2 -->
   <div id="card-s2" class="bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all">
     <div class="flex justify-between items-center text-[10px] font-bold text-rose-400 uppercase tracking-wider px-1">
-      <span>SONDA 2 (Temp. Tubería)</span>
+      <span id="s2-title">SONDA 2</span>
       <div class="flex items-center gap-1 text-[9px] text-slate-400">
         <span>Alarma:</span>
         <input type="number" id="alarm2-input" value="40" min="-50" max="100" step="0.5" oninput="saveAndRender()" class="w-12 bg-slate-900 border border-slate-700 text-rose-400 text-center rounded focus:outline-none py-0.5">
@@ -205,17 +219,19 @@
 
 
   <!-- PRESIÓN / PRUEBA DE HERMETICIDAD — ADICIONAL -->
-  <div id="card-pressure-test" class="bg-slate-800 border border-emerald-500/30 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all">
+  <div id="card-pressure-test" class="bg-slate-800 border border-emerald-500/30 py-2 px-3 rounded-xl shadow-md text-center relative transition-all">
     <div class="flex justify-between items-center text-[10px] font-bold text-emerald-400 uppercase tracking-wider px-1">
       <div class="flex items-center gap-1.5">
         <span>Presión / Prueba de Hermeticidad</span>
         <button onclick="togglePressureMode(false)" title="Ocultar" class="text-slate-500 hover:text-emerald-400 p-0.5">×</button>
       </div>
+      <span class="text-[8px] text-slate-500 normal-case">60/40</span>
     </div>
 
+    <!-- ENTRADA COMPACTA -->
     <div class="grid grid-cols-[1fr_auto] gap-2 items-end mt-1.5">
       <div class="text-left">
-        <label class="block text-[10px] text-slate-400 mb-0.5">Presión (PSI)</label>
+        <label class="block text-[9px] text-slate-400 mb-0.5">Presión medida (PSI)</label>
         <input type="number" id="n2-p-init" value="150" min="0" step="0.5"
           class="w-full bg-slate-900 border border-slate-700 text-emerald-400 font-bold px-2 py-1.5 rounded focus:outline-none">
       </div>
@@ -227,29 +243,33 @@
 
     <input type="datetime-local" id="n2-time-init" class="hidden">
 
-    <div class="text-[9px] text-slate-500 mt-1">Modelo P.H.: 60% exterior (S1) + 40% interior (S2)</div>
+    <div class="text-[8px] text-slate-500 mt-1">
+      N₂: 60% exterior (S1) + 40% interior (S2)
+    </div>
 
-    <div class="border-t border-slate-700/60 mt-2 pt-2">
-      <div class="flex justify-between items-center text-[10px] font-bold text-emerald-400 uppercase tracking-wider px-1">
-        <span>Presión Estimada (Compensada)</span>
-        <span id="n2-elapsed" class="text-[9px] text-slate-400">Tiempo: --</span>
+    <div class="border-t border-slate-700/60 mt-1.5 pt-1.5">
+      <div class="grid grid-cols-2 gap-2">
+        <div class="rounded-lg bg-slate-900/50 border border-slate-700/50 py-1">
+          <div class="text-[8px] text-slate-500 uppercase">Presión esperada</div>
+          <div id="n2-p-calc" class="text-xl font-extrabold text-emerald-400 leading-tight">---.- PSI</div>
+        </div>
+        <div class="rounded-lg bg-slate-900/50 border border-slate-700/50 py-1">
+          <div class="text-[8px] text-slate-500 uppercase">Última medida</div>
+          <div id="n2-p-last" class="text-xl font-extrabold text-slate-200 leading-tight">---.- PSI</div>
+        </div>
       </div>
 
-      <div id="n2-p-calc" class="text-2xl font-extrabold text-emerald-400 mt-0.5">---.- PSI</div>
-
-      <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-1">
+      <div class="flex justify-center flex-wrap gap-x-4 gap-y-0.5 text-[9px] font-mono text-slate-400 mt-1">
+        <span>Δ real: <strong id="n2-diff" class="text-slate-200">--.-</strong> PSI</span>
         <span>Ref.: <strong id="n2-p-ref" class="text-slate-200">--.-</strong> PSI</span>
-        <span>T. Ref. 60/40: <strong id="n2-t-ref" class="text-slate-200">--.-</strong> °C</span>
+        <span>Tef: <strong id="n2-t-ref" class="text-slate-200">--.-</strong> °C</span>
+        <span id="n2-elapsed">Tiempo: --</span>
       </div>
 
-      <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-0.5">
-        <span>Última: <strong id="n2-p-last" class="text-slate-200">--.-</strong> PSI</span>
-        <span>Δ medida: <strong id="n2-diff" class="text-slate-200">--.-</strong> PSI</span>
-      </div>
-
-      <div id="n2-status-msg" class="text-[9px] text-slate-500 mt-0.5"></div>
+      <div id="n2-status-msg" class="text-[8px] text-slate-500 mt-0.5"></div>
     </div>
   </div>
+
 
   <div id="restore-pressure-test" class="hidden flex justify-center -my-1">
     <button onclick="togglePressureMode(true)"
@@ -328,7 +348,8 @@
         { label: "SONDA 1", borderColor: "#38bdf8", backgroundColor: "rgba(56,189,248,.05)", data: [], borderWidth: 2, tension: .2, pointRadius: 1, fill: true },
         { label: "SONDA 2", borderColor: "#f87171", backgroundColor: "rgba(248,113,113,.05)", data: [], borderWidth: 2, tension: .2, pointRadius: 1, fill: true },
         { label: "ΔT", borderColor: "#fbbf24", backgroundColor: "rgba(251,191,36,.05)", data: [], borderWidth: 2, tension: .2, pointRadius: 1, fill: true },
-        { label: "Presión", borderColor: "#34d399", backgroundColor: "rgba(52,211,153,.03)", data: [], borderWidth: 2, tension: .15, pointRadius: 1, fill: false, yAxisID: "pressure" }
+        { label: "P.H. Esperada", borderColor: "#34d399", backgroundColor: "rgba(52,211,153,.03)", data: [], borderWidth: 2, tension: .15, pointRadius: 1, fill: false, yAxisID: "pressure" },
+        { label: "P.H. Medida", borderColor: "#a7f3d0", backgroundColor: "rgba(167,243,208,.0)", data: [], borderWidth: 0, tension: 0, pointRadius: 4, pointHoverRadius: 5, showLine: false, fill: false, yAxisID: "pressure" }
       ]
     },
     options: {
@@ -353,7 +374,7 @@
             label: function(context) {
               const value = context.parsed.y;
               if (value === null || value === undefined) return context.dataset.label + ": DESC";
-              const unit = context.dataset.label === "Presión" ? " PSI" : " °C";
+              const unit = context.dataset.label.startsWith("P.H.") ? " PSI" : " °C";
               return context.dataset.label + ": " + value.toFixed(1) + unit;
             }
           }
@@ -371,6 +392,53 @@
   }
 
   /* MODOS Y VISTA */
+  /* MODOS DE TRABAJO
+     TERMÓMETRO = S1 / S2 / ΔT genéricos
+     P.H.       = S1 exterior + S2 interior + motor 60/40
+  */
+  let workMode =
+    localStorage.getItem("work-mode") === "ph"
+      ? "ph"
+      : "thermometer";
+
+  function setWorkMode(mode) {
+    workMode = mode === "ph" ? "ph" : "thermometer";
+    localStorage.setItem("work-mode", workMode);
+
+    const isPH = workMode === "ph";
+
+    document.getElementById("mode-thermometer").className =
+      isPH
+        ? "py-1.5 text-[10px] font-bold rounded-lg transition text-slate-400 hover:text-slate-200"
+        : "py-1.5 text-[10px] font-bold rounded-lg transition bg-sky-600 text-white shadow";
+
+    document.getElementById("mode-ph").className =
+      isPH
+        ? "py-1.5 text-[10px] font-bold rounded-lg transition bg-emerald-600 text-white shadow"
+        : "py-1.5 text-[10px] font-bold rounded-lg transition text-slate-400 hover:text-slate-200";
+
+    document.getElementById("s1-title").textContent =
+      isPH ? "SONDA 1 · TEMP. EXTERIOR" : "SONDA 1";
+
+    document.getElementById("s2-title").textContent =
+      isPH ? "SONDA 2 · TEMP. INTERIOR" : "SONDA 2";
+
+    // P.H. is available only in its dedicated work mode.
+    // The graph checkbox remains the individual visibility control.
+    const phSelector = document.getElementById("pressure-chart-selector");
+    if (phSelector) {
+      phSelector.classList.toggle("hidden", !isPH);
+    }
+
+    if (isPH) {
+      togglePressureMode(true);
+    } else {
+      togglePressureMode(false);
+    }
+
+    updateChartVisibility();
+  }
+
   function toggleEPaperMode() {
     isEPaper = !isEPaper;
     localStorage.setItem("epaper-mode", isEPaper ? "true" : "false");
@@ -429,6 +497,7 @@
     tempChart.setDatasetVisibility(1, s2);
     tempChart.setDatasetVisibility(2, delta);
     tempChart.setDatasetVisibility(3, pressure);
+    tempChart.setDatasetVisibility(4, pressure);
     tempChart.update();
   }
 
@@ -449,9 +518,6 @@
 
     if (np !== null)
       document.getElementById("n2-p-init").value = np;
-
-    loadPressureState();
-    togglePressureTest(pressureTestVisible);
 
     if (localStorage.getItem("epaper-mode") === "true") {
       isEPaper = true;
@@ -475,6 +541,51 @@
       ? "p-2 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/60 transition-all shadow-md active:scale-90 ring-2 ring-amber-500/30"
       : "p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition-all shadow-md active:scale-90";
     renderData();
+  }
+
+  /*
+    BATERÍA 18650 Li-ion
+    El campo "bateria" puede venir como:
+      - voltaje real (ej. 3.40 V), que es lo esperado para esta versión
+      - porcentaje 0..100, para mantener compatibilidad con firmware antiguo
+
+    La curva no es lineal: se interpola entre puntos representativos
+    de una celda Li-ion de 4.20 V.
+  */
+  function batteryPercentFromVoltage(voltage) {
+    const v = Number(voltage);
+    if (!Number.isFinite(v)) return null;
+
+    const curve = [
+      [3.00, 0],
+      [3.20, 5],
+      [3.30, 10],
+      [3.40, 15],
+      [3.50, 20],
+      [3.60, 30],
+      [3.70, 40],
+      [3.75, 50],
+      [3.80, 60],
+      [3.90, 70],
+      [4.00, 80],
+      [4.10, 90],
+      [4.20, 100]
+    ];
+
+    if (v <= curve[0][0]) return 0;
+    if (v >= curve[curve.length - 1][0]) return 100;
+
+    for (let i = 1; i < curve.length; i++) {
+      const [v2, p2] = curve[i];
+      const [v1, p1] = curve[i - 1];
+
+      if (v <= v2) {
+        const ratio = (v - v1) / (v2 - v1);
+        return p1 + ratio * (p2 - p1);
+      }
+    }
+
+    return null;
   }
 
   function processRow(row) {
@@ -513,6 +624,7 @@
 
   let pressureReference = null;
   let pressureLastMeasured = null;
+  let pressureMeasurements = [];
   let pressureTestVisible =
     localStorage.getItem("pressure-test-visible") !== "false";
 
@@ -574,6 +686,18 @@
       const last = JSON.parse(
         localStorage.getItem("pressure-last-measured") || "null"
       );
+
+      const measurements = JSON.parse(
+        localStorage.getItem("pressure-measurements") || "[]"
+      );
+
+      pressureMeasurements = Array.isArray(measurements)
+        ? measurements.filter(m =>
+            m &&
+            Number.isFinite(Number(m.pressureGauge)) &&
+            Number.isFinite(new Date(m.timestamp).getTime())
+          )
+        : [];
 
       if (
         ref &&
@@ -695,7 +819,7 @@
     if (!isLive) {
       const msg = document.getElementById("n2-status-msg");
       msg.textContent = "Pulse Actual antes de registrar una medición.";
-      msg.className = "text-[9px] text-rose-400 font-bold mt-0.5";
+      msg.className = "text-[8px] text-rose-400 font-bold mt-0.5";
       return;
     }
 
@@ -704,13 +828,10 @@
 
     const record = getLatestTemperatureRecord();
 
-    if (
-      !Number.isFinite(pressureGauge) ||
-      pressureGauge < 0
-    ) {
+    if (!Number.isFinite(pressureGauge) || pressureGauge < 0) {
       const msg = document.getElementById("n2-status-msg");
       msg.textContent = "Presión no válida.";
-      msg.className = "text-[9px] text-rose-400 font-bold mt-0.5";
+      msg.className = "text-[8px] text-rose-400 font-bold mt-0.5";
       return;
     }
 
@@ -724,7 +845,7 @@
       const msg = document.getElementById("n2-status-msg");
       msg.textContent =
         "Esperando lecturas válidas de Sonda 1 y Sonda 2.";
-      msg.className = "text-[9px] text-rose-400 font-bold mt-0.5";
+      msg.className = "text-[8px] text-rose-400 font-bold mt-0.5";
       return;
     }
 
@@ -736,10 +857,12 @@
     if (tEff === null) return;
 
     const now = new Date();
+    const timestamp = now.toISOString();
 
     if (!pressureReference) {
+      // Primera aceptación = referencia.
       pressureReference = {
-        timestamp: now.toISOString(),
+        timestamp,
         pressureGauge,
         tempS1C: Number(record.s1),
         tempS2C: Number(record.s2),
@@ -747,26 +870,49 @@
         model: "60/40"
       };
 
+      pressureLastMeasured = null;
+      pressureMeasurements = [];
+
       localStorage.setItem(
         "pressure-reference",
         JSON.stringify(pressureReference)
       );
+      localStorage.removeItem("pressure-last-measured");
+      localStorage.setItem(
+        "pressure-measurements",
+        JSON.stringify(pressureMeasurements)
+      );
 
       document.getElementById("n2-status-msg").textContent =
-        "Referencia P.H. establecida con S1/S2 (60/40).";
+        "Referencia P.H. establecida.";
     } else {
-      pressureLastMeasured = {
-        timestamp: now.toISOString(),
+      // Cada Aceptar posterior = presión realmente medida.
+      const expectedAtMeasurement = estimatePressureGauge(
+        pressureReference.pressureGauge,
+        pressureReference.tempRefC,
+        tEff
+      );
+
+      const measurement = {
+        timestamp,
         pressureGauge,
         tempS1C: Number(record.s1),
         tempS2C: Number(record.s2),
         tempC: Number(tEff),
+        expectedPressure: expectedAtMeasurement,
         model: "60/40"
       };
+
+      pressureMeasurements.push(measurement);
+      pressureLastMeasured = measurement;
 
       localStorage.setItem(
         "pressure-last-measured",
         JSON.stringify(pressureLastMeasured)
+      );
+      localStorage.setItem(
+        "pressure-measurements",
+        JSON.stringify(pressureMeasurements)
       );
 
       document.getElementById("n2-status-msg").textContent =
@@ -774,39 +920,21 @@
     }
 
     document.getElementById("n2-status-msg").className =
-      "text-[9px] text-emerald-400 mt-0.5";
-
-    const estimatedNow = estimatePressureGauge(
-      pressureReference.pressureGauge,
-      pressureReference.tempRefC,
-      tEff
-    );
-
-    if (estimatedNow !== null) {
-      const latestRow = rawData
-        .slice()
-        .sort(
-          (a, b) =>
-            new Date(a.created_at).getTime() -
-            new Date(b.created_at).getTime()
-        )
-        .at(-1);
-
-      if (latestRow) {
-        latestRow.presion_estimada = Number(estimatedNow);
-      }
-    }
+      "text-[8px] text-emerald-400 mt-0.5";
 
     await backfillEstimatedPressure();
     renderData();
   }
 
+
   function resetPressureTest() {
     pressureReference = null;
     pressureLastMeasured = null;
+    pressureMeasurements = [];
 
     localStorage.removeItem("pressure-reference");
     localStorage.removeItem("pressure-last-measured");
+    localStorage.removeItem("pressure-measurements");
 
     document.getElementById("n2-p-calc").textContent = "---.- PSI";
     document.getElementById("n2-elapsed").textContent = "Tiempo: --";
@@ -874,26 +1002,18 @@
         measuredDate >= referenceDate &&
         measuredDate <= currentDate
       ) {
-        const measuredTef =
-          Number.isFinite(Number(pressureLastMeasured.tempC))
-            ? Number(pressureLastMeasured.tempC)
-            : effectiveNitrogenTemperature(
-                pressureLastMeasured.tempS1C,
-                pressureLastMeasured.tempS2C
+        const expected =
+          Number.isFinite(Number(pressureLastMeasured.expectedPressure))
+            ? Number(pressureLastMeasured.expectedPressure)
+            : estimatePressureGauge(
+                pressureReference.pressureGauge,
+                pressureReference.tempRefC,
+                Number(pressureLastMeasured.tempC)
               );
 
-        if (measuredTef !== null) {
-          const expected =
-            estimatePressureGauge(
-              pressureReference.pressureGauge,
-              pressureReference.tempRefC,
-              measuredTef
-            );
-
-          if (expected !== null) {
-            result.deviation =
-              pressureLastMeasured.pressureGauge - expected;
-          }
+        if (expected !== null) {
+          result.deviation =
+            Number(pressureLastMeasured.pressureGauge) - expected;
         }
       }
     }
@@ -952,12 +1072,26 @@
     document.getElementById("temp2-time").textContent = `Lectura: ${dateText}${time}`;
 
     if (p.bateria !== null && !isNaN(p.bateria)) {
-      const bat = Math.max(0, Math.min(100, p.bateria));
-      document.getElementById("bat-val").textContent = `${bat.toFixed(0)}%`;
-      document.getElementById("bat-bar").style.width = `${bat}%`;
-    }
+      const rawBattery = Number(p.bateria);
 
-    calculateNitrogenPressure(p);
+      // 18650: values <= 5 are interpreted as volts.
+      // Values > 5 remain compatible with a firmware that sends %.
+      const isVoltage = rawBattery <= 5.0;
+      const voltage = isVoltage ? rawBattery : null;
+      const bat = isVoltage
+        ? batteryPercentFromVoltage(rawBattery)
+        : Math.max(0, Math.min(100, rawBattery));
+
+      if (bat !== null) {
+        document.getElementById("bat-val").textContent =
+          isVoltage
+            ? `${bat.toFixed(0)}% · ${voltage.toFixed(2)}V`
+            : `${bat.toFixed(0)}%`;
+
+        document.getElementById("bat-bar").style.width =
+          `${bat}%`;
+      }
+    }
 
     const pressureResult =
       calculateNitrogenPressure(p);
@@ -987,7 +1121,12 @@
 
           document.getElementById("n2-diff").textContent =
             `${sign}${pressureResult.deviation.toFixed(1)}`;
+        } else {
+          document.getElementById("n2-diff").textContent = "--.-";
         }
+      } else {
+        document.getElementById("n2-p-last").textContent = "---.- PSI";
+        document.getElementById("n2-diff").textContent = "--.-";
       }
     } else {
       document.getElementById("n2-p-calc").textContent =
@@ -1005,6 +1144,13 @@
         pressureReference
           ? Number(pressureReference.tempRefC).toFixed(1)
           : "--.-";
+
+      document.getElementById("n2-p-last").textContent =
+        pressureLastMeasured
+          ? Number(pressureLastMeasured.pressureGauge).toFixed(1)
+          : "---.- PSI";
+
+      document.getElementById("n2-diff").textContent = "--.-";
     }
 
   }
@@ -1031,7 +1177,7 @@
     const d2 = processed.map(r => r.s2);
     const dDelta = processed.map(r => r.delta);
 
-    const dPressure = processed.map((p, i) => {
+    const dPressureExpected = processed.map((p, i) => {
       const row = sourceRows[i];
 
       if (
@@ -1046,11 +1192,26 @@
       return calculateNitrogenPressure(p).pressure;
     });
 
+    const dPressureMeasured = processed.map((p) => {
+      const recordTime = new Date(p.created_at).getTime();
+
+      const match = pressureMeasurements.find(m =>
+        Math.abs(
+          new Date(m.timestamp).getTime() - recordTime
+        ) <= 30000
+      );
+
+      return match
+        ? Number(match.pressureGauge)
+        : null;
+    });
+
     tempChart.data.labels = labels;
     tempChart.data.datasets[0].data = d1;
     tempChart.data.datasets[1].data = d2;
     tempChart.data.datasets[2].data = dDelta;
-    tempChart.data.datasets[3].data = dPressure;
+    tempChart.data.datasets[3].data = dPressureExpected;
+    tempChart.data.datasets[4].data = dPressureMeasured;
     tempChart.update();
 
     const validS1 = d1.filter(v => v !== null);
@@ -1106,7 +1267,7 @@
     }
 
     // FIRST: calculate and persist every missing pressure estimate
-    // generated from the real Sonda 1 temperature.
+    // generated from the real S1/S2 60/40 effective temperature.
     if (pressureReference) {
       await backfillEstimatedPressure();
     }
@@ -1133,6 +1294,7 @@
   /* INIT */
   loadSavedAlarms();
   loadPressureState();
+  setWorkMode(workMode);
   fetchData();
   setInterval(async () => {
     if (isLive) {
