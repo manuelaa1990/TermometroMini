@@ -203,45 +203,50 @@
     <div id="delta-status-msg" class="text-[9px] text-slate-500 mt-0.5">Esperando datos...</div>
   </div>
 
-  <!-- PRESIÓN / PRUEBA DE HERMETICIDAD — ADICIONAL DEBAJO DE ΔT -->
-  <div id="card-pressure-test" class="bg-slate-800 border border-emerald-500/30 p-3 rounded-xl shadow-md space-y-2">
-    <div class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex justify-between items-center px-1">
+
+  <!-- PRESIÓN / PRUEBA — ADICIONAL DEBAJO DE ΔT -->
+  <div id="card-pressure-test" class="bg-slate-800 border border-emerald-500/40 py-2.5 px-3 rounded-xl shadow-md text-center transition-all">
+    <div class="flex justify-between items-center text-[10px] font-bold text-emerald-400 uppercase tracking-wider px-1">
       <div class="flex items-center gap-1.5">
         <span>Presión / Prueba de Hermeticidad</span>
         <button onclick="togglePressureTest(false)" title="Ocultar Presión / Prueba" class="text-slate-500 hover:text-emerald-400 p-0.5">×</button>
       </div>
-      <span id="pressure-point-status" class="text-[9px] text-slate-500 normal-case font-medium">Sin punto de referencia</span>
     </div>
 
-    <div class="grid grid-cols-[1fr_auto] gap-2 items-end">
-      <div>
+    <div class="grid grid-cols-[1fr_auto] gap-2 items-end mt-1.5">
+      <div class="text-left">
         <label class="block text-[10px] text-slate-400 mb-0.5">Presión (PSI)</label>
-        <input type="number" id="n2-p-init" value="150" step="0.5"
+        <input type="number" id="n2-p-init" value="150" min="0" step="0.5"
           class="w-full bg-slate-900 border border-slate-700 text-emerald-400 font-bold px-2 py-1.5 rounded focus:outline-none">
       </div>
       <button onclick="acceptPressurePoint()"
-        class="px-4 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition active:scale-95">
+        class="px-4 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition active:scale-95">
         Aceptar
       </button>
     </div>
 
+    <!-- Fecha/hora interna: nunca visible al técnico -->
     <input type="datetime-local" id="n2-time-init" class="hidden">
 
-    <div id="card-n2-result" class="border-t border-slate-700/60 pt-2 text-center">
-      <div class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider px-1 flex justify-between">
+    <div class="border-t border-slate-700/60 mt-2 pt-2">
+      <div class="flex justify-between items-center text-[10px] font-bold text-emerald-400 uppercase tracking-wider px-1">
         <span>Presión Estimada (Compensada)</span>
         <span id="n2-elapsed" class="text-[9px] text-slate-400">Tiempo: --</span>
       </div>
+
       <div id="n2-p-calc" class="text-2xl font-extrabold text-emerald-400 mt-0.5">---.- PSI</div>
+
       <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-1">
         <span>Ref.: <strong id="n2-p-ref" class="text-slate-200">--.-</strong> PSI</span>
         <span>T. Ref.: <strong id="n2-t-ref" class="text-slate-200">--.-</strong> °C</span>
       </div>
+
       <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-0.5">
         <span>Última: <strong id="n2-p-last" class="text-slate-200">--.-</strong> PSI</span>
         <span>Δ medida: <strong id="n2-diff" class="text-slate-200">--.-</strong> PSI</span>
       </div>
-      <div id="n2-status-msg" class="text-[9px] text-slate-400 mt-0.5">---</div>
+
+      <div id="n2-status-msg" class="text-[9px] text-slate-500 mt-0.5"></div>
     </div>
   </div>
 
@@ -323,7 +328,7 @@
         { label: "SONDA 1", borderColor: "#38bdf8", backgroundColor: "rgba(56,189,248,.05)", data: [], borderWidth: 2, tension: .2, pointRadius: 1, fill: true },
         { label: "SONDA 2", borderColor: "#f87171", backgroundColor: "rgba(248,113,113,.05)", data: [], borderWidth: 2, tension: .2, pointRadius: 1, fill: true },
         { label: "ΔT", borderColor: "#fbbf24", backgroundColor: "rgba(251,191,36,.05)", data: [], borderWidth: 2, tension: .2, pointRadius: 1, fill: true },
-        { label: "Presión", borderColor: "#34d399", backgroundColor: "rgba(52,211,153,.03)", data: [], borderWidth: 2, tension: .15, pointRadius: 2, fill: false, yAxisID: "pressure" }
+        { label: "Presión", borderColor: "#34d399", backgroundColor: "rgba(52,211,153,.03)", data: [], borderWidth: 2, tension: .15, pointRadius: 1, fill: false, yAxisID: "pressure" }
       ]
     },
     options: {
@@ -357,196 +362,12 @@
     }
   });
 
-  /* PUNTOS DE PRESIÓN / PRUEBA DE HERMETICIDAD
-     Lógica:
-     - El PRIMER punto aceptado es la referencia (P1, T1, t1).
-     - Los puntos siguientes son mediciones reales de presión.
-     - La presión esperada en cualquier instante se calcula desde la referencia
-       mediante Pabs/T = constante.
-     - La desviación de una medición es: Pmedida - Pesperada a la misma temperatura.
-     - Nunca se reinicia la referencia al aceptar una nueva lectura.
-  */
-  let pressurePoints = (() => {
-    try {
-      const parsed = JSON.parse(localStorage.getItem("pressure-points") || "[]");
-      return Array.isArray(parsed) ? parsed.filter(p =>
-        p && Number.isFinite(Number(p.pressure)) &&
-        Number.isFinite(Number(p.tempRef)) &&
-        Number.isFinite(new Date(p.timestamp).getTime())
-      ).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)) : [];
-    } catch (e) {
-      return [];
-    }
-  })();
-  let pressureTestVisible = localStorage.getItem("pressure-test-visible") !== "false";
-
-  const ATM_PSI = 14.696; // atmósfera estándar, usada solo para convertir manométrica ↔ absoluta.
-
-  function togglePressureTest(showState) {
-    pressureTestVisible = !!showState;
-    localStorage.setItem("pressure-test-visible", pressureTestVisible ? "true" : "false");
-
-    const card = document.getElementById("card-pressure-test");
-    const restore = document.getElementById("restore-pressure-test");
-
-    if (pressureTestVisible) {
-      card.classList.remove("hidden");
-      restore.classList.add("hidden");
-    } else {
-      card.classList.add("hidden");
-      restore.classList.remove("hidden");
-    }
-
-    updateChartVisibility();
-    renderData();
-  }
-
-  function getCurrentLiveRecord() {
-    const processed = rawData.map(processRow).filter(r => r !== null);
-    return processed.length ? processed[processed.length - 1] : null;
-  }
-
-  function acceptPressurePoint() {
-    // Aceptar debe representar una medición tomada AHORA, no una temperatura histórica.
-    if (!isLive) {
-      const msg = document.getElementById("n2-status-msg");
-      msg.textContent = "Vuelva a ACTUAL para registrar una medición.";
-      msg.className = "text-[9px] text-rose-400 font-bold mt-0.5";
-      return;
-    }
-
-    const pressure = Number(document.getElementById("n2-p-init").value);
-    const record = getCurrentLiveRecord();
-
-    if (!Number.isFinite(pressure) || pressure < 0) {
-      const msg = document.getElementById("n2-status-msg");
-      msg.textContent = "Presión no válida.";
-      msg.className = "text-[9px] text-rose-400 font-bold mt-0.5";
-      return;
-    }
-
-    if (!record || record.s1 === null || !Number.isFinite(Number(record.s1))) {
-      const msg = document.getElementById("n2-status-msg");
-      msg.textContent = "No hay una lectura válida de Sonda 1.";
-      msg.className = "text-[9px] text-rose-400 font-bold mt-0.5";
-      return;
-    }
-
+  /* HORA Y FECHA INICIAL PARA NITRÓGENO */
+  function setCurrentDateTime() {
     const now = new Date();
-    const point = {
-      id: Date.now(),
-      timestamp: now.toISOString(),
-      pressure: pressure,
-      tempRef: Number(record.s1),
-      sourceTempTimestamp: record.created_at
-    };
-
-    pressurePoints.push(point);
-    pressurePoints.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-    localStorage.setItem("pressure-points", JSON.stringify(pressurePoints));
-
-    document.getElementById("n2-p-init").value = pressure.toFixed(1);
-    document.getElementById("n2-time-init").value =
-      new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-
-    document.getElementById("n2-status-msg").textContent =
-      pressurePoints.length === 1 ? "Referencia establecida." : "Medición registrada.";
-    document.getElementById("n2-status-msg").className =
-      "text-[9px] text-emerald-400 mt-0.5";
-
-    renderData();
-  }
-
-  function getReferencePressurePoint() {
-    if (!Array.isArray(pressurePoints) || !pressurePoints.length) return null;
-    return pressurePoints.slice().sort(
-      (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
-    )[0];
-  }
-
-  function getLastMeasuredPointAtOrBefore(date) {
-    const target = new Date(date).getTime();
-    let selected = null;
-
-    for (const point of pressurePoints) {
-      const t = new Date(point.timestamp).getTime();
-      if (!Number.isFinite(t)) continue;
-      if (t <= target) selected = point;
-      else break;
-    }
-    return selected;
-  }
-
-  function estimatePressureFromReference(reference, currentTempC) {
-    if (!reference || !Number.isFinite(Number(currentTempC))) return null;
-
-    const p1Gauge = Number(reference.pressure);
-    const t1C = Number(reference.tempRef);
-    const t2C = Number(currentTempC);
-
-    if (!Number.isFinite(p1Gauge) || !Number.isFinite(t1C) || !Number.isFinite(t2C)) return null;
-
-    // Ley de Amontons/Gay-Lussac para un volumen prácticamente constante.
-    // Se trabaja en presión absoluta y temperatura absoluta.
-    const p1Abs = p1Gauge + ATM_PSI;
-    const t1K = t1C + 273.15;
-    const t2K = t2C + 273.15;
-
-    if (p1Abs <= 0 || t1K <= 0 || t2K <= 0) return null;
-
-    return (p1Abs * (t2K / t1K)) - ATM_PSI;
-  }
-
-  function pressureAtPointComparedWithReference(point, reference) {
-    if (!point || !reference) return null;
-    const expected = estimatePressureFromReference(reference, Number(point.tempRef));
-    if (expected === null) return null;
-    return Number(point.pressure) - expected;
-  }
-
-  function calculateNitrogenPressure(currentRecord) {
-    const result = {
-      pressure: null,
-      reference: null,
-      lastMeasured: null,
-      deviation: null,
-      elapsedText: "Tiempo: --",
-      tempRef: null
-    };
-
-    if (!currentRecord) return result;
-
-    const reference = getReferencePressurePoint();
-    if (!reference) return result;
-
-    const currentDate = new Date(currentRecord.created_at);
-    const referenceDate = new Date(reference.timestamp);
-
-    if (!Number.isFinite(currentDate.getTime()) || !Number.isFinite(referenceDate.getTime())) {
-      return result;
-    }
-
-    // Antes de la referencia no se extrapola.
-    if (currentDate < referenceDate) return result;
-
-    const estimated = estimatePressureFromReference(reference, currentRecord.s1);
-    if (estimated === null) return result;
-
-    const diffMs = currentDate - referenceDate;
-    const elapsedHrs = Math.floor(diffMs / 3600000);
-    const elapsedMins = Math.floor((diffMs % 3600000) / 60000);
-
-    const lastMeasured = getLastMeasuredPointAtOrBefore(currentRecord.created_at);
-    const deviation = pressureAtPointComparedWithReference(lastMeasured, reference);
-
-    result.pressure = estimated;
-    result.reference = reference;
-    result.lastMeasured = lastMeasured;
-    result.deviation = deviation;
-    result.elapsedText = `Tiempo: ${elapsedHrs}h ${elapsedMins}m`;
-    result.tempRef = Number(reference.tempRef);
-
-    return result;
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    document.getElementById("n2-time-init").value = now.toISOString().slice(0, 16);
+    saveAndRender();
   }
 
   /* MODOS Y VISTA */
@@ -601,8 +422,6 @@
     const s2 = document.getElementById("chk-s2").checked;
     const delta = document.getElementById("chk-delta").checked;
     const pressure = document.getElementById("chk-pressure").checked && pressureTestVisible;
-    const pressureSelector = document.getElementById("pressure-chart-selector");
-    if (pressureSelector) pressureSelector.classList.toggle("hidden", !pressureTestVisible);
 
     tempChart.setDatasetVisibility(0, s1);
     tempChart.setDatasetVisibility(1, s2);
@@ -661,20 +480,240 @@
     return { ...row, s1, s2, delta, bateria, wifi };
   }
 
-  function updateCards(p) {
+  /* PRUEBA DE HERMETICIDAD
+     Entrada del técnico: PSI MANOMÉTRICA.
+     Motor: PSI absoluta + Kelvin.
+     Referencia: primer punto Aceptado de la prueba.
+     Los Aceptar posteriores son mediciones reales; NO reinician la referencia.
+  */
+  const ATM_PSI = 14.696;
+
+  let pressurePoints = (() => {
+    try {
+      const a = JSON.parse(localStorage.getItem("pressure-points") || "[]");
+      return Array.isArray(a)
+        ? a.filter(p =>
+            p &&
+            Number.isFinite(Number(p.pressure)) &&
+            Number.isFinite(Number(p.tempRef)) &&
+            Number.isFinite(new Date(p.timestamp).getTime())
+          ).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp))
+        : [];
+    } catch (_) {
+      return [];
+    }
+  })();
+
+  let pressureTestVisible = localStorage.getItem("pressure-test-visible") !== "false";
+
+  function togglePressureTest(showState) {
+    pressureTestVisible = !!showState;
+    localStorage.setItem("pressure-test-visible", pressureTestVisible ? "true" : "false");
+
+    const card = document.getElementById("card-pressure-test");
+    const restore = document.getElementById("restore-pressure-test");
+
+    if (pressureTestVisible) {
+      card.classList.remove("hidden");
+      restore.classList.add("hidden");
+    } else {
+      card.classList.add("hidden");
+      restore.classList.remove("hidden");
+    }
+
+    updateChartVisibility();
+    renderData();
+  }
+
+  function getLatestLiveTemperature() {
+    const processed = rawData.map(processRow).filter(Boolean);
+    if (!processed.length) return null;
+    const last = processed[processed.length - 1];
+    return (last.s1 !== null && Number.isFinite(Number(last.s1))) ? Number(last.s1) : null;
+  }
+
+  function acceptPressurePoint() {
+    if (!isLive) {
+      const msg = document.getElementById("n2-status-msg");
+      msg.textContent = "Pulse Actual antes de registrar una medición.";
+      msg.className = "text-[9px] text-rose-400 font-bold mt-0.5";
+      return;
+    }
+
+    const input = document.getElementById("n2-p-init");
+    const pressureGauge = Number(input.value);
+    const tempRef = getLatestLiveTemperature();
+
+    if (!Number.isFinite(pressureGauge) || pressureGauge < 0) {
+      const msg = document.getElementById("n2-status-msg");
+      msg.textContent = "Presión no válida.";
+      msg.className = "text-[9px] text-rose-400 font-bold mt-0.5";
+      return;
+    }
+
+    if (tempRef === null) {
+      const msg = document.getElementById("n2-status-msg");
+      msg.textContent = "Esperando una lectura válida de Sonda 1.";
+      msg.className = "text-[9px] text-rose-400 font-bold mt-0.5";
+      return;
+    }
+
+    const now = new Date();
+
+    pressurePoints.push({
+      id: Date.now(),
+      timestamp: now.toISOString(),
+      pressure: pressureGauge,
+      tempRef: tempRef
+    });
+
+    pressurePoints.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+    localStorage.setItem("pressure-points", JSON.stringify(pressurePoints));
+
+    document.getElementById("n2-time-init").value =
+      new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0,16);
+
+    document.getElementById("n2-status-msg").textContent =
+      pressurePoints.length === 1 ? "Referencia establecida." : "Medición registrada.";
+    document.getElementById("n2-status-msg").className =
+      "text-[9px] text-emerald-400 mt-0.5";
+
+    renderData();
+  }
+
+  function getReferencePressurePoint() {
+    return pressurePoints.length ? pressurePoints[0] : null;
+  }
+
+  function getLastMeasuredPointAtOrBefore(date) {
+    const target = new Date(date).getTime();
+    let selected = null;
+
+    for (const p of pressurePoints) {
+      const t = new Date(p.timestamp).getTime();
+      if (t <= target) selected = p;
+      else break;
+    }
+    return selected;
+  }
+
+  function estimatePressureFromReference(reference, currentTempC) {
+    if (!reference || !Number.isFinite(Number(currentTempC))) return null;
+
+    const p1Gauge = Number(reference.pressure);
+    const t1K = Number(reference.tempRef) + 273.15;
+    const t2K = Number(currentTempC) + 273.15;
+
+    if (!Number.isFinite(p1Gauge) || !Number.isFinite(t1K) ||
+        !Number.isFinite(t2K) || t1K <= 0 || t2K <= 0) {
+      return null;
+    }
+
+    // PSIg -> PSIa; °C -> K; Gay-Lussac/Amontons; PSIa -> PSIg.
+    const p1Abs = p1Gauge + ATM_PSI;
+    const p2Abs = p1Abs * (t2K / t1K);
+    return p2Abs - ATM_PSI;
+  }
+
+  function calculateNitrogenPressure(currentRecord) {
+    const result = {
+      pressure: null,
+      reference: null,
+      lastMeasured: null,
+      deviation: null,
+      elapsedText: "Tiempo: --",
+      tempRef: null
+    };
+
+    if (!currentRecord || currentRecord.s1 === null) return result;
+
+    const reference = getReferencePressurePoint();
+    if (!reference) return result;
+
+    const currentDate = new Date(currentRecord.created_at);
+    const referenceDate = new Date(reference.timestamp);
+
+    if (!Number.isFinite(currentDate.getTime()) ||
+        !Number.isFinite(referenceDate.getTime()) ||
+        currentDate < referenceDate) {
+      return result;
+    }
+
+    const estimated = estimatePressureFromReference(reference, currentRecord.s1);
+    if (estimated === null) return result;
+
+    const diffMs = currentDate - referenceDate;
+    const elapsedHrs = Math.floor(diffMs / 3600000);
+    const elapsedMins = Math.floor((diffMs % 3600000) / 60000);
+
+    const measured = getLastMeasuredPointAtOrBefore(currentRecord.created_at);
+    let deviation = null;
+
+    if (measured) {
+      const expectedAtMeasurement = estimatePressureFromReference(reference, measured.tempRef);
+      if (expectedAtMeasurement !== null) {
+        deviation = Number(measured.pressure) - expectedAtMeasurement;
+      }
+    }
+
+    result.pressure = estimated;
+    result.reference = reference;
+    result.lastMeasured = measured;
+    result.deviation = deviation;
+    result.elapsedText = `Tiempo: ${elapsedHrs}h ${elapsedMins}m`;
+    result.tempRef = Number(reference.tempRef);
+
+    return result;
+  }
+
+  let supabaseConnected = false;
+  let supabaseLastError = null;
+
+  function setConnectionStatus(mode, detail = "") {
     const badge = document.getElementById("status-badge");
+
+    if (mode === "connected") {
+      badge.textContent = "Supabase OK";
+      badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
+    } else if (mode === "empty") {
+      badge.textContent = "Supabase OK";
+      badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40";
+    } else if (mode === "error") {
+      badge.textContent = "Error Supabase";
+      badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40";
+      if (detail) console.error("Supabase:", detail);
+    } else {
+      badge.textContent = "Conectando...";
+      badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20";
+    }
+  }
+
+  function updateCards(p) {
     const wifiEl = document.getElementById("wifi-val");
 
     if (!p) {
-      badge.textContent = "Sin Datos";
-      badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-slate-800 text-slate-400 border border-slate-700";
-      wifiEl.textContent = 'Wifi: "Sin conexión"';
+      if (supabaseConnected) {
+        setConnectionStatus("empty");
+        wifiEl.textContent = 'Wifi: "Sin lecturas recientes"';
+      } else if (supabaseLastError) {
+        setConnectionStatus("error", supabaseLastError);
+        wifiEl.textContent = 'Wifi: "Sin conexión a datos"';
+      } else {
+        setConnectionStatus("connecting");
+        wifiEl.textContent = 'Wifi: "Conectando..."';
+      }
+
+      document.getElementById("temp1-val").textContent = "--.- °C";
+      document.getElementById("temp2-val").textContent = "--.- °C";
+      document.getElementById("delta-val").textContent = "--.- °C";
+      document.getElementById("temp1-time").textContent = "Esperando...";
+      document.getElementById("temp2-time").textContent = "Esperando...";
       document.getElementById("n2-p-calc").textContent = "---.- PSI";
       document.getElementById("n2-elapsed").textContent = "Tiempo: --";
-      document.getElementById("n2-diff").textContent = "--.-";
       document.getElementById("n2-p-ref").textContent = "--.-";
       document.getElementById("n2-p-last").textContent = "--.-";
       document.getElementById("n2-t-ref").textContent = "--.-";
+      document.getElementById("n2-diff").textContent = "--.-";
       return;
     }
 
@@ -684,29 +723,41 @@
     const online = diffSeconds <= 30;
 
     if (!isLive) {
-      badge.textContent = "Historial";
-      badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/40";
+      document.getElementById("status-badge").textContent = "Historial";
+      document.getElementById("status-badge").className =
+        "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/40";
     } else if (online) {
-      badge.textContent = "Online";
-      badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
+      document.getElementById("status-badge").textContent = "Online";
+      document.getElementById("status-badge").className =
+        "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
     } else {
-      badge.textContent = "Offline";
-      badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse";
+      document.getElementById("status-badge").textContent = "Offline";
+      document.getElementById("status-badge").className =
+        "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse";
     }
 
-    wifiEl.textContent = (online && p.wifi) ? `Wifi: "${p.wifi}"` : 'Wifi: "Sin conexión"';
+    wifiEl.textContent = (online && p.wifi)
+      ? `Wifi: "${p.wifi}"`
+      : 'Wifi: "Sin conexión"';
 
-    document.getElementById("temp1-val").textContent = p.s1 !== null ? `${p.s1.toFixed(1)} °C` : "DESC";
-    document.getElementById("temp2-val").textContent = p.s2 !== null ? `${p.s2.toFixed(1)} °C` : "DESC";
-    document.getElementById("delta-val").textContent = p.delta !== null ? `${p.delta.toFixed(1)} °C` : "--.- °C";
+    document.getElementById("temp1-val").textContent =
+      p.s1 !== null ? `${p.s1.toFixed(1)} °C` : "DESC";
+    document.getElementById("temp2-val").textContent =
+      p.s2 !== null ? `${p.s2.toFixed(1)} °C` : "DESC";
+    document.getElementById("delta-val").textContent =
+      p.delta !== null ? `${p.delta.toFixed(1)} °C` : "--.- °C";
 
     const date = new Date(p.created_at);
     const today = new Date().toDateString() === date.toDateString();
-    const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const time = date.toLocaleTimeString([], {
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    });
     const dateText = today ? "" : `${date.getDate()}/${date.getMonth()+1} `;
 
-    document.getElementById("temp1-time").textContent = `Lectura: ${dateText}${time}`;
-    document.getElementById("temp2-time").textContent = `Lectura: ${dateText}${time}`;
+    document.getElementById("temp1-time").textContent =
+      `Lectura: ${dateText}${time}`;
+    document.getElementById("temp2-time").textContent =
+      `Lectura: ${dateText}${time}`;
 
     if (p.bateria !== null && !isNaN(p.bateria)) {
       const bat = Math.max(0, Math.min(100, p.bateria));
@@ -719,7 +770,8 @@
     if (pressureResult.pressure !== null) {
       document.getElementById("n2-p-calc").textContent =
         `${pressureResult.pressure.toFixed(1)} PSI`;
-      document.getElementById("n2-elapsed").textContent = pressureResult.elapsedText;
+      document.getElementById("n2-elapsed").textContent =
+        pressureResult.elapsedText;
       document.getElementById("n2-p-ref").textContent =
         pressureResult.reference.pressure.toFixed(1);
       document.getElementById("n2-t-ref").textContent =
@@ -738,22 +790,17 @@
 
       const msgEl = document.getElementById("n2-status-msg");
       if (pressureResult.lastMeasured && pressureResult.deviation !== null) {
-        msgEl.textContent = Math.abs(pressureResult.deviation) < 1
-          ? "Sin desviación significativa."
-          : pressureResult.deviation < 0
-            ? "Presión medida inferior a la esperada."
-            : "Presión medida superior a la esperada.";
-        msgEl.className = Math.abs(pressureResult.deviation) < 1
-          ? "text-[9px] text-emerald-400 mt-0.5"
-          : "text-[9px] text-amber-400 mt-0.5";
+        msgEl.textContent =
+          Math.abs(pressureResult.deviation) < 1
+            ? "Sin desviación significativa."
+            : pressureResult.deviation < 0
+              ? "Presión medida inferior a la esperada."
+              : "Presión medida superior a la esperada.";
+        msgEl.className =
+          Math.abs(pressureResult.deviation) < 1
+            ? "text-[9px] text-emerald-400 mt-0.5"
+            : "text-[9px] text-amber-400 mt-0.5";
       }
-    } else {
-      document.getElementById("n2-p-calc").textContent = "---.- PSI";
-      document.getElementById("n2-elapsed").textContent = "Tiempo: --";
-      document.getElementById("n2-p-ref").textContent = "--.-";
-      document.getElementById("n2-t-ref").textContent = "--.-";
-      document.getElementById("n2-p-last").textContent = "--.-";
-      document.getElementById("n2-diff").textContent = "--.-";
     }
   }
 
@@ -773,10 +820,7 @@
     const d1 = processed.map(r => r.s1);
     const d2 = processed.map(r => r.s2);
     const dDelta = processed.map(r => r.delta);
-    const dPressure = processed.map(r => {
-      const result = calculateNitrogenPressure(r);
-      return result.pressure;
-    });
+    const dPressure = processed.map(r => calculateNitrogenPressure(r).pressure);
 
     tempChart.data.labels = labels;
     tempChart.data.datasets[0].data = d1;
@@ -801,19 +845,42 @@
   }
 
   async function fetchData() {
+    setConnectionStatus("connecting");
+
     const start = new Date(windowEndTime.getTime() - TWO_HOURS_MS).toISOString();
     const end = windowEndTime.toISOString();
 
-    const { data, error } = await supabaseClient
-      .from("mediciones")
-      .select("*")
-      .gte("created_at", start)
-      .lte("created_at", end)
-      .order("created_at", { ascending: true });
+    try {
+      const { data, error } = await supabaseClient
+        .from("mediciones")
+        .select("*")
+        .gte("created_at", start)
+        .lte("created_at", end)
+        .order("created_at", { ascending: true });
 
-    if (!error && data) {
-      rawData = data;
+      if (error) {
+        supabaseConnected = false;
+        supabaseLastError = error.message || String(error);
+        console.error("Error consultando Supabase:", error);
+        updateCards(null);
+        return;
+      }
+
+      supabaseConnected = true;
+      supabaseLastError = null;
+      rawData = Array.isArray(data) ? data : [];
+
+      // La conexión se considera correcta aunque la ventana de 2 horas esté vacía.
+      if (rawData.length === 0) {
+        setConnectionStatus("empty");
+      }
+
       renderData();
+    } catch (err) {
+      supabaseConnected = false;
+      supabaseLastError = err?.message || String(err);
+      console.error("Error de red/Supabase:", err);
+      updateCards(null);
     }
   }
 
