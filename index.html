@@ -209,7 +209,7 @@
     <div class="flex justify-between items-center text-[10px] font-bold text-emerald-400 uppercase tracking-wider px-1">
       <div class="flex items-center gap-1.5">
         <span>Presión / Prueba de Hermeticidad</span>
-        <button onclick="togglePressureTest(false)" title="Ocultar" class="text-slate-500 hover:text-emerald-400 p-0.5">×</button>
+        <button onclick="togglePressureMode(false)" title="Ocultar" class="text-slate-500 hover:text-emerald-400 p-0.5">×</button>
       </div>
     </div>
 
@@ -227,6 +227,8 @@
 
     <input type="datetime-local" id="n2-time-init" class="hidden">
 
+    <div class="text-[9px] text-slate-500 mt-1">Modelo P.H.: 60% exterior (S1) + 40% interior (S2)</div>
+
     <div class="border-t border-slate-700/60 mt-2 pt-2">
       <div class="flex justify-between items-center text-[10px] font-bold text-emerald-400 uppercase tracking-wider px-1">
         <span>Presión Estimada (Compensada)</span>
@@ -237,7 +239,7 @@
 
       <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-1">
         <span>Ref.: <strong id="n2-p-ref" class="text-slate-200">--.-</strong> PSI</span>
-        <span>T. Ref.: <strong id="n2-t-ref" class="text-slate-200">--.-</strong> °C</span>
+        <span>T. Ref. 60/40: <strong id="n2-t-ref" class="text-slate-200">--.-</strong> °C</span>
       </div>
 
       <div class="flex justify-center gap-4 text-[10px] font-mono text-slate-400 mt-0.5">
@@ -250,7 +252,7 @@
   </div>
 
   <div id="restore-pressure-test" class="hidden flex justify-center -my-1">
-    <button onclick="togglePressureTest(true)"
+    <button onclick="togglePressureMode(true)"
       class="px-3 py-1 text-[9px] font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 transition active:scale-95">
       Mostrar Presión / Prueba
     </button>
@@ -286,9 +288,9 @@
         <span class="text-[11px]">ΔT</span>
       </label>
       <label id="pressure-chart-selector" class="flex items-center gap-1.5 cursor-pointer">
-        <input type="checkbox" id="chk-pressure" checked onchange="updateChartVisibility()">
+        <input type="checkbox" id="chk-pressure" checked onchange="togglePressureMode(this.checked)">
         <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span>
-        <span class="text-[11px]">Presión</span>
+        <span class="text-[11px]">P.H.</span>
       </label>
     </div>
 
@@ -490,22 +492,42 @@
   }
 
   /* ==========================================================
-     PRUEBA DE HERMETICIDAD
-     Entrada: PSI manométrica.
-     Cálculo: PSIa + Kelvin.
-     Referencia: primer Aceptar.
-     Historial: campo presion_estimada de Supabase.
+     PRUEBA DE HERMETICIDAD — MOTOR 60/40
+
+     S1 = 60% exterior
+     S2 = 40% interior
+     Tef = 0.60*S1 + 0.40*S2
+
+     La presión introducida por el técnico es manométrica (PSI).
+     Internamente se convierte a absoluta, se aplica la relación
+     P/T del gas ideal a volumen constante y se devuelve a PSI
+     manométrica.
+
+     La variable almacenada en Supabase sigue siendo:
+     presion_estimada
   ========================================================== */
 
   const ATM_PSI = 14.696;
+  const PH_S1_WEIGHT = 0.60;
+  const PH_S2_WEIGHT = 0.40;
 
   let pressureReference = null;
   let pressureLastMeasured = null;
   let pressureTestVisible =
     localStorage.getItem("pressure-test-visible") !== "false";
 
-  function togglePressureTest(showState) {
+  function effectiveNitrogenTemperature(s1C, s2C) {
+    const s1 = Number(s1C);
+    const s2 = Number(s2C);
+
+    if (!Number.isFinite(s1) || !Number.isFinite(s2)) return null;
+
+    return (PH_S1_WEIGHT * s1) + (PH_S2_WEIGHT * s2);
+  }
+
+  function togglePressureMode(showState) {
     pressureTestVisible = !!showState;
+
     localStorage.setItem(
       "pressure-test-visible",
       pressureTestVisible ? "true" : "false"
@@ -517,7 +539,15 @@
     document.getElementById("restore-pressure-test")
       .classList.toggle("hidden", pressureTestVisible);
 
+    const checkbox = document.getElementById("chk-pressure");
+    if (checkbox) checkbox.checked = pressureTestVisible;
+
     updateChartVisibility();
+  }
+
+  // Compatibilidad con cualquier llamada anterior.
+  function togglePressureTest(showState) {
+    togglePressureMode(showState);
   }
 
   function estimatePressureGauge(pGaugeRef, tRefC, tCurrentC) {
@@ -566,6 +596,15 @@
       pressureReference = null;
       pressureLastMeasured = null;
     }
+
+    document.getElementById("card-pressure-test")
+      .classList.toggle("hidden", !pressureTestVisible);
+
+    document.getElementById("restore-pressure-test")
+      .classList.toggle("hidden", pressureTestVisible);
+
+    const checkbox = document.getElementById("chk-pressure");
+    if (checkbox) checkbox.checked = pressureTestVisible;
   }
 
   function getLatestTemperatureRecord() {
@@ -580,56 +619,75 @@
     return processRow(row);
   }
 
-  async function saveEstimatedPressure(timestamp, estimated) {
-    if (!Number.isFinite(Number(estimated))) return;
+  async function saveEstimatedPressure(row, estimated) {
+    if (
+      !row ||
+      row.id === undefined ||
+      row.id === null ||
+      !Number.isFinite(Number(estimated))
+    ) return false;
+
+    const value = Number(estimated);
 
     const { error } = await supabaseClient
       .from("lecturas_temperatura")
       .update({
-        presion_estimada: Number(estimated)
+        presion_estimada: value
       })
-      .eq("created_at", timestamp);
+      .eq("id", row.id);
 
     if (error) {
       console.error("Error guardando presion_estimada:", error);
+      return false;
     }
+
+    row.presion_estimada = value;
+    return true;
   }
 
   async function backfillEstimatedPressure() {
     if (!pressureReference || !rawData.length) return;
 
     const refDate = new Date(pressureReference.timestamp);
+    if (!Number.isFinite(refDate.getTime())) return;
 
     for (const row of rawData) {
-      if (
-        row.presion_estimada !== null &&
-        row.presion_estimada !== undefined &&
-        Number.isFinite(Number(row.presion_estimada))
-      ) continue;
-
       const record = processRow(row);
       const recordDate = new Date(row.created_at);
 
       if (
         !record ||
         record.s1 === null ||
+        record.s2 === null ||
         !Number.isFinite(Number(record.s1)) ||
+        !Number.isFinite(Number(record.s2)) ||
         !Number.isFinite(recordDate.getTime()) ||
         recordDate < refDate
       ) continue;
 
+      const tEff = effectiveNitrogenTemperature(
+        record.s1,
+        record.s2
+      );
+
+      if (tEff === null) continue;
+
       const estimated = estimatePressureGauge(
         pressureReference.pressureGauge,
         pressureReference.tempRefC,
-        Number(record.s1)
+        tEff
       );
 
-      if (estimated !== null) {
-        await saveEstimatedPressure(
-          row.created_at,
-          estimated
-        );
-      }
+      if (estimated === null) continue;
+
+      const stored = Number(row.presion_estimada);
+
+      if (
+        Number.isFinite(stored) &&
+        Math.abs(stored - estimated) < 0.05
+      ) continue;
+
+      await saveEstimatedPressure(row, estimated);
     }
   }
 
@@ -659,13 +717,23 @@
     if (
       !record ||
       record.s1 === null ||
-      !Number.isFinite(Number(record.s1))
+      record.s2 === null ||
+      !Number.isFinite(Number(record.s1)) ||
+      !Number.isFinite(Number(record.s2))
     ) {
       const msg = document.getElementById("n2-status-msg");
-      msg.textContent = "Esperando una lectura válida de Sonda 1.";
+      msg.textContent =
+        "Esperando lecturas válidas de Sonda 1 y Sonda 2.";
       msg.className = "text-[9px] text-rose-400 font-bold mt-0.5";
       return;
     }
+
+    const tEff = effectiveNitrogenTemperature(
+      record.s1,
+      record.s2
+    );
+
+    if (tEff === null) return;
 
     const now = new Date();
 
@@ -673,7 +741,10 @@
       pressureReference = {
         timestamp: now.toISOString(),
         pressureGauge,
-        tempRefC: Number(record.s1)
+        tempS1C: Number(record.s1),
+        tempS2C: Number(record.s2),
+        tempRefC: Number(tEff),
+        model: "60/40"
       };
 
       localStorage.setItem(
@@ -682,12 +753,15 @@
       );
 
       document.getElementById("n2-status-msg").textContent =
-        "Referencia establecida.";
+        "Referencia P.H. establecida con S1/S2 (60/40).";
     } else {
       pressureLastMeasured = {
         timestamp: now.toISOString(),
         pressureGauge,
-        tempC: Number(record.s1)
+        tempS1C: Number(record.s1),
+        tempS2C: Number(record.s2),
+        tempC: Number(tEff),
+        model: "60/40"
       };
 
       localStorage.setItem(
@@ -696,31 +770,52 @@
       );
 
       document.getElementById("n2-status-msg").textContent =
-        "Medición registrada.";
+        "Medición P.H. registrada.";
     }
 
     document.getElementById("n2-status-msg").className =
       "text-[9px] text-emerald-400 mt-0.5";
 
-    document.getElementById("n2-time-init").value =
-      new Date(
-        now.getTime() - now.getTimezoneOffset() * 60000
-      ).toISOString().slice(0, 16);
-
     const estimatedNow = estimatePressureGauge(
       pressureReference.pressureGauge,
       pressureReference.tempRefC,
-      Number(record.s1)
+      tEff
     );
 
     if (estimatedNow !== null) {
-      await saveEstimatedPressure(
-        record.created_at,
-        estimatedNow
-      );
+      const latestRow = rawData
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() -
+            new Date(b.created_at).getTime()
+        )
+        .at(-1);
+
+      if (latestRow) {
+        latestRow.presion_estimada = Number(estimatedNow);
+      }
     }
 
     await backfillEstimatedPressure();
+    renderData();
+  }
+
+  function resetPressureTest() {
+    pressureReference = null;
+    pressureLastMeasured = null;
+
+    localStorage.removeItem("pressure-reference");
+    localStorage.removeItem("pressure-last-measured");
+
+    document.getElementById("n2-p-calc").textContent = "---.- PSI";
+    document.getElementById("n2-elapsed").textContent = "Tiempo: --";
+    document.getElementById("n2-p-ref").textContent = "--.-";
+    document.getElementById("n2-t-ref").textContent = "--.-";
+    document.getElementById("n2-p-last").textContent = "--.-";
+    document.getElementById("n2-diff").textContent = "--.-";
+    document.getElementById("n2-status-msg").textContent = "";
+
     renderData();
   }
 
@@ -731,13 +826,15 @@
       lastMeasured: pressureLastMeasured,
       deviation: null,
       elapsedText: "Tiempo: --",
-      tempRef: null
+      tempRef: null,
+      tempCurrent: null
     };
 
     if (
       !pressureReference ||
       !currentRecord ||
-      currentRecord.s1 === null
+      currentRecord.s1 === null ||
+      currentRecord.s2 === null
     ) return result;
 
     const currentDate = new Date(currentRecord.created_at);
@@ -749,10 +846,17 @@
       currentDate < referenceDate
     ) return result;
 
+    const currentTef = effectiveNitrogenTemperature(
+      currentRecord.s1,
+      currentRecord.s2
+    );
+
+    if (currentTef === null) return result;
+
     const estimated = estimatePressureGauge(
       pressureReference.pressureGauge,
       pressureReference.tempRefC,
-      Number(currentRecord.s1)
+      currentTef
     );
 
     if (estimated === null) return result;
@@ -770,16 +874,26 @@
         measuredDate >= referenceDate &&
         measuredDate <= currentDate
       ) {
-        const expected =
-          estimatePressureGauge(
-            pressureReference.pressureGauge,
-            pressureReference.tempRefC,
-            pressureLastMeasured.tempC
-          );
+        const measuredTef =
+          Number.isFinite(Number(pressureLastMeasured.tempC))
+            ? Number(pressureLastMeasured.tempC)
+            : effectiveNitrogenTemperature(
+                pressureLastMeasured.tempS1C,
+                pressureLastMeasured.tempS2C
+              );
 
-        if (expected !== null) {
-          result.deviation =
-            pressureLastMeasured.pressureGauge - expected;
+        if (measuredTef !== null) {
+          const expected =
+            estimatePressureGauge(
+              pressureReference.pressureGauge,
+              pressureReference.tempRefC,
+              measuredTef
+            );
+
+          if (expected !== null) {
+            result.deviation =
+              pressureLastMeasured.pressureGauge - expected;
+          }
         }
       }
     }
@@ -789,6 +903,8 @@
       `Tiempo: ${hours}h ${minutes}m`;
     result.tempRef =
       Number(pressureReference.tempRefC);
+    result.tempCurrent =
+      Number(currentTef);
 
     return result;
   }
@@ -906,11 +1022,17 @@
       return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     });
 
+    const sourceRows = rawData.filter(row => {
+      const p = processRow(row);
+      return p !== null;
+    });
+
     const d1 = processed.map(r => r.s1);
     const d2 = processed.map(r => r.s2);
     const dDelta = processed.map(r => r.delta);
+
     const dPressure = processed.map((p, i) => {
-      const row = rawData[i];
+      const row = sourceRows[i];
 
       if (
         row &&
@@ -983,11 +1105,14 @@
         rawData[rawData.length - 1];
     }
 
-    renderData();
-
+    // FIRST: calculate and persist every missing pressure estimate
+    // generated from the real Sonda 1 temperature.
     if (pressureReference) {
-      backfillEstimatedPressure();
+      await backfillEstimatedPressure();
     }
+
+    // SECOND: render using the values now present in the rows.
+    renderData();
   }
 
 
@@ -1007,9 +1132,13 @@
 
   /* INIT */
   loadSavedAlarms();
+  loadPressureState();
   fetchData();
-  setInterval(() => {
-    if (isLive) goLive();
+  setInterval(async () => {
+    if (isLive) {
+      windowEndTime = new Date();
+      await fetchData();
+    }
   }, 10000);
 </script>
 
