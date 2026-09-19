@@ -131,7 +131,7 @@
     </div>
   </div>
 
-  <!-- TITULO SOLICITADO -->
+  <!-- TITULO -->
   <header class="text-center py-1">
     <h1 class="text-2xl font-bold text-sky-400">Termometro DataBase</h1>
   </header>
@@ -226,7 +226,6 @@
       <span class="text-[8px] text-slate-500 normal-case">60/40</span>
     </div>
 
-    <!-- ENTRADA COMPACTA -->
     <div class="grid grid-cols-[1fr_auto] gap-2 items-end mt-1.5">
       <div class="text-left">
         <label class="block text-[9px] text-slate-400 mb-0.5">Presión medida (PSI)</label>
@@ -275,13 +274,25 @@
     </button>
   </div>
 
-  <!-- NAVEGACIÓN -->
-  <div class="bg-slate-800 border border-slate-700/60 p-2 rounded-xl shadow-md flex items-center justify-center gap-3">
-    <button onclick="navigateWindow(-2)" title="Atrás 2 Horas" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition active:scale-95">‹</button>
-    <button onclick="goLive()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition flex items-center gap-1.5">
-      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Actual
-    </button>
-    <button id="btn-next" onclick="navigateWindow(2)" title="Adelante 2 Horas" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition disabled:opacity-30">›</button>
+  <!-- CONTROLES DE NAVEGACIÓN Y RANGO DE TIEMPO -->
+  <div class="bg-slate-800 border border-slate-700/60 p-2 rounded-xl shadow-md space-y-2">
+    <!-- SELECTOR DE HORAS -->
+    <div class="grid grid-cols-5 gap-1 bg-slate-900/70 p-1 rounded-lg text-[10px] font-bold text-center">
+      <button id="btn-range-2" onclick="setTimeRange(2)" class="py-1 rounded-md transition">2h</button>
+      <button id="btn-range-4" onclick="setTimeRange(4)" class="py-1 rounded-md transition">4h</button>
+      <button id="btn-range-8" onclick="setTimeRange(8)" class="py-1 rounded-md transition">8h</button>
+      <button id="btn-range-12" onclick="setTimeRange(12)" class="py-1 rounded-md transition">12h</button>
+      <button id="btn-range-24" onclick="setTimeRange(24)" class="py-1 rounded-md transition">24h</button>
+    </div>
+
+    <!-- BOTONES ATRÁS / ACTUAL / ADELANTE -->
+    <div class="flex items-center justify-center gap-3">
+      <button onclick="navigateWindow(-1)" id="btn-prev-nav" title="Retroceder" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition active:scale-95">‹</button>
+      <button onclick="goLive()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Actual
+      </button>
+      <button id="btn-next" onclick="navigateWindow(1)" title="Avanzar" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition disabled:opacity-30">›</button>
+    </div>
   </div>
 
   <!-- SELECTORES GRÁFICA -->
@@ -326,13 +337,12 @@
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   /* VARIABLES GLOBALES */
-  const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+  let selectedHoursRange = parseInt(localStorage.getItem("selected-hours-range")) || 2;
   let windowEndTime = new Date();
   let isLive = true;
   let rawData = [];
   let lastGlobalRecord = null;
   let isInverted = false;
-  let lastVibrationTime = 0;
   let isEPaper = false;
 
   /* GRÁFICA INICIALIZACIÓN */
@@ -380,12 +390,33 @@
     }
   });
 
-  /* HORA Y FECHA INICIAL PARA NITRÓGENO */
-  function setCurrentDateTime() {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    document.getElementById("n2-time-init").value = now.toISOString().slice(0, 16);
-    saveAndRender();
+  /* MODO RANGO DE TIEMPO */
+  function setTimeRange(hours) {
+    selectedHoursRange = hours;
+    localStorage.setItem("selected-hours-range", hours);
+    updateRangeUI();
+    if (isLive) {
+      windowEndTime = new Date();
+    }
+    fetchData();
+  }
+
+  function updateRangeUI() {
+    [2, 4, 8, 12, 24].forEach(h => {
+      const btn = document.getElementById(`btn-range-${h}`);
+      if (btn) {
+        if (h === selectedHoursRange) {
+          btn.className = "py-1 rounded-md transition bg-sky-600 text-white shadow font-bold";
+        } else {
+          btn.className = "py-1 rounded-md transition text-slate-400 hover:text-slate-200 hover:bg-slate-800";
+        }
+      }
+    });
+
+    const prevBtn = document.getElementById("btn-prev-nav");
+    if (prevBtn) prevBtn.title = `Atrás ${selectedHoursRange} Horas`;
+    const nextBtn = document.getElementById("btn-next");
+    if (nextBtn) nextBtn.title = `Adelante ${selectedHoursRange} Horas`;
   }
 
   /* MODOS DE TRABAJO */
@@ -772,7 +803,7 @@
     return result;
   }
 
-  /* ACTUALIZACIÓN DE TARJETAS Y ALARMAS RECONECTADAS */
+  /* ACTUALIZACIÓN DE TARJETAS Y ALARMAS */
   function updateCards(p) {
     const badge = document.getElementById("status-badge");
     const wifiEl = document.getElementById("wifi-val");
@@ -814,7 +845,7 @@
     document.getElementById("temp1-time").textContent = `Lectura: ${dateText}${time}`;
     document.getElementById("temp2-time").textContent = `Lectura: ${dateText}${time}`;
 
-    // RENDERIZADO BATERÍA 18650
+    // RENDERIZADO BATERÍA
     const vVal = Number(p.bateriaVolt);
     if (p.bateriaVolt !== null && !isNaN(vVal)) {
       const pct = ((vVal - 3.0) / (4.2 - 3.0)) * 100;
@@ -902,8 +933,13 @@
       return;
     }
 
+    const showDateInLabel = selectedHoursRange >= 12;
+
     const labels = processed.map(r => {
       const d = new Date(r.created_at);
+      if (showDateInLabel) {
+        return `${d.getDate()}/${d.getMonth()+1} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+      }
       return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     });
 
@@ -951,7 +987,8 @@
   }
 
   async function fetchData() {
-    const start = new Date(windowEndTime.getTime() - TWO_HOURS_MS).toISOString();
+    const rangeMs = selectedHoursRange * 60 * 60 * 1000;
+    const start = new Date(windowEndTime.getTime() - rangeMs).toISOString();
     const end = windowEndTime.toISOString();
 
     const { data, error } = await supabaseClient
@@ -982,10 +1019,19 @@
     renderData();
   }
 
-  function navigateWindow(hours) {
+  function navigateWindow(direction) {
     isLive = false;
-    windowEndTime = new Date(windowEndTime.getTime() + hours * 3600000);
-    document.getElementById("btn-next").disabled = windowEndTime >= new Date();
+    const shiftMs = direction * selectedHoursRange * 3600000;
+    windowEndTime = new Date(windowEndTime.getTime() + shiftMs);
+
+    if (windowEndTime >= new Date()) {
+      windowEndTime = new Date();
+      isLive = true;
+      document.getElementById("btn-next").disabled = true;
+    } else {
+      document.getElementById("btn-next").disabled = false;
+    }
+
     fetchData();
   }
 
@@ -999,8 +1045,10 @@
   /* INIT */
   loadSavedAlarms();
   loadPressureState();
+  updateRangeUI();
   setWorkMode(workMode);
   fetchData();
+
   setInterval(async () => {
     if (isLive) {
       windowEndTime = new Date();
