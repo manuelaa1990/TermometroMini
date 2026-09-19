@@ -97,7 +97,7 @@
     <div class="flex items-center gap-3 text-slate-400">
       <!-- BATERÍA -->
       <div class="flex items-center gap-1.5">
-        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg id="bat-icon" class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
         </svg>
         <span id="bat-val" title="Batería 18650" class="font-medium text-slate-300 text-[11px]">--% · --.--V</span>
@@ -129,6 +129,11 @@
         Conectando...
       </div>
     </div>
+  </div>
+
+  <!-- BANNER DE ALERTA BATERÍA BAJA -->
+  <div id="bat-alert-banner" class="hidden bg-rose-600/20 border border-rose-500/50 p-2 rounded-xl text-center text-rose-300 text-xs animate-pulse">
+    ⚠️ <strong>¡ALERTA DE BATERÍA BAJA!</strong> <span id="bat-alert-msg">Nivel por debajo del 20%. Cargue el dispositivo pronto.</span>
   </div>
 
   <!-- TITULO -->
@@ -362,7 +367,7 @@
   /* SISTEMA DE VIBRACIÓN DE ALARMA CADA 10 SEGUNDOS */
   setInterval(() => {
     if (alarmActive && "vibrate" in navigator) {
-      navigator.vibrate(1000); // Vibración de 1 segundo
+      navigator.vibrate(1000);
     }
   }, 10000);
 
@@ -594,8 +599,9 @@
     
     let bateria = null;
     if (vBat !== null && !isNaN(vBat)) {
-      const pct = ((vBat - 3.0) / (4.2 - 3.0)) * 100;
-      bateria = Math.max(0, Math.min(100, pct));
+      // Cálculo preciso Li-Ion 18650 (3.10V a 4.20V)
+      const pct = ((vBat - 3.10) / (4.20 - 3.10)) * 100;
+      bateria = Math.max(0, Math.min(100, Math.round(pct)));
     }
 
     const wifi = row.wifi || row.ssid || null;
@@ -717,348 +723,258 @@
         model: "60/40"
       };
 
-      pressureLastMeasured = null;
-      pressureMeasurements = [];
-
-      localStorage.setItem("pressure-reference", JSON.stringify(pressureReference));
-      localStorage.removeItem("pressure-last-measured");
-      localStorage.setItem("pressure-measurements", JSON.stringify(pressureMeasurements));
-
-      document.getElementById("n2-status-msg").textContent = "Referencia P.H. establecida.";
+      pressureLastMeasured = { timestamp, pressureGauge, tempC: Number(tEff) };
+      pressureMeasurements = [{ timestamp, pressureGauge, tempC: Number(tEff) }];
     } else {
-      const expectedAtMeasurement = estimatePressureGauge(pressureReference.pressureGauge, pressureReference.tempRefC, tEff);
-
-      const measurement = {
-        timestamp,
-        pressureGauge,
-        tempS1C: Number(record.s1),
-        tempS2C: Number(record.s2),
-        tempC: Number(tEff),
-        expectedPressure: expectedAtMeasurement,
-        model: "60/40"
-      };
-
-      pressureMeasurements.push(measurement);
-      pressureLastMeasured = measurement;
-
-      localStorage.setItem("pressure-last-measured", JSON.stringify(pressureLastMeasured));
-      localStorage.setItem("pressure-measurements", JSON.stringify(pressureMeasurements));
-
-      document.getElementById("n2-status-msg").textContent = "Medición P.H. registrada.";
+      pressureLastMeasured = { timestamp, pressureGauge, tempC: Number(tEff) };
+      pressureMeasurements.push({ timestamp, pressureGauge, tempC: Number(tEff) });
     }
 
-    document.getElementById("n2-status-msg").className = "text-[8px] text-emerald-400 mt-0.5";
+    localStorage.setItem("pressure-reference", JSON.stringify(pressureReference));
+    localStorage.setItem("pressure-last-measured", JSON.stringify(pressureLastMeasured));
+    localStorage.setItem("pressure-measurements", JSON.stringify(pressureMeasurements));
+
     renderData();
   }
 
-  function calculateNitrogenPressure(currentRecord) {
-    const result = {
-      pressure: null,
-      reference: pressureReference,
-      lastMeasured: pressureLastMeasured,
-      deviation: null,
-      elapsedText: "Tiempo: --",
-      tempRef: null,
-      tempCurrent: null
-    };
-
-    if (!pressureReference || !currentRecord || currentRecord.s1 === null || currentRecord.s2 === null) return result;
-
-    const currentDate = new Date(currentRecord.created_at);
-    const referenceDate = new Date(pressureReference.timestamp);
-
-    if (!Number.isFinite(currentDate.getTime()) || !Number.isFinite(referenceDate.getTime()) || currentDate < referenceDate) return result;
-
-    const currentTef = effectiveNitrogenTemperature(currentRecord.s1, currentRecord.s2);
-    if (currentTef === null) return result;
-
-    const estimated = estimatePressureGauge(pressureReference.pressureGauge, pressureReference.tempRefC, currentTef);
-    if (estimated === null) return result;
-
-    const diffMs = currentDate - referenceDate;
-    const hours = Math.floor(diffMs / 3600000);
-    const minutes = Math.floor((diffMs % 3600000) / 60000);
-
-    if (pressureLastMeasured) {
-      const measuredDate = new Date(pressureLastMeasured.timestamp);
-      if (measuredDate >= referenceDate && measuredDate <= currentDate) {
-        const expected = Number.isFinite(Number(pressureLastMeasured.expectedPressure))
-          ? Number(pressureLastMeasured.expectedPressure)
-          : estimatePressureGauge(pressureReference.pressureGauge, pressureReference.tempRefC, Number(pressureLastMeasured.tempC));
-
-        if (expected !== null) {
-          result.deviation = Number(pressureLastMeasured.pressureGauge) - expected;
-        }
-      }
-    }
-
-    result.pressure = estimated;
-    result.elapsedText = `Tiempo: ${hours}h ${minutes}m`;
-    result.tempRef = Number(pressureReference.tempRefC);
-    result.tempCurrent = Number(currentTef);
-
-    return result;
-  }
-
-  /* ACTUALIZACIÓN DE TARJETAS Y ALARMAS CON VIBRACIÓN */
-  function updateCards(p) {
-    const badge = document.getElementById("status-badge");
-    const wifiEl = document.getElementById("wifi-val");
-
-    if (!p) {
-      badge.textContent = "Sin Datos";
-      badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-slate-800 text-slate-400 border border-slate-700";
-      wifiEl.textContent = 'Wifi: "Sin conexión"';
-      alarmActive = false;
-      return;
-    }
-
-    const now = Date.now();
-    const readingTime = new Date(p.created_at).getTime();
-    const diffSeconds = (now - readingTime) / 1000;
-    const online = diffSeconds <= 30;
-
-    if (!isLive) {
-      badge.textContent = "Historial";
-      badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/40";
-    } else if (online) {
-      badge.textContent = "Online";
-      badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
-    } else {
-      badge.textContent = "Offline";
-      badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse";
-    }
-
-    wifiEl.textContent = (online && p.wifi) ? `Wifi: "${p.wifi}"` : 'Wifi: "Sin conexión"';
-
-    document.getElementById("temp1-val").textContent = p.s1 !== null ? `${p.s1.toFixed(1)} °C` : "DESC";
-    document.getElementById("temp2-val").textContent = p.s2 !== null ? `${p.s2.toFixed(1)} °C` : "DESC";
-    document.getElementById("delta-val").textContent = p.delta !== null ? `${p.delta.toFixed(1)} °C` : "--.- °C";
-
-    const date = new Date(p.created_at);
-    const today = new Date().toDateString() === date.toDateString();
-    const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    const dateText = today ? "" : `${date.getDate()}/${date.getMonth()+1} `;
-
-    document.getElementById("temp1-time").textContent = `Lectura: ${dateText}${time}`;
-    document.getElementById("temp2-time").textContent = `Lectura: ${dateText}${time}`;
-
-    // RENDERIZADO BATERÍA
-    const vVal = Number(p.bateriaVolt);
-    if (p.bateriaVolt !== null && !isNaN(vVal)) {
-      const pct = ((vVal - 3.0) / (4.2 - 3.0)) * 100;
-      const batPct = Math.max(0, Math.min(100, pct));
-      document.getElementById("bat-val").textContent = `${batPct.toFixed(0)}% (${vVal.toFixed(2)}V)`;
-      document.getElementById("bat-bar").style.width = `${batPct}%`;
-    } else {
-      document.getElementById("bat-val").textContent = "--%";
-      document.getElementById("bat-bar").style.width = "0%";
-    }
-
-    // EVALUACIÓN DE ALARMAS
-    const limit1 = parseFloat(document.getElementById("alarm1-input").value);
-    const limit2 = parseFloat(document.getElementById("alarm2-input").value);
-    const limitDelta = parseFloat(document.getElementById("alarmDeltaMin-input").value);
-
-    let isAlarmS1 = p.s1 !== null && !isNaN(limit1) && p.s1 >= limit1;
-    let isAlarmS2 = p.s2 !== null && !isNaN(limit2) && p.s2 >= limit2;
-    let isAlarmDelta = p.delta !== null && !isNaN(limitDelta) && p.delta < limitDelta;
-
-    // ESTADO GENERAL DE ALARMA ACTIVA (SI CUALQUIERA DISPARA, ACTIVA VIBRACIÓN)
-    alarmActive = isAlarmS1 || isAlarmS2 || isAlarmDelta;
-
-    const cardS1 = document.getElementById("card-s1");
-    if (isAlarmS1) {
-      cardS1.classList.add("bg-rose-950/80", "border-rose-500", "animate-pulse");
-      cardS1.classList.remove("bg-slate-800", "border-slate-700/60");
-    } else {
-      cardS1.classList.remove("bg-rose-950/80", "border-rose-500", "animate-pulse");
-      cardS1.classList.add("bg-slate-800", "border-slate-700/60");
-    }
-
-    const cardS2 = document.getElementById("card-s2");
-    if (isAlarmS2) {
-      cardS2.classList.add("bg-rose-950/80", "border-rose-500", "animate-pulse");
-      cardS2.classList.remove("bg-slate-800", "border-slate-700/60");
-    } else {
-      cardS2.classList.remove("bg-rose-950/80", "border-rose-500", "animate-pulse");
-      cardS2.classList.add("bg-slate-800", "border-slate-700/60");
-    }
-
-    const cardDelta = document.getElementById("card-delta");
-    const deltaMsg = document.getElementById("delta-status-msg");
-    if (isAlarmDelta) {
-      cardDelta.classList.add("bg-yellow-950/80", "border-yellow-500");
-      cardDelta.classList.remove("bg-slate-800", "border-slate-700/60");
-      deltaMsg.textContent = "⚠️ ΔT por debajo del límite mínimo";
-      deltaMsg.className = "text-[9px] text-yellow-400 font-bold mt-0.5";
-    } else {
-      cardDelta.classList.remove("bg-yellow-950/80", "border-yellow-500");
-      cardDelta.classList.add("bg-slate-800", "border-slate-700/60");
-      deltaMsg.textContent = "Rango normal";
-      deltaMsg.className = "text-[9px] text-slate-500 mt-0.5";
-    }
-
-    // CÁLCULOS P.H.
-    const pressureResult = calculateNitrogenPressure(p);
-
-    if (pressureResult.pressure !== null) {
-      document.getElementById("n2-p-calc").textContent = `${pressureResult.pressure.toFixed(1)} PSI`;
-      document.getElementById("n2-elapsed").textContent = pressureResult.elapsedText;
-      document.getElementById("n2-p-ref").textContent = pressureResult.reference.pressureGauge.toFixed(1);
-      document.getElementById("n2-t-ref").textContent = pressureResult.tempRef.toFixed(1);
-
-      if (pressureResult.lastMeasured) {
-        document.getElementById("n2-p-last").textContent = Number(pressureResult.lastMeasured.pressureGauge).toFixed(1);
-        if (pressureResult.deviation !== null) {
-          const sign = pressureResult.deviation >= 0 ? "+" : "";
-          document.getElementById("n2-diff").textContent = `${sign}${pressureResult.deviation.toFixed(1)}`;
-        } else {
-          document.getElementById("n2-diff").textContent = "--.-";
-        }
-      } else {
-        document.getElementById("n2-p-last").textContent = "---.- PSI";
-        document.getElementById("n2-diff").textContent = "--.-";
-      }
-    } else {
-      document.getElementById("n2-p-calc").textContent = "---.- PSI";
-      document.getElementById("n2-elapsed").textContent = "Tiempo: --";
-      document.getElementById("n2-p-ref").textContent = pressureReference ? Number(pressureReference.pressureGauge).toFixed(1) : "--.-";
-      document.getElementById("n2-t-ref").textContent = pressureReference ? Number(pressureReference.tempRefC).toFixed(1) : "--.-";
-      document.getElementById("n2-p-last").textContent = pressureLastMeasured ? Number(pressureLastMeasured.pressureGauge).toFixed(1) : "---.- PSI";
-      document.getElementById("n2-diff").textContent = "--.-";
-    }
-  }
-
-  function renderData() {
-    const processed = rawData.map(processRow).filter(r => r !== null);
-
-    updateTimeWindowLabel();
-
-    if (processed.length === 0) {
-      tempChart.data.labels = [];
-      tempChart.data.datasets.forEach(ds => ds.data = []);
-      tempChart.update();
-      updateCards(null);
-      return;
-    }
-
-    const showDateInLabel = selectedHoursRange >= 8;
-
-    const labels = processed.map(r => {
-      const d = new Date(r.created_at);
-      if (showDateInLabel) {
-        return `${d.getDate()}/${d.getMonth()+1} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-      }
-      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    });
-
-    const d1 = processed.map(r => r.s1);
-    const d2 = processed.map(r => r.s2);
-    const dDelta = processed.map(r => r.delta);
-
-    const dPressureExpected = processed.map(p => calculateNitrogenPressure(p).pressure);
-
-    const dPressureMeasured = processed.map(p => {
-      const recordTime = new Date(p.created_at).getTime();
-      const match = pressureMeasurements.find(m => Math.abs(new Date(m.timestamp).getTime() - recordTime) <= 30000);
-      return match ? Number(match.pressureGauge) : null;
-    });
-
-    tempChart.data.labels = labels;
-    tempChart.data.datasets[0].data = d1;
-    tempChart.data.datasets[1].data = d2;
-    tempChart.data.datasets[2].data = dDelta;
-    tempChart.data.datasets[3].data = dPressureExpected;
-    tempChart.data.datasets[4].data = dPressureMeasured;
-    tempChart.update();
-
-    const validS1 = d1.filter(v => v !== null);
-    const validS2 = d2.filter(v => v !== null);
-    const validDelta = dDelta.filter(v => v !== null);
-
-    document.getElementById("s1-min").textContent = validS1.length ? Math.min(...validS1).toFixed(1) : "--.-";
-    document.getElementById("s1-max").textContent = validS1.length ? Math.max(...validS1).toFixed(1) : "--.-";
-    document.getElementById("s2-min").textContent = validS2.length ? Math.min(...validS2).toFixed(1) : "--.-";
-    document.getElementById("s2-max").textContent = validS2.length ? Math.max(...validS2).toFixed(1) : "--.-";
-    document.getElementById("delta-min").textContent = validDelta.length ? Math.min(...validDelta).toFixed(1) : "--.-";
-    document.getElementById("delta-max").textContent = validDelta.length ? Math.max(...validDelta).toFixed(1) : "--.-";
-
-    const lastRecord = processed[processed.length - 1];
-    updateCards(lastRecord);
-  }
-
-  async function fetchData() {
-    if (isFetching) return;
-    isFetching = true;
-
-    const rangeMs = selectedHoursRange * 60 * 60 * 1000;
-    const start = new Date(windowEndTime.getTime() - rangeMs).toISOString();
-    const end = windowEndTime.toISOString();
-
-    try {
-      const { data, error } = await supabaseClient
-        .from("lecturas_temperatura")
-        .select("*")
-        .gte("created_at", start)
-        .lte("created_at", end)
-        .order("created_at", { ascending: true })
-        .limit(500);
-
-      if (error) {
-        console.error("Error Supabase:", error);
-        const badge = document.getElementById("status-badge");
-        badge.textContent = "Error Supabase";
-        badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40";
-        isFetching = false;
-        return;
-      }
-
-      rawData = data || [];
-      renderData();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      isFetching = false;
-    }
-  }
-
+  /* NAVEGACIÓN Y OBTENCIÓN DE DATOS */
   function navigateWindow(direction) {
     isLive = false;
-    const shiftMs = direction * selectedHoursRange * 3600000;
-    windowEndTime = new Date(windowEndTime.getTime() + shiftMs);
-
-    if (windowEndTime >= new Date()) {
-      windowEndTime = new Date();
-      isLive = true;
-      document.getElementById("btn-next").disabled = true;
-    } else {
-      document.getElementById("btn-next").disabled = false;
-    }
-
+    const rangeMs = selectedHoursRange * 60 * 60 * 1000;
+    windowEndTime = new Date(windowEndTime.getTime() + (direction * rangeMs));
     fetchData();
   }
 
   function goLive() {
     isLive = true;
     windowEndTime = new Date();
-    document.getElementById("btn-next").disabled = true;
     fetchData();
   }
 
-  /* INIT */
-  loadSavedAlarms();
-  loadPressureState();
-  updateRangeUI();
-  setWorkMode(workMode);
-  fetchData();
+  async function fetchData() {
+    if (isFetching) return;
+    isFetching = true;
 
-  setInterval(async () => {
-    if (isLive && !isFetching) {
-      windowEndTime = new Date();
-      await fetchData();
+    const badge = document.getElementById("status-badge");
+    badge.textContent = "Cargando...";
+    badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20";
+
+    const rangeMs = selectedHoursRange * 60 * 60 * 1000;
+    const startTime = new Date(windowEndTime.getTime() - rangeMs);
+
+    try {
+      const { data, error } = await supabaseClient
+        .from("lecturas")
+        .select("*")
+        .gte("created_at", startTime.toISOString())
+        .lte("created_at", windowEndTime.toISOString())
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+
+      rawData = data || [];
+      renderData();
+
+      badge.textContent = isLive ? "En vivo" : "Histórico";
+      badge.className = isLive 
+        ? "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+        : "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20";
+
+    } catch (err) {
+      console.error("Error al obtener datos:", err);
+      badge.textContent = "Error";
+      badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20";
+    } finally {
+      isFetching = false;
+      updateRangeUI();
     }
-  }, 10000);
+  }
+
+  /* RENDERIZADO DE INTERFAZ Y BATERÍA CON ALERTAS */
+  function renderData() {
+    updateTimeWindowLabel();
+
+    const alarm1Val = parseFloat(document.getElementById("alarm1-input").value);
+    const alarm2Val = parseFloat(document.getElementById("alarm2-input").value);
+    const alarmDeltaMinVal = parseFloat(document.getElementById("alarmDeltaMin-input").value);
+
+    let a1Active = false;
+    let a2Active = false;
+    let aDeltaActive = false;
+
+    const processed = rawData.map(r => processRow(r)).filter(r => r !== null);
+
+    const labels = [];
+    const s1Data = [];
+    const s2Data = [];
+    const deltaData = [];
+    const pressureExpData = [];
+    const pressureMeasData = [];
+
+    let minS1 = Infinity, maxS1 = -Infinity;
+    let minS2 = Infinity, maxS2 = -Infinity;
+    let minDelta = Infinity, maxDelta = -Infinity;
+
+    processed.forEach(r => {
+      const timeStr = new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      labels.push(timeStr);
+
+      s1Data.push(r.s1);
+      s2Data.push(r.s2);
+      deltaData.push(r.delta);
+
+      if (r.s1 !== null) { minS1 = Math.min(minS1, r.s1); maxS1 = Math.max(maxS1, r.s1); }
+      if (r.s2 !== null) { minS2 = Math.min(minS2, r.s2); maxS2 = Math.max(maxS2, r.s2); }
+      if (r.delta !== null) { minDelta = Math.min(minDelta, r.delta); maxDelta = Math.max(maxDelta, r.delta); }
+
+      // Presión esperada
+      if (pressureReference && r.s1 !== null && r.s2 !== null) {
+        const tEff = effectiveNitrogenTemperature(r.s1, r.s2);
+        const pCalc = tEff !== null ? estimatePressureGauge(pressureReference.pressureGauge, pressureReference.tempRefC, tEff) : null;
+        pressureExpData.push(pCalc !== null ? parseFloat(pCalc.toFixed(1)) : null);
+      } else {
+        pressureExpData.push(null);
+      }
+
+      // Presión medida guardada
+      const pMeas = pressureMeasurements.find(m => Math.abs(new Date(m.timestamp).getTime() - new Date(r.created_at).getTime()) < 30000);
+      pressureMeasData.push(pMeas ? pMeas.pressureGauge : null);
+    });
+
+    // Actualizar tarjetas en tiempo real si hay datos
+    const latest = processed.length > 0 ? processed[processed.length - 1] : null;
+
+    if (latest) {
+      document.getElementById("temp1-val").textContent = latest.s1 !== null ? `${latest.s1.toFixed(1)} °C` : "--.- °C";
+      document.getElementById("temp2-val").textContent = latest.s2 !== null ? `${latest.s2.toFixed(1)} °C` : "--.- °C";
+      document.getElementById("delta-val").textContent = latest.delta !== null ? `${latest.delta.toFixed(1)} °C` : "--.- °C";
+
+      const lastTime = new Date(latest.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      document.getElementById("temp1-time").textContent = `Última: ${lastTime}`;
+      document.getElementById("temp2-time").textContent = `Última: ${lastTime}`;
+
+      // BATERÍA Y RED
+      if (latest.bateriaVolt !== null) {
+        const v = latest.bateriaVolt;
+        const pct = latest.bateria;
+        document.getElementById("bat-val").textContent = `${pct}% · ${v.toFixed(2)}V`;
+        const batBar = document.getElementById("bat-bar");
+        const batIcon = document.getElementById("bat-icon");
+        const batBanner = document.getElementById("bat-alert-banner");
+        const batMsg = document.getElementById("bat-alert-msg");
+
+        batBar.style.width = `${pct}%`;
+
+        // Lógica de alerta por bajo voltaje
+        if (pct <= 20 || v <= 3.10) {
+          batBar.className = "bg-rose-500 h-full transition-all duration-500";
+          batIcon.className = "w-3.5 h-3.5 text-rose-500";
+          batBanner.classList.remove("hidden");
+
+          if (v <= 3.10) {
+            batMsg.textContent = `Batería en nivel crítico (${v.toFixed(2)}V). El dispositivo entrará en modo de corte/protección.`;
+          } else {
+            batMsg.textContent = `Nivel por debajo del 20% (${v.toFixed(2)}V). Cargue el dispositivo pronto.`;
+          }
+        } else if (pct <= 50) {
+          batBar.className = "bg-amber-500 h-full transition-all duration-500";
+          batIcon.className = "w-3.5 h-3.5 text-amber-400";
+          batBanner.classList.add("hidden");
+        } else {
+          batBar.className = "bg-emerald-500 h-full transition-all duration-500";
+          batIcon.className = "w-3.5 h-3.5 text-emerald-400";
+          batBanner.classList.add("hidden");
+        }
+      }
+
+      if (latest.wifi) {
+        document.getElementById("wifi-val").textContent = `Wifi: "${latest.wifi}"`;
+      }
+
+      // Verificación de alarmas de temperatura
+      if (latest.s1 !== null && latest.s1 >= alarm1Val) a1Active = true;
+      if (latest.s2 !== null && latest.s2 >= alarm2Val) a2Active = true;
+      if (latest.delta !== null && latest.delta <= alarmDeltaMinVal) aDeltaActive = true;
+    }
+
+    // Min / Max visuales
+    document.getElementById("s1-min").textContent = minS1 !== Infinity ? minS1.toFixed(1) : "--.-";
+    document.getElementById("s1-max").textContent = maxS1 !== -Infinity ? maxS1.toFixed(1) : "--.-";
+    document.getElementById("s2-min").textContent = minS2 !== Infinity ? minS2.toFixed(1) : "--.-";
+    document.getElementById("s2-max").textContent = maxS2 !== -Infinity ? maxS2.toFixed(1) : "--.-";
+    document.getElementById("delta-min").textContent = minDelta !== Infinity ? minDelta.toFixed(1) : "--.-";
+    document.getElementById("delta-max").textContent = maxDelta !== -Infinity ? maxDelta.toFixed(1) : "--.-";
+
+    // Manejo de estado visual de tarjetas por Alarma
+    document.getElementById("card-s1").className = a1Active
+      ? "bg-rose-900/40 border-2 border-rose-500 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all animate-pulse"
+      : "bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all";
+
+    document.getElementById("card-s2").className = a2Active
+      ? "bg-rose-900/40 border-2 border-rose-500 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all animate-pulse"
+      : "bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all";
+
+    document.getElementById("card-delta").className = aDeltaActive
+      ? "bg-rose-900/40 border-2 border-rose-500 py-2.5 px-3 rounded-xl shadow-md text-center transition-all animate-pulse"
+      : "bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center transition-all";
+
+    alarmActive = a1Active || a2Active || aDeltaActive;
+
+    // RENDERIZAR PRUEBA DE HERMETICIDAD
+    if (pressureReference && latest && latest.s1 !== null && latest.s2 !== null) {
+      const tEff = effectiveNitrogenTemperature(latest.s1, latest.s2);
+      const pCalc = tEff !== null ? estimatePressureGauge(pressureReference.pressureGauge, pressureReference.tempRefC, tEff) : null;
+
+      document.getElementById("n2-p-calc").textContent = pCalc !== null ? `${pCalc.toFixed(1)} PSI` : "---.- PSI";
+      document.getElementById("n2-p-last").textContent = pressureLastMeasured ? `${pressureLastMeasured.pressureGauge.toFixed(1)} PSI` : "---.- PSI";
+      
+      const diff = (pressureLastMeasured && pCalc !== null) ? (pressureLastMeasured.pressureGauge - pCalc) : null;
+      document.getElementById("n2-diff").textContent = diff !== null ? `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}` : "--.-";
+      document.getElementById("n2-p-ref").textContent = `${pressureReference.pressureGauge.toFixed(1)}`;
+      document.getElementById("n2-t-ref").textContent = `${pressureReference.tempRefC.toFixed(1)}`;
+
+      const elapsedMs = new Date().getTime() - new Date(pressureReference.timestamp).getTime();
+      const elapsedHrs = (elapsedMs / (1000 * 60 * 60)).toFixed(1);
+      document.getElementById("n2-elapsed").textContent = `Tiempo: ${elapsedHrs}h`;
+    }
+
+    // ACTUALIZAR GRÁFICA
+    tempChart.data.labels = labels;
+    tempChart.data.datasets[0].data = s1Data;
+    tempChart.data.datasets[1].data = s2Data;
+    tempChart.data.datasets[2].data = deltaData;
+    tempChart.data.datasets[3].data = pressureExpData;
+    tempChart.data.datasets[4].data = pressureMeasData;
+    tempChart.update();
+  }
+
+  /* INICIALIZACIÓN DE LA APLICACIÓN */
+  window.addEventListener("DOMContentLoaded", () => {
+    loadSavedAlarms();
+    loadPressureState();
+    setWorkMode(workMode);
+    fetchData();
+
+    // Suscripción Realtime Supabase
+    supabaseClient
+      .channel("public:lecturas")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "lecturas" }, payload => {
+        if (isLive) {
+          rawData.push(payload.new);
+          windowEndTime = new Date();
+          renderData();
+        }
+      })
+      .subscribe();
+
+    // Auto-actualización cada 30 segundos
+    setInterval(() => {
+      if (isLive) {
+        windowEndTime = new Date();
+        fetchData();
+      }
+    }, 30000);
+  });
 </script>
 
 </body>
