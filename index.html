@@ -285,6 +285,12 @@
       <button id="btn-range-24" onclick="setTimeRange(24)" class="py-1 rounded-md transition">24h</button>
     </div>
 
+    <!-- INDICADOR VISUAL DEL RANGO DE FECHA/HORA ACTUAL -->
+    <div class="text-center bg-slate-900/50 border border-slate-700/40 rounded-lg py-1 px-2">
+      <span class="text-[9px] text-slate-400">Ventana visible:</span>
+      <div id="time-window-label" class="text-[11px] font-mono font-semibold text-sky-400">Calculando rango...</div>
+    </div>
+
     <!-- BOTONES ATRÁS / ACTUAL / ADELANTE -->
     <div class="flex items-center justify-center gap-3">
       <button onclick="navigateWindow(-1)" id="btn-prev-nav" title="Retroceder" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition active:scale-95">‹</button>
@@ -390,6 +396,19 @@
     }
   });
 
+  /* ACTUALIZAR INDICADOR VISUAL DE FECHA / HORA DE VENTANA */
+  function updateTimeWindowLabel() {
+    const rangeMs = selectedHoursRange * 60 * 60 * 1000;
+    const startTime = new Date(windowEndTime.getTime() - rangeMs);
+
+    const formatOpts = { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
+    const startStr = startTime.toLocaleDateString([], formatOpts);
+    const endStr = windowEndTime.toLocaleDateString([], formatOpts);
+
+    const liveBadge = isLive ? " <span class='text-emerald-400 font-bold'>(En vivo)</span>" : "";
+    document.getElementById("time-window-label").innerHTML = `${startStr} ➔ ${endStr}${liveBadge}`;
+  }
+
   /* MODO RANGO DE TIEMPO */
   function setTimeRange(hours) {
     selectedHoursRange = hours;
@@ -417,6 +436,8 @@
     if (prevBtn) prevBtn.title = `Atrás ${selectedHoursRange} Horas`;
     const nextBtn = document.getElementById("btn-next");
     if (nextBtn) nextBtn.title = `Adelante ${selectedHoursRange} Horas`;
+
+    updateTimeWindowLabel();
   }
 
   /* MODOS DE TRABAJO */
@@ -928,12 +949,17 @@
   function renderData() {
     const processed = rawData.map(processRow).filter(r => r !== null);
 
+    updateTimeWindowLabel();
+
     if (processed.length === 0) {
+      tempChart.data.labels = [];
+      tempChart.data.datasets.forEach(ds => ds.data = []);
+      tempChart.update();
       updateCards(null);
       return;
     }
 
-    const showDateInLabel = selectedHoursRange >= 12;
+    const showDateInLabel = selectedHoursRange >= 8;
 
     const labels = processed.map(r => {
       const d = new Date(r.created_at);
