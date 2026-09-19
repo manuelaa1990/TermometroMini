@@ -88,7 +88,7 @@
   </style>
 </head>
 
-<body class="bg-slate-900 text-slate-100 min-h-screen p-3 md:p-6">
+<body class="bg-slate-900 text-slate-100 min-h-screen p-3 md:p-6" onclick="enableVibrationOnTouch()">
 
 <div class="max-w-md md:max-w-3xl mx-auto space-y-3">
 
@@ -347,9 +347,24 @@
   let windowEndTime = new Date();
   let isLive = true;
   let rawData = [];
-  let lastGlobalRecord = null;
   let isInverted = false;
   let isEPaper = false;
+  let isFetching = false;
+  let alarmActive = false;
+
+  /* HABILITAR VIBRACIÓN AL TOCAR PANTALLA */
+  function enableVibrationOnTouch() {
+    if ("vibrate" in navigator) {
+      navigator.vibrate(10);
+    }
+  }
+
+  /* SISTEMA DE VIBRACIÓN DE ALARMA CADA 10 SEGUNDOS */
+  setInterval(() => {
+    if (alarmActive && "vibrate" in navigator) {
+      navigator.vibrate(1000); // Vibración de 1 segundo
+    }
+  }, 10000);
 
   /* GRÁFICA INICIALIZACIÓN */
   const ctx = document.getElementById("tempChart").getContext("2d");
@@ -368,6 +383,7 @@
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: false,
       interaction: { mode: "index", intersect: false },
       scales: {
         x: { ticks: { color: "#94a3b8", font: { size: 10 }, maxTicksLimit: 8 }, grid: { color: "#334155" } },
@@ -660,45 +676,6 @@
     return processRow(row);
   }
 
-  async function saveEstimatedPressure(row, estimated) {
-    if (!row || row.id === undefined || row.id === null || !Number.isFinite(Number(estimated))) return false;
-
-    const value = Number(estimated);
-    const { error } = await supabaseClient.from("lecturas_temperatura").update({ presion_estimada: value }).eq("id", row.id);
-
-    if (error) {
-      console.error("Error guardando presion_estimada:", error);
-      return false;
-    }
-
-    row.presion_estimada = value;
-    return true;
-  }
-
-  async function backfillEstimatedPressure() {
-    if (!pressureReference || !rawData.length) return;
-    const refDate = new Date(pressureReference.timestamp);
-    if (!Number.isFinite(refDate.getTime())) return;
-
-    for (const row of rawData) {
-      const record = processRow(row);
-      const recordDate = new Date(row.created_at);
-
-      if (!record || record.s1 === null || record.s2 === null || !Number.isFinite(Number(record.s1)) || !Number.isFinite(Number(record.s2)) || !Number.isFinite(recordDate.getTime()) || recordDate < refDate) continue;
-
-      const tEff = effectiveNitrogenTemperature(record.s1, record.s2);
-      if (tEff === null) continue;
-
-      const estimated = estimatePressureGauge(pressureReference.pressureGauge, pressureReference.tempRefC, tEff);
-      if (estimated === null) continue;
-
-      const stored = Number(row.presion_estimada);
-      if (Number.isFinite(stored) && Math.abs(stored - estimated) < 0.05) continue;
-
-      await saveEstimatedPressure(row, estimated);
-    }
-  }
-
   async function acceptPressurePoint() {
     if (!isLive) {
       const msg = document.getElementById("n2-status-msg");
@@ -771,7 +748,6 @@
     }
 
     document.getElementById("n2-status-msg").className = "text-[8px] text-emerald-400 mt-0.5";
-    await backfillEstimatedPressure();
     renderData();
   }
 
@@ -824,7 +800,7 @@
     return result;
   }
 
-  /* ACTUALIZACIÓN DE TARJETAS Y ALARMAS */
+  /* ACTUALIZACIÓN DE TARJETAS Y ALARMAS CON VIBRACIÓN */
   function updateCards(p) {
     const badge = document.getElementById("status-badge");
     const wifiEl = document.getElementById("wifi-val");
@@ -833,6 +809,7 @@
       badge.textContent = "Sin Datos";
       badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-slate-800 text-slate-400 border border-slate-700";
       wifiEl.textContent = 'Wifi: "Sin conexión"';
+      alarmActive = false;
       return;
     }
 
@@ -883,8 +860,15 @@
     const limit2 = parseFloat(document.getElementById("alarm2-input").value);
     const limitDelta = parseFloat(document.getElementById("alarmDeltaMin-input").value);
 
+    let isAlarmS1 = p.s1 !== null && !isNaN(limit1) && p.s1 >= limit1;
+    let isAlarmS2 = p.s2 !== null && !isNaN(limit2) && p.s2 >= limit2;
+    let isAlarmDelta = p.delta !== null && !isNaN(limitDelta) && p.delta < limitDelta;
+
+    // ESTADO GENERAL DE ALARMA ACTIVA (SI CUALQUIERA DISPARA, ACTIVA VIBRACIÓN)
+    alarmActive = isAlarmS1 || isAlarmS2 || isAlarmDelta;
+
     const cardS1 = document.getElementById("card-s1");
-    if (p.s1 !== null && !isNaN(limit1) && p.s1 >= limit1) {
+    if (isAlarmS1) {
       cardS1.classList.add("bg-rose-950/80", "border-rose-500", "animate-pulse");
       cardS1.classList.remove("bg-slate-800", "border-slate-700/60");
     } else {
@@ -893,7 +877,7 @@
     }
 
     const cardS2 = document.getElementById("card-s2");
-    if (p.s2 !== null && !isNaN(limit2) && p.s2 >= limit2) {
+    if (isAlarmS2) {
       cardS2.classList.add("bg-rose-950/80", "border-rose-500", "animate-pulse");
       cardS2.classList.remove("bg-slate-800", "border-slate-700/60");
     } else {
@@ -903,7 +887,7 @@
 
     const cardDelta = document.getElementById("card-delta");
     const deltaMsg = document.getElementById("delta-status-msg");
-    if (p.delta !== null && !isNaN(limitDelta) && p.delta < limitDelta) {
+    if (isAlarmDelta) {
       cardDelta.classList.add("bg-yellow-950/80", "border-yellow-500");
       cardDelta.classList.remove("bg-slate-800", "border-slate-700/60");
       deltaMsg.textContent = "⚠️ ΔT por debajo del límite mínimo";
@@ -969,21 +953,13 @@
       return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     });
 
-    const sourceRows = rawData.filter(row => processRow(row) !== null);
-
     const d1 = processed.map(r => r.s1);
     const d2 = processed.map(r => r.s2);
     const dDelta = processed.map(r => r.delta);
 
-    const dPressureExpected = processed.map((p, i) => {
-      const row = sourceRows[i];
-      if (row && row.presion_estimada !== null && row.presion_estimada !== undefined && Number.isFinite(Number(row.presion_estimada))) {
-        return Number(row.presion_estimada);
-      }
-      return calculateNitrogenPressure(p).pressure;
-    });
+    const dPressureExpected = processed.map(p => calculateNitrogenPressure(p).pressure);
 
-    const dPressureMeasured = processed.map((p) => {
+    const dPressureMeasured = processed.map(p => {
       const recordTime = new Date(p.created_at).getTime();
       const match = pressureMeasurements.find(m => Math.abs(new Date(m.timestamp).getTime() - recordTime) <= 30000);
       return match ? Number(match.pressureGauge) : null;
@@ -1013,36 +989,38 @@
   }
 
   async function fetchData() {
+    if (isFetching) return;
+    isFetching = true;
+
     const rangeMs = selectedHoursRange * 60 * 60 * 1000;
     const start = new Date(windowEndTime.getTime() - rangeMs).toISOString();
     const end = windowEndTime.toISOString();
 
-    const { data, error } = await supabaseClient
-      .from("lecturas_temperatura")
-      .select("*")
-      .gte("created_at", start)
-      .lte("created_at", end)
-      .order("created_at", { ascending: true });
+    try {
+      const { data, error } = await supabaseClient
+        .from("lecturas_temperatura")
+        .select("*")
+        .gte("created_at", start)
+        .lte("created_at", end)
+        .order("created_at", { ascending: true })
+        .limit(500);
 
-    if (error) {
-      console.error("Error Supabase:", error);
-      const badge = document.getElementById("status-badge");
-      badge.textContent = "Error Supabase";
-      badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40";
-      return;
+      if (error) {
+        console.error("Error Supabase:", error);
+        const badge = document.getElementById("status-badge");
+        badge.textContent = "Error Supabase";
+        badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40";
+        isFetching = false;
+        return;
+      }
+
+      rawData = data || [];
+      renderData();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      isFetching = false;
     }
-
-    rawData = data || [];
-
-    if (rawData.length) {
-      lastGlobalRecord = rawData[rawData.length - 1];
-    }
-
-    if (pressureReference) {
-      await backfillEstimatedPressure();
-    }
-
-    renderData();
   }
 
   function navigateWindow(direction) {
@@ -1076,7 +1054,7 @@
   fetchData();
 
   setInterval(async () => {
-    if (isLive) {
+    if (isLive && !isFetching) {
       windowEndTime = new Date();
       await fetchData();
     }
