@@ -85,6 +85,12 @@
     body.epaper-mode .bg-rose-600 * {
       color:#fff !important;
     }
+
+    /* Botón "avanzar" deshabilitado en el presente */
+    #btn-next:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 
@@ -140,6 +146,11 @@
   <!-- BANNER DE ALERTA BATERÍA BAJA -->
   <div id="bat-alert-banner" class="hidden bg-rose-600/20 border border-rose-500/50 p-2 rounded-xl text-center text-rose-300 text-xs animate-pulse">
     ⚠️ <strong>¡ALERTA DE BATERÍA BAJA!</strong> <span id="bat-alert-msg">Nivel por debajo del 20%. Cargue el dispositivo pronto.</span>
+  </div>
+
+  <!-- BANNER DE DATOS OBSOLETOS -->
+  <div id="stale-banner" class="hidden bg-amber-600/20 border border-amber-500/50 p-2 rounded-xl text-center text-amber-300 text-xs">
+    ⏸ <strong>Datos congelados.</strong> El ESP32 no envía lecturas desde hace más de 35 s. Las alarmas están en pausa hasta recibir datos nuevos.
   </div>
 
   <!-- TITULO -->
@@ -234,7 +245,7 @@
         <span>Presión / Prueba de Hermeticidad</span>
         <button onclick="togglePressureMode(false)" title="Ocultar" class="text-slate-500 hover:text-emerald-400 p-0.5">×</button>
       </div>
-      <span class="text-[8px] text-slate-500 normal-case">60/40</span>
+      <span id="ph-model-label" class="text-[8px] text-slate-500 normal-case">60/40</span>
     </div>
 
     <div class="grid grid-cols-[1fr_auto] gap-2 items-end mt-1.5">
@@ -251,11 +262,35 @@
 
     <input type="datetime-local" id="n2-time-init" class="hidden">
 
-    <div class="text-[8px] text-slate-500 mt-1">
-      N₂: 60% exterior (S1) + 40% interior (S2)
+    <!-- BALANCE EVAP/COND (reparto configurable) -->
+    <div class="mt-2 bg-slate-900/50 border border-slate-700/50 rounded-lg p-2 text-left">
+      <div class="flex justify-between items-center mb-1.5">
+        <label class="text-[9px] text-slate-400 font-semibold uppercase tracking-wider">Balance Evap/Cond</label>
+        <span class="text-[8px] text-slate-500">Suma 100 %</span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] font-bold text-sky-400 w-10">Evap</span>
+        <input type="range" id="ph-s1-weight-range" min="0" max="100" step="5" value="60"
+          oninput="setPHWeight(this.value)"
+          class="flex-1 accent-sky-500 h-1.5">
+        <input type="number" id="ph-s1-weight-num" min="0" max="100" step="5" value="60"
+          oninput="setPHWeight(this.value)"
+          class="w-14 bg-slate-900 border border-slate-700 text-sky-400 text-center rounded py-0.5 text-[11px] font-bold focus:outline-none">
+        <span class="text-[10px] text-slate-400">%</span>
+      </div>
+
+      <div class="flex items-center gap-2 mt-1.5">
+        <span class="text-[10px] font-bold text-rose-400 w-10">Cond</span>
+        <div class="flex-1 bg-slate-800 rounded h-1.5 overflow-hidden">
+          <div id="ph-s2-bar" class="bg-rose-500 h-full transition-all duration-300" style="width:40%"></div>
+        </div>
+        <span id="ph-s2-val" class="text-[11px] font-bold text-rose-400 w-14 text-center">40 %</span>
+        <span class="text-[10px] text-slate-400 invisible">%</span>
+      </div>
     </div>
 
-    <div class="border-t border-slate-700/60 mt-1.5 pt-1.5">
+    <div class="border-t border-slate-700/60 mt-2 pt-1.5">
       <div class="grid grid-cols-2 gap-2">
         <div class="rounded-lg bg-slate-900/50 border border-slate-700/50 py-1">
           <div class="text-[8px] text-slate-500 uppercase">Presión esperada</div>
@@ -382,12 +417,12 @@
   let alarmActive = false;
 
   /* ESTADO DE CONEXIÓN (ESP32 / SUPABASE) */
-  const ESP_CONNECTED_MAX_AGE_MS = 35000;  // el ESP32 envía cada 10 s: 35 s ≈ 3 envíos perdidos
-  const POLL_INTERVAL_MS = 10000;          // consulta ligera de "última lectura"
+  const ESP_CONNECTED_MAX_AGE_MS = 35000;
+  const POLL_INTERVAL_MS = 10000;
   const pageLoadedAt = Date.now();
 
-  let lastSeenAt = null;                   // Date de la lectura más reciente conocida (created_at)
-  let dbOk = null;                         // null = sin probar, true = Supabase responde, false = error
+  let lastSeenAt = null;
+  let dbOk = null;
   let dbError = null;
   let realtimeStatus = "INICIANDO";
   let realtimeEvents = 0;
@@ -480,11 +515,17 @@
     return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
-  /* Registra la lectura más reciente conocida (nunca retrocede) */
   function noteReading(createdAt) {
     const d = new Date(createdAt);
     if (isNaN(d.getTime())) return;
     if (!lastSeenAt || d > lastSeenAt) lastSeenAt = d;
+  }
+
+  function isDataFresh(createdAt) {
+    if (!createdAt) return false;
+    const t = new Date(createdAt).getTime();
+    if (isNaN(t)) return false;
+    return (Date.now() - t) <= ESP_CONNECTED_MAX_AGE_MS;
   }
 
   function updateConnectionBadge() {
@@ -543,8 +584,6 @@
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
   }
 
-  /* Consulta ligera (1 fila) cada 10 s: mantiene al día el estado
-     aunque Realtime no esté activo y aunque se vea el historial. */
   async function pollLatest() {
     if (isPolling || document.hidden) return;
     isPolling = true;
@@ -650,7 +689,6 @@
     setDiagSummary("run", "Ejecutando pruebas...");
 
     try {
-      /* 1. URL y clave */
       const key = String(SUPABASE_KEY || "");
       const jwt = decodeJwt(key);
       let host = "";
@@ -677,14 +715,12 @@
         add("warn", "Clave", "Formato de clave no reconocido.");
       }
 
-      /* 2. Internet */
       if (!navigator.onLine) {
         add("fail", "Internet", "Este dispositivo no tiene conexión a Internet.");
         setDbState(false, { message: "Sin Internet" });
         return;
       }
 
-      /* 3. Servidor + clave + tabla */
       try {
         const t0 = performance.now();
         const res = await withTimeout(
@@ -713,7 +749,6 @@
         return;
       }
 
-      /* 4. Última lectura del ESP32 */
       try {
         const { data, error } = await withTimeout(
           supabaseClient.from(TABLE_NAME).select("*").order("created_at", { ascending: false }).limit(1),
@@ -746,7 +781,6 @@
         return;
       }
 
-      /* 5. Realtime (no crítico: hay consulta periódica de respaldo) */
       const espActive = lastSeenAt && (Date.now() - lastSeenAt.getTime() <= ESP_CONNECTED_MAX_AGE_MS);
       if (realtimeStatus === "SUBSCRIBED") {
         if (realtimeEvents === 0 && espActive && Date.now() - pageLoadedAt > 30000) {
@@ -812,10 +846,19 @@
 
     const prevBtn = document.getElementById("btn-prev-nav");
     if (prevBtn) prevBtn.title = `Atrás ${selectedHoursRange} Horas`;
-    const nextBtn = document.getElementById("btn-next");
-    if (nextBtn) nextBtn.title = `Adelante ${selectedHoursRange} Horas`;
 
+    updateNextButtonState();
     updateTimeWindowLabel();
+  }
+
+  function updateNextButtonState() {
+    const btn = document.getElementById("btn-next");
+    if (!btn) return;
+
+    const now = Date.now();
+    const atPresent = isLive || windowEndTime.getTime() >= now - 5000;
+    btn.disabled = atPresent;
+    btn.title = atPresent ? "Ya estás en el presente" : `Adelante ${selectedHoursRange} Horas`;
   }
 
   /* MODOS DE TRABAJO */
@@ -951,12 +994,11 @@
     const s1 = isInverted ? raw2 : raw1;
     const s2 = isInverted ? raw1 : raw2;
     const delta = (s1 !== null && s2 !== null) ? Math.abs(s1 - s2) : null;
-    
+
     const vBat = (row.bateriaVolt !== undefined && row.bateriaVolt !== null) ? Number(row.bateriaVolt) : null;
-    
+
     let bateria = null;
     if (vBat !== null && !isNaN(vBat)) {
-      // Cálculo preciso Li-Ion 18650 (3.10V a 4.20V)
       const pct = ((vBat - 3.10) / (4.20 - 3.10)) * 100;
       bateria = Math.max(0, Math.min(100, Math.round(pct)));
     }
@@ -966,10 +1008,47 @@
     return { ...row, s1, s2, delta, bateria, bateriaVolt: vBat, wifi };
   }
 
-  /* PRUEBA DE HERMETICIDAD */
+  /* PRUEBA DE HERMETICIDAD — BALANCE EVAP/COND CONFIGURABLE */
   const ATM_PSI = 14.696;
-  const PH_S1_WEIGHT = 0.60;
-  const PH_S2_WEIGHT = 0.40;
+
+  // Pesos configurables por el usuario (en porcentaje, 0-100). Por defecto 60/40.
+  let phS1Weight = parseInt(localStorage.getItem("ph-s1-weight"));
+  if (!Number.isFinite(phS1Weight) || phS1Weight < 0 || phS1Weight > 100) phS1Weight = 60;
+  let phS2Weight = 100 - phS1Weight;
+
+  function setPHWeight(value) {
+    let v = parseInt(value);
+    if (!Number.isFinite(v)) v = 60;
+    v = Math.max(0, Math.min(100, v));
+
+    phS1Weight = v;
+    phS2Weight = 100 - v;
+
+    localStorage.setItem("ph-s1-weight", v);
+
+    const rangeEl = document.getElementById("ph-s1-weight-range");
+    const numEl = document.getElementById("ph-s1-weight-num");
+    const s2Bar = document.getElementById("ph-s2-bar");
+    const s2Val = document.getElementById("ph-s2-val");
+    const modelLabel = document.getElementById("ph-model-label");
+
+    if (rangeEl && Number(rangeEl.value) !== v) rangeEl.value = v;
+    if (numEl && Number(numEl.value) !== v) numEl.value = v;
+    if (s2Bar) s2Bar.style.width = `${phS2Weight}%`;
+    if (s2Val) s2Val.textContent = `${phS2Weight} %`;
+    if (modelLabel) modelLabel.textContent = `${phS1Weight}/${phS2Weight}`;
+
+    // Aviso si hay una referencia tomada con un modelo distinto
+    if (pressureReference && pressureReference.model !== `${phS1Weight}/${phS2Weight}`) {
+      const msg = document.getElementById("n2-status-msg");
+      if (msg) {
+        msg.textContent = `⚠ Referencia tomada con balance ${pressureReference.model}. Cambiar a ${phS1Weight}/${phS2Weight} alterará la presión esperada.`;
+        msg.className = "text-[8px] text-amber-400 font-bold mt-0.5";
+      }
+    }
+
+    renderData();
+  }
 
   let pressureReference = null;
   let pressureLastMeasured = null;
@@ -980,7 +1059,7 @@
     const s1 = Number(s1C);
     const s2 = Number(s2C);
     if (!Number.isFinite(s1) || !Number.isFinite(s2)) return null;
-    return (PH_S1_WEIGHT * s1) + (PH_S2_WEIGHT * s2);
+    return (phS1Weight / 100) * s1 + (phS2Weight / 100) * s2;
   }
 
   function togglePressureMode(showState) {
@@ -1031,6 +1110,10 @@
 
     const checkbox = document.getElementById("chk-pressure");
     if (checkbox) checkbox.checked = pressureTestVisible;
+
+    // Restaurar el balance Evap/Cond configurado (por defecto 60/40)
+    const savedWeight = parseInt(localStorage.getItem("ph-s1-weight"));
+    setPHWeight(Number.isFinite(savedWeight) && savedWeight >= 0 && savedWeight <= 100 ? savedWeight : 60);
   }
 
   function getLatestTemperatureRecord() {
@@ -1077,7 +1160,7 @@
         tempS1C: Number(record.s1),
         tempS2C: Number(record.s2),
         tempRefC: Number(tEff),
-        model: "60/40"
+        model: `${phS1Weight}/${phS2Weight}`
       };
 
       pressureLastMeasured = { timestamp, pressureGauge, tempC: Number(tEff) };
@@ -1100,6 +1183,7 @@
     updateConnectionBadge();
     const rangeMs = selectedHoursRange * 60 * 60 * 1000;
     windowEndTime = new Date(windowEndTime.getTime() + (direction * rangeMs));
+    updateNextButtonState();
     fetchData();
   }
 
@@ -1107,6 +1191,7 @@
     isLive = true;
     updateConnectionBadge();
     windowEndTime = new Date();
+    updateNextButtonState();
     fetchData();
   }
 
@@ -1179,7 +1264,6 @@
       if (r.s2 !== null) { minS2 = Math.min(minS2, r.s2); maxS2 = Math.max(maxS2, r.s2); }
       if (r.delta !== null) { minDelta = Math.min(minDelta, r.delta); maxDelta = Math.max(maxDelta, r.delta); }
 
-      // Presión esperada
       if (pressureReference && r.s1 !== null && r.s2 !== null) {
         const tEff = effectiveNitrogenTemperature(r.s1, r.s2);
         const pCalc = tEff !== null ? estimatePressureGauge(pressureReference.pressureGauge, pressureReference.tempRefC, tEff) : null;
@@ -1188,12 +1272,10 @@
         pressureExpData.push(null);
       }
 
-      // Presión medida guardada
       const pMeas = pressureMeasurements.find(m => Math.abs(new Date(m.timestamp).getTime() - new Date(r.created_at).getTime()) < 30000);
       pressureMeasData.push(pMeas ? pMeas.pressureGauge : null);
     });
 
-    // Actualizar tarjetas en tiempo real si hay datos
     const latest = processed.length > 0 ? processed[processed.length - 1] : null;
 
     if (latest) {
@@ -1205,7 +1287,6 @@
       document.getElementById("temp1-time").textContent = `Última: ${lastTime}`;
       document.getElementById("temp2-time").textContent = `Última: ${lastTime}`;
 
-      // BATERÍA Y RED
       if (latest.bateriaVolt !== null) {
         const v = latest.bateriaVolt;
         const pct = latest.bateria;
@@ -1217,7 +1298,6 @@
 
         batBar.style.width = `${pct}%`;
 
-        // Lógica de alerta por bajo voltaje
         if (pct <= 20 || v <= 3.10) {
           batBar.className = "bg-rose-500 h-full transition-all duration-500";
           batIcon.className = "w-3.5 h-3.5 text-rose-500";
@@ -1243,13 +1323,18 @@
         document.getElementById("wifi-val").textContent = `Wifi: "${latest.wifi}"`;
       }
 
-      // Verificación de alarmas de temperatura
-      if (latest.s1 !== null && latest.s1 >= alarm1Val) a1Active = true;
-      if (latest.s2 !== null && latest.s2 >= alarm2Val) a2Active = true;
-      if (latest.delta !== null && latest.delta <= alarmDeltaMinVal) aDeltaActive = true;
+      const dataIsFresh = isDataFresh(latest.created_at);
+
+      if (dataIsFresh) {
+        if (latest.s1 !== null && latest.s1 >= alarm1Val) a1Active = true;
+        if (latest.s2 !== null && latest.s2 >= alarm2Val) a2Active = true;
+        if (latest.delta !== null && latest.delta <= alarmDeltaMinVal) aDeltaActive = true;
+      }
+
+      const staleBanner = document.getElementById("stale-banner");
+      if (staleBanner) staleBanner.classList.toggle("hidden", dataIsFresh);
     }
 
-    // Min / Max visuales
     document.getElementById("s1-min").textContent = minS1 !== Infinity ? minS1.toFixed(1) : "--.-";
     document.getElementById("s1-max").textContent = maxS1 !== -Infinity ? maxS1.toFixed(1) : "--.-";
     document.getElementById("s2-min").textContent = minS2 !== Infinity ? minS2.toFixed(1) : "--.-";
@@ -1257,7 +1342,6 @@
     document.getElementById("delta-min").textContent = minDelta !== Infinity ? minDelta.toFixed(1) : "--.-";
     document.getElementById("delta-max").textContent = maxDelta !== -Infinity ? maxDelta.toFixed(1) : "--.-";
 
-    // Manejo de estado visual de tarjetas por Alarma
     document.getElementById("card-s1").className = a1Active
       ? "bg-rose-900/40 border-2 border-rose-500 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all animate-pulse"
       : "bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all";
@@ -1272,14 +1356,13 @@
 
     alarmActive = a1Active || a2Active || aDeltaActive;
 
-    // RENDERIZAR PRUEBA DE HERMETICIDAD
     if (pressureReference && latest && latest.s1 !== null && latest.s2 !== null) {
       const tEff = effectiveNitrogenTemperature(latest.s1, latest.s2);
       const pCalc = tEff !== null ? estimatePressureGauge(pressureReference.pressureGauge, pressureReference.tempRefC, tEff) : null;
 
       document.getElementById("n2-p-calc").textContent = pCalc !== null ? `${pCalc.toFixed(1)} PSI` : "---.- PSI";
       document.getElementById("n2-p-last").textContent = pressureLastMeasured ? `${pressureLastMeasured.pressureGauge.toFixed(1)} PSI` : "---.- PSI";
-      
+
       const diff = (pressureLastMeasured && pCalc !== null) ? (pressureLastMeasured.pressureGauge - pCalc) : null;
       document.getElementById("n2-diff").textContent = diff !== null ? `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}` : "--.-";
       document.getElementById("n2-p-ref").textContent = `${pressureReference.pressureGauge.toFixed(1)}`;
@@ -1290,7 +1373,6 @@
       document.getElementById("n2-elapsed").textContent = `Tiempo: ${elapsedHrs}h`;
     }
 
-    // ACTUALIZAR GRÁFICA
     tempChart.data.labels = labels;
     tempChart.data.datasets[0].data = s1Data;
     tempChart.data.datasets[1].data = s2Data;
@@ -1305,11 +1387,11 @@
     loadSavedAlarms();
     loadPressureState();
     setWorkMode(workMode);
+    updateNextButtonState();
     updateConnectionBadge();
     fetchData();
     pollLatest();
 
-    // Suscripción Realtime Supabase
     supabaseClient
       .channel("public:" + TABLE_NAME)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: TABLE_NAME }, payload => {
@@ -1327,7 +1409,6 @@
         realtimeStatus = status;
       });
 
-    // Auto-actualización cada 30 segundos
     setInterval(() => {
       if (isLive) {
         windowEndTime = new Date();
@@ -1335,11 +1416,9 @@
       }
     }, 30000);
 
-    // Estado de conexión: consulta ligera + recálculo local
     setInterval(pollLatest, POLL_INTERVAL_MS);
     setInterval(updateConnectionBadge, 2000);
 
-    // Al volver a la pestaña / app, actualizar de inmediato
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) {
         pollLatest();
@@ -1350,6 +1429,18 @@
       }
     });
   });
+</script>
+
+<!-- Registro del Service Worker (PWA) -->
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker
+        .register("./sw.js")
+        .then(reg => console.log("[PWA] Service Worker registrado:", reg.scope))
+        .catch(err => console.warn("[PWA] Error al registrar SW:", err));
+    });
+  }
 </script>
 
 </body>
