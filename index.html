@@ -124,9 +124,15 @@
         <span id="epaper-btn-text">ePaper</span>
       </button>
 
-      <!-- ESTADO -->
-      <div id="status-badge" class="px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-        Conectando...
+      <!-- DIAGNÓSTICO SUPABASE -->
+      <button id="btn-diag" onclick="openDiagnostics()" title="Diagnóstico de Supabase" class="px-2 py-0.5 text-[10px] font-bold rounded border border-slate-600 bg-slate-800 text-slate-300 transition active:scale-95 flex items-center gap-1.5">
+        <span id="diag-dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+        <span>DB</span>
+      </button>
+
+      <!-- ESTADO: Conectado / Desconectado / Historial -->
+      <div id="status-badge" onclick="openDiagnostics()" title="Toque para diagnosticar" class="px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 cursor-pointer">
+        Verificando...
       </div>
     </div>
   </div>
@@ -341,10 +347,28 @@
 
 </div>
 
+<!-- MODAL: DIAGNÓSTICO DE SUPABASE -->
+<div id="diag-modal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center p-3" onclick="if(event.target===this)closeDiagnostics()">
+  <div class="w-full max-w-md bg-slate-900 border border-slate-700 rounded-xl shadow-xl p-3 max-h-[85vh] overflow-y-auto">
+    <div class="flex justify-between items-center mb-2">
+      <div class="text-sm font-bold text-sky-400">Diagnóstico de Supabase</div>
+      <button onclick="closeDiagnostics()" title="Cerrar" class="text-slate-400 hover:text-white px-2 text-lg leading-none">×</button>
+    </div>
+
+    <div id="diag-summary" class="text-xs font-bold text-slate-400 text-center py-1">—</div>
+    <div id="diag-list" class="mt-1"></div>
+
+    <button onclick="runDiagnostics()" class="mt-3 w-full py-1.5 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition active:scale-95">
+      Volver a probar
+    </button>
+  </div>
+</div>
+
 <script>
   /* SUPABASE CONFIG */
   const SUPABASE_URL = "https://ovaqbqkahttkmmtlmxha.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92YXFicWthaHR0a21tdGxteGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2NDYxOTMsImV4cCI6MjEwNDIyMjE5M30.PpXfbHxW1-4ArrKuod0LLh8TZbjLO091r4DwkMNs3m8";
+  const TABLE_NAME = "lecturas_temperatura";
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   /* VARIABLES GLOBALES */
@@ -356,6 +380,19 @@
   let isEPaper = false;
   let isFetching = false;
   let alarmActive = false;
+
+  /* ESTADO DE CONEXIÓN (ESP32 / SUPABASE) */
+  const ESP_CONNECTED_MAX_AGE_MS = 35000;  // el ESP32 envía cada 10 s: 35 s ≈ 3 envíos perdidos
+  const POLL_INTERVAL_MS = 10000;          // consulta ligera de "última lectura"
+  const pageLoadedAt = Date.now();
+
+  let lastSeenAt = null;                   // Date de la lectura más reciente conocida (created_at)
+  let dbOk = null;                         // null = sin probar, true = Supabase responde, false = error
+  let dbError = null;
+  let realtimeStatus = "INICIANDO";
+  let realtimeEvents = 0;
+  let isPolling = false;
+  let diagRunning = false;
 
   /* HABILITAR VIBRACIÓN AL TOCAR PANTALLA */
   function enableVibrationOnTouch() {
@@ -416,6 +453,326 @@
       }
     }
   });
+
+  /* ============================================================
+     ESTADO DE CONEXIÓN: Conectado / Desconectado / Historial
+     ============================================================ */
+
+  const BADGE_BASE = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full border cursor-pointer ";
+  const BADGE_STYLES = {
+    ok:   "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    off:  "bg-rose-500/10 text-rose-400 border-rose-500/20",
+    hist: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+    warn: "bg-amber-500/10 text-amber-400 border-amber-500/20"
+  };
+
+  function formatAge(ms) {
+    const s = Math.max(0, Math.round(ms / 1000));
+    if (s < 60) return `${s} s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m} min`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} h ${m % 60} min`;
+    return `${Math.floor(h / 24)} d`;
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  /* Registra la lectura más reciente conocida (nunca retrocede) */
+  function noteReading(createdAt) {
+    const d = new Date(createdAt);
+    if (isNaN(d.getTime())) return;
+    if (!lastSeenAt || d > lastSeenAt) lastSeenAt = d;
+  }
+
+  function updateConnectionBadge() {
+    const badge = document.getElementById("status-badge");
+    if (!badge) return;
+
+    const age = lastSeenAt ? Math.max(0, Date.now() - lastSeenAt.getTime()) : null;
+    let text, style, tip;
+
+    if (!isLive) {
+      text = "Historial";
+      style = "hist";
+      tip = "Mostrando datos históricos. Pulse «Actual» para volver.";
+    } else if (dbOk === null) {
+      text = "Verificando...";
+      style = "warn";
+      tip = "Comprobando acceso a Supabase...";
+    } else if (dbOk === false) {
+      text = "Sin Supabase";
+      style = "warn";
+      tip = "No se puede leer Supabase, por eso no se sabe si el ESP32 transmite. Toque para diagnosticar.";
+    } else if (age !== null && age <= ESP_CONNECTED_MAX_AGE_MS) {
+      text = "Conectado";
+      style = "ok";
+      tip = `ESP32 transmitiendo · última lectura hace ${formatAge(age)}`;
+    } else {
+      text = age !== null ? `Desconectado · ${formatAge(age)}` : "Desconectado";
+      style = "off";
+      tip = age !== null ? `Sin lecturas del ESP32 desde hace ${formatAge(age)}` : "No hay lecturas registradas del ESP32";
+    }
+
+    badge.textContent = text;
+    badge.className = BADGE_BASE + BADGE_STYLES[style];
+    badge.title = tip;
+  }
+
+  function updateDiagDot() {
+    const dot = document.getElementById("diag-dot");
+    if (!dot) return;
+    dot.className = "w-1.5 h-1.5 rounded-full " +
+      (dbOk === true ? "bg-emerald-400" : dbOk === false ? "bg-rose-500" : "bg-slate-500");
+  }
+
+  function setDbState(ok, err) {
+    dbOk = ok;
+    dbError = ok ? null : (err || null);
+    updateDiagDot();
+    updateConnectionBadge();
+  }
+
+  function withTimeout(promise, ms) {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("TIMEOUT")), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+  }
+
+  /* Consulta ligera (1 fila) cada 10 s: mantiene al día el estado
+     aunque Realtime no esté activo y aunque se vea el historial. */
+  async function pollLatest() {
+    if (isPolling || document.hidden) return;
+    isPolling = true;
+    try {
+      const { data, error } = await withTimeout(
+        supabaseClient.from(TABLE_NAME).select("created_at").order("created_at", { ascending: false }).limit(1),
+        8000
+      );
+      if (error) throw error;
+      if (data && data.length) noteReading(data[0].created_at);
+      setDbState(true);
+    } catch (err) {
+      setDbState(false, err);
+    } finally {
+      isPolling = false;
+      updateConnectionBadge();
+    }
+  }
+
+  /* ============================================================
+     DIAGNÓSTICO DE SUPABASE
+     ============================================================ */
+
+  function decodeJwt(token) {
+    try {
+      let p = String(token).split(".")[1];
+      if (!p) return null;
+      p = p.replace(/-/g, "+").replace(/_/g, "/");
+      while (p.length % 4) p += "=";
+      return JSON.parse(atob(p));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function interpretDbError(err, status) {
+    const msg = String((err && err.message) || err || "Error desconocido");
+    const code = (err && err.code) || "";
+
+    if (msg === "TIMEOUT") {
+      return "Sin respuesta en 10 s: red muy lenta o proyecto pausado (los proyectos del plan gratuito se pausan tras un tiempo sin actividad).";
+    }
+    if (status === 0 || /failed to fetch|networkerror|load failed/i.test(msg)) {
+      return "No se pudo contactar al servidor: sin Internet, URL incorrecta, proyecto pausado o red bloqueada.";
+    }
+    if (status === 401 || code === "PGRST301" || /invalid api key|jwt/i.test(msg)) {
+      return `Clave rechazada por Supabase (${msg}). Revise SUPABASE_KEY.`;
+    }
+    if (status === 403 || code === "42501") {
+      return `Permiso denegado (${msg}). Falta permiso o política SELECT para el rol anon.`;
+    }
+    if (status === 404 || code === "42P01" || code === "PGRST205") {
+      return `La tabla "${TABLE_NAME}" no existe o no está expuesta (${msg}).`;
+    }
+    if (status >= 500) {
+      return `Error interno de Supabase (HTTP ${status}): ${msg}`;
+    }
+    return msg;
+  }
+
+  const DIAG_ICONS = { ok: "✔", warn: "⚠", fail: "✖", run: "…" };
+  const DIAG_COLORS = { ok: "text-emerald-400", warn: "text-amber-400", fail: "text-rose-400", run: "text-slate-400" };
+
+  function renderDiag(steps, running) {
+    const list = document.getElementById("diag-list");
+    list.innerHTML = steps.map(s => `
+      <div class="flex gap-2 items-start text-left border-b border-slate-700/50 py-1.5">
+        <span class="${DIAG_COLORS[s.state]} font-bold w-4 shrink-0 text-center">${DIAG_ICONS[s.state]}</span>
+        <div class="min-w-0">
+          <div class="text-[11px] font-semibold text-slate-200">${escapeHtml(s.label)}</div>
+          <div class="text-[10px] text-slate-400 break-words">${escapeHtml(s.detail)}</div>
+        </div>
+      </div>`).join("") +
+      (running ? `<div class="text-[10px] text-slate-500 py-1.5">Comprobando...</div>` : "");
+  }
+
+  function setDiagSummary(state, text) {
+    const el = document.getElementById("diag-summary");
+    el.textContent = text;
+    el.className = "text-xs font-bold text-center py-1 " + DIAG_COLORS[state];
+  }
+
+  function openDiagnostics() {
+    document.getElementById("diag-modal").classList.remove("hidden");
+    runDiagnostics();
+  }
+
+  function closeDiagnostics() {
+    document.getElementById("diag-modal").classList.add("hidden");
+  }
+
+  async function runDiagnostics() {
+    if (diagRunning) return;
+    diagRunning = true;
+
+    const steps = [];
+    const add = (state, label, detail) => {
+      steps.push({ state, label, detail });
+      renderDiag(steps, true);
+    };
+
+    renderDiag(steps, true);
+    setDiagSummary("run", "Ejecutando pruebas...");
+
+    try {
+      /* 1. URL y clave */
+      const key = String(SUPABASE_KEY || "");
+      const jwt = decodeJwt(key);
+      let host = "";
+      try { host = new URL(SUPABASE_URL).hostname; } catch (_) {}
+
+      if (!host) add("fail", "URL del proyecto", "SUPABASE_URL no es una URL válida.");
+      else add("ok", "URL del proyecto", host);
+
+      if (key.startsWith("sb_secret_")) {
+        add("fail", "Clave", "Es una clave SECRETA. No debe estar en una página web: use la clave publishable/anon.");
+      } else if (key.startsWith("sb_publishable_")) {
+        add("ok", "Clave", "Clave publishable.");
+      } else if (jwt) {
+        if (jwt.role === "service_role") {
+          add("fail", "Clave", "Es la clave service_role: da acceso total y NO debe estar en el navegador. Use la anon.");
+        } else if (jwt.exp && jwt.exp < Date.now() / 1000) {
+          add("fail", "Clave", "La clave expiró.");
+        } else if (jwt.ref && host && !host.startsWith(jwt.ref + ".")) {
+          add("warn", "Clave", `La clave pertenece a otro proyecto (${jwt.ref}).`);
+        } else {
+          add("ok", "Clave", `JWT con rol "${jwt.role}", vigente.`);
+        }
+      } else {
+        add("warn", "Clave", "Formato de clave no reconocido.");
+      }
+
+      /* 2. Internet */
+      if (!navigator.onLine) {
+        add("fail", "Internet", "Este dispositivo no tiene conexión a Internet.");
+        setDbState(false, { message: "Sin Internet" });
+        return;
+      }
+
+      /* 3. Servidor + clave + tabla */
+      try {
+        const t0 = performance.now();
+        const res = await withTimeout(
+          supabaseClient.from(TABLE_NAME).select("*", { count: "exact", head: true }),
+          10000
+        );
+        const ms = Math.round(performance.now() - t0);
+
+        if (res.error) {
+          add("fail", "Acceso a la tabla", interpretDbError(res.error, res.status));
+          setDbState(false, res.error);
+          return;
+        }
+
+        setDbState(true);
+        add("ok", "Servidor y clave", `Respuesta HTTP ${res.status} en ${ms} ms.`);
+
+        if (res.count === 0) {
+          add("warn", "Lectura de la tabla", "0 filas visibles: la tabla está vacía o RLS oculta las filas (falta una política SELECT para el rol anon).");
+        } else {
+          add("ok", "Lectura de la tabla", `${res.count ?? "?"} filas visibles.`);
+        }
+      } catch (err) {
+        add("fail", "Acceso a la tabla", interpretDbError(err));
+        setDbState(false, err);
+        return;
+      }
+
+      /* 4. Última lectura del ESP32 */
+      try {
+        const { data, error } = await withTimeout(
+          supabaseClient.from(TABLE_NAME).select("*").order("created_at", { ascending: false }).limit(1),
+          10000
+        );
+        if (error) throw error;
+
+        if (!data || !data.length) {
+          add("warn", "Datos del ESP32", "Todavía no hay ninguna lectura registrada.");
+        } else {
+          const row = data[0];
+          noteReading(row.created_at);
+          const age = Date.now() - new Date(row.created_at).getTime();
+          const extra = [
+            row.wifi ? `red "${row.wifi}"` : null,
+            row.rssi != null ? `RSSI ${row.rssi} dBm` : null,
+            row.bateriaVolt != null ? `batería ${Number(row.bateriaVolt).toFixed(2)} V` : null
+          ].filter(Boolean).join(" · ");
+
+          if (age < -10000) {
+            add("warn", "Reloj de este dispositivo", `La última lectura figura ${formatAge(-age)} en el futuro: el reloj de este dispositivo está atrasado y el estado Conectado/Desconectado puede fallar.`);
+          } else if (age <= ESP_CONNECTED_MAX_AGE_MS) {
+            add("ok", "Datos del ESP32", `Transmitiendo · última lectura hace ${formatAge(age)}.${extra ? " " + extra : ""}`);
+          } else {
+            add("warn", "Datos del ESP32", `Supabase responde bien, pero el ESP32 no envía desde hace ${formatAge(age)}. Revise alimentación, WiFi y el monitor serie (HTTP 201 = OK, 401/403 = clave o política INSERT, 404 = tabla).`);
+          }
+        }
+      } catch (err) {
+        add("fail", "Datos del ESP32", interpretDbError(err));
+        return;
+      }
+
+      /* 5. Realtime (no crítico: hay consulta periódica de respaldo) */
+      const espActive = lastSeenAt && (Date.now() - lastSeenAt.getTime() <= ESP_CONNECTED_MAX_AGE_MS);
+      if (realtimeStatus === "SUBSCRIBED") {
+        if (realtimeEvents === 0 && espActive && Date.now() - pageLoadedAt > 30000) {
+          add("warn", "Realtime", "Canal suscrito, pero no llegan lecturas nuevas al instante. Active Realtime para la tabla (Database → Publications → supabase_realtime). No es crítico: la gráfica se refresca igual cada 30 s.");
+        } else {
+          add("ok", "Realtime", `Canal activo · ${realtimeEvents} evento(s) recibidos.`);
+        }
+      } else if (realtimeStatus === "CHANNEL_ERROR" || realtimeStatus === "TIMED_OUT") {
+        add("warn", "Realtime", `Canal con error (${realtimeStatus}). La app sigue funcionando por consulta periódica.`);
+      } else {
+        add("warn", "Realtime", `Estado del canal: ${realtimeStatus}.`);
+      }
+
+    } finally {
+      const fails = steps.filter(s => s.state === "fail").length;
+      const warns = steps.filter(s => s.state === "warn").length;
+      renderDiag(steps, false);
+
+      if (fails) setDiagSummary("fail", "✖ Problema de acceso a Supabase");
+      else if (warns) setDiagSummary("warn", "⚠ Acceso a Supabase correcto, con advertencias");
+      else setDiagSummary("ok", "✔ Acceso a Supabase correcto");
+
+      diagRunning = false;
+      updateConnectionBadge();
+    }
+  }
 
   /* ACTUALIZAR INDICADOR VISUAL DE FECHA / HORA DE VENTANA */
   function updateTimeWindowLabel() {
@@ -740,6 +1097,7 @@
   /* NAVEGACIÓN Y OBTENCIÓN DE DATOS */
   function navigateWindow(direction) {
     isLive = false;
+    updateConnectionBadge();
     const rangeMs = selectedHoursRange * 60 * 60 * 1000;
     windowEndTime = new Date(windowEndTime.getTime() + (direction * rangeMs));
     fetchData();
@@ -747,6 +1105,7 @@
 
   function goLive() {
     isLive = true;
+    updateConnectionBadge();
     windowEndTime = new Date();
     fetchData();
   }
@@ -755,16 +1114,12 @@
     if (isFetching) return;
     isFetching = true;
 
-    const badge = document.getElementById("status-badge");
-    badge.textContent = "Cargando...";
-    badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20";
-
     const rangeMs = selectedHoursRange * 60 * 60 * 1000;
     const startTime = new Date(windowEndTime.getTime() - rangeMs);
 
     try {
       const { data, error } = await supabaseClient
-        .from("lecturas_temperatura")
+        .from(TABLE_NAME)
         .select("*")
         .gte("created_at", startTime.toISOString())
         .lte("created_at", windowEndTime.toISOString())
@@ -773,20 +1128,17 @@
       if (error) throw error;
 
       rawData = data || [];
+      if (rawData.length) noteReading(rawData[rawData.length - 1].created_at);
+      setDbState(true);
       renderData();
-
-      badge.textContent = isLive ? "En vivo" : "Histórico";
-      badge.className = isLive 
-        ? "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-        : "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20";
 
     } catch (err) {
       console.error("Error al obtener datos:", err);
-      badge.textContent = "Error";
-      badge.className = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20";
+      setDbState(false, err);
     } finally {
       isFetching = false;
       updateRangeUI();
+      updateConnectionBadge();
     }
   }
 
@@ -953,19 +1305,27 @@
     loadSavedAlarms();
     loadPressureState();
     setWorkMode(workMode);
+    updateConnectionBadge();
     fetchData();
+    pollLatest();
 
     // Suscripción Realtime Supabase
     supabaseClient
-      .channel("public:lecturas_temperatura")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "lecturas_temperatura" }, payload => {
+      .channel("public:" + TABLE_NAME)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: TABLE_NAME }, payload => {
+        realtimeEvents++;
+        if (payload.new && payload.new.created_at) noteReading(payload.new.created_at);
+
         if (isLive) {
           rawData.push(payload.new);
           windowEndTime = new Date();
           renderData();
         }
+        updateConnectionBadge();
       })
-      .subscribe();
+      .subscribe(status => {
+        realtimeStatus = status;
+      });
 
     // Auto-actualización cada 30 segundos
     setInterval(() => {
@@ -974,6 +1334,21 @@
         fetchData();
       }
     }, 30000);
+
+    // Estado de conexión: consulta ligera + recálculo local
+    setInterval(pollLatest, POLL_INTERVAL_MS);
+    setInterval(updateConnectionBadge, 2000);
+
+    // Al volver a la pestaña / app, actualizar de inmediato
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        pollLatest();
+        if (isLive) {
+          windowEndTime = new Date();
+          fetchData();
+        }
+      }
+    });
   });
 </script>
 
