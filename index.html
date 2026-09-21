@@ -16,7 +16,6 @@
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
     body.epaper-mode {
@@ -86,7 +85,6 @@
       color:#fff !important;
     }
 
-    /* Botón "avanzar" deshabilitado en el presente */
     #btn-next:disabled {
       opacity: 0.3;
       cursor: not-allowed;
@@ -130,10 +128,10 @@
         <span id="epaper-btn-text">ePaper</span>
       </button>
 
-      <!-- DIAGNÓSTICO SUPABASE -->
-      <button id="btn-diag" onclick="openDiagnostics()" title="Diagnóstico de Supabase" class="px-2 py-0.5 text-[10px] font-bold rounded border border-slate-600 bg-slate-800 text-slate-300 transition active:scale-95 flex items-center gap-1.5">
+      <!-- DIAGNÓSTICO CLOUDFLARE -->
+      <button id="btn-diag" onclick="openDiagnostics()" title="Diagnóstico de Cloudflare" class="px-2 py-0.5 text-[10px] font-bold rounded border border-slate-600 bg-slate-800 text-slate-300 transition active:scale-95 flex items-center gap-1.5">
         <span id="diag-dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
-        <span>DB</span>
+        <span>API</span>
       </button>
 
       <!-- ESTADO: Conectado / Desconectado / Historial -->
@@ -382,29 +380,35 @@
 
 </div>
 
-<!-- MODAL: DIAGNÓSTICO DE SUPABASE -->
+<!-- MODAL: DIAGNÓSTICO DE CLOUDFLARE -->
 <div id="diag-modal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center p-3" onclick="if(event.target===this)closeDiagnostics()">
   <div class="w-full max-w-md bg-slate-900 border border-slate-700 rounded-xl shadow-xl p-3 max-h-[85vh] overflow-y-auto">
     <div class="flex justify-between items-center mb-2">
-      <div class="text-sm font-bold text-sky-400">Diagnóstico de Supabase</div>
+      <div class="text-sm font-bold text-sky-400">Diagnóstico de Cloudflare</div>
       <button onclick="closeDiagnostics()" title="Cerrar" class="text-slate-400 hover:text-white px-2 text-lg leading-none">×</button>
     </div>
 
     <div id="diag-summary" class="text-xs font-bold text-slate-400 text-center py-1">—</div>
     <div id="diag-list" class="mt-1"></div>
 
-    <button onclick="runDiagnostics()" class="mt-3 w-full py-1.5 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition active:scale-95">
-      Volver a probar
-    </button>
+    <div class="grid grid-cols-2 gap-2 mt-3">
+      <button onclick="runDiagnostics()" class="py-1.5 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition active:scale-95">
+        Probar API
+      </button>
+      <button onclick="testBlocking()" class="py-1.5 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-500 text-white transition active:scale-95">
+        Test Bloqueo
+      </button>
+    </div>
   </div>
 </div>
 
 <script>
-  /* SUPABASE CONFIG */
-  const SUPABASE_URL = "https://ovaqbqkahttkmmtlmxha.supabase.co";
-  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92YXFicWthaHR0a21tdGxteGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2NDYxOTMsImV4cCI6MjEwNDIyMjE5M30.PpXfbHxW1-4ArrKuod0LLh8TZbjLO091r4DwkMNs3m8";
-  const TABLE_NAME = "lecturas_temperatura";
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  /* ============================================================
+     CONFIGURACIÓN CLOUDFLARE
+     ============================================================ */
+
+  const API_URL   = "https://api-termometro.manuelaa1990.workers.dev";
+  const API_TOKEN = "trm_2026_xK9pL3mN7qR2sT5vW8yZ1bC4dF6gH0jA";
 
   /* VARIABLES GLOBALES */
   let selectedHoursRange = parseInt(localStorage.getItem("selected-hours-range")) || 2;
@@ -416,7 +420,10 @@
   let isFetching = false;
   let alarmActive = false;
 
-  /* ESTADO DE CONEXIÓN (ESP32 / SUPABASE) */
+  /* ESTADO DEL SISTEMA (independiente de la ventana visible) */
+  let latestAbsolute = null;
+
+  /* ESTADO DE CONEXIÓN */
   const ESP_CONNECTED_MAX_AGE_MS = 35000;
   const POLL_INTERVAL_MS = 10000;
   const pageLoadedAt = Date.now();
@@ -424,8 +431,6 @@
   let lastSeenAt = null;
   let dbOk = null;
   let dbError = null;
-  let realtimeStatus = "INICIANDO";
-  let realtimeEvents = 0;
   let isPolling = false;
   let diagRunning = false;
 
@@ -490,7 +495,7 @@
   });
 
   /* ============================================================
-     ESTADO DE CONEXIÓN: Conectado / Desconectado / Historial
+     ESTADO DE CONEXIÓN
      ============================================================ */
 
   const BADGE_BASE = "px-2.5 py-0.5 text-[10px] font-semibold rounded-full border cursor-pointer ";
@@ -542,11 +547,11 @@
     } else if (dbOk === null) {
       text = "Verificando...";
       style = "warn";
-      tip = "Comprobando acceso a Supabase...";
+      tip = "Comprobando acceso a Cloudflare...";
     } else if (dbOk === false) {
-      text = "Sin Supabase";
+      text = "Sin API";
       style = "warn";
-      tip = "No se puede leer Supabase, por eso no se sabe si el ESP32 transmite. Toque para diagnosticar.";
+      tip = "No se puede leer Cloudflare. Toque para diagnosticar.";
     } else if (age !== null && age <= ESP_CONNECTED_MAX_AGE_MS) {
       text = "Conectado";
       style = "ok";
@@ -584,16 +589,49 @@
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
   }
 
+  /* ============================================================
+     FETCH A CLOUDFLARE
+     ============================================================ */
+
+  async function fetchJSON(path, options = {}) {
+    const url = `${API_URL}${path}`;
+    const opts = {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      }
+    };
+    const res = await withTimeout(fetch(url, opts), 10000);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status}${text ? ": " + text.substring(0, 100) : ""}`);
+    }
+    return res.json();
+  }
+
+  async function fetchLatest() {
+    return fetchJSON("/latest");
+  }
+
+  async function fetchRange(hours) {
+    return fetchJSON(`/range?hours=${hours}`);
+  }
+
+  /* ============================================================
+     POLL: última lectura absoluta (barra superior)
+     ============================================================ */
+
   async function pollLatest() {
     if (isPolling || document.hidden) return;
     isPolling = true;
     try {
-      const { data, error } = await withTimeout(
-        supabaseClient.from(TABLE_NAME).select("created_at").order("created_at", { ascending: false }).limit(1),
-        8000
-      );
-      if (error) throw error;
-      if (data && data.length) noteReading(data[0].created_at);
+      const row = await fetchLatest();
+      if (row && row.created_at) {
+        noteReading(row.created_at);
+        latestAbsolute = processRow(row);
+        renderBatteryAndWifi();
+      }
       setDbState(true);
     } catch (err) {
       setDbState(false, err);
@@ -604,42 +642,26 @@
   }
 
   /* ============================================================
-     DIAGNÓSTICO DE SUPABASE
+     DIAGNÓSTICO
      ============================================================ */
 
-  function decodeJwt(token) {
-    try {
-      let p = String(token).split(".")[1];
-      if (!p) return null;
-      p = p.replace(/-/g, "+").replace(/_/g, "/");
-      while (p.length % 4) p += "=";
-      return JSON.parse(atob(p));
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function interpretDbError(err, status) {
+  function interpretApiError(err, status) {
     const msg = String((err && err.message) || err || "Error desconocido");
-    const code = (err && err.code) || "";
 
     if (msg === "TIMEOUT") {
-      return "Sin respuesta en 10 s: red muy lenta o proyecto pausado (los proyectos del plan gratuito se pausan tras un tiempo sin actividad).";
+      return "Sin respuesta en 10 s: red muy lenta o dominio bloqueado.";
     }
-    if (status === 0 || /failed to fetch|networkerror|load failed/i.test(msg)) {
-      return "No se pudo contactar al servidor: sin Internet, URL incorrecta, proyecto pausado o red bloqueada.";
+    if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+      return "No se pudo contactar al servidor: sin Internet, dominio bloqueado o proyecto caído.";
     }
-    if (status === 401 || code === "PGRST301" || /invalid api key|jwt/i.test(msg)) {
-      return `Clave rechazada por Supabase (${msg}). Revise SUPABASE_KEY.`;
+    if (status === 401 || /HTTP 401/.test(msg)) {
+      return "Token inválido. Revise API_TOKEN en el ESP32 y en la app.";
     }
-    if (status === 403 || code === "42501") {
-      return `Permiso denegado (${msg}). Falta permiso o política SELECT para el rol anon.`;
+    if (status === 404 || /HTTP 404/.test(msg)) {
+      return "Endpoint no encontrado. Revise la URL base del Worker.";
     }
-    if (status === 404 || code === "42P01" || code === "PGRST205") {
-      return `La tabla "${TABLE_NAME}" no existe o no está expuesta (${msg}).`;
-    }
-    if (status >= 500) {
-      return `Error interno de Supabase (HTTP ${status}): ${msg}`;
+    if (/HTTP 5\d\d/.test(msg)) {
+      return `Error interno del Worker: ${msg}`;
     }
     return msg;
   }
@@ -689,123 +711,162 @@
     setDiagSummary("run", "Ejecutando pruebas...");
 
     try {
-      const key = String(SUPABASE_KEY || "");
-      const jwt = decodeJwt(key);
+      /* 1. URL */
       let host = "";
-      try { host = new URL(SUPABASE_URL).hostname; } catch (_) {}
+      try { host = new URL(API_URL).hostname; } catch (_) {}
 
-      if (!host) add("fail", "URL del proyecto", "SUPABASE_URL no es una URL válida.");
-      else add("ok", "URL del proyecto", host);
+      if (!host) {
+        add("fail", "URL del Worker", "API_URL no es una URL válida.");
+        return;
+      }
+      add("ok", "URL del Worker", host);
 
-      if (key.startsWith("sb_secret_")) {
-        add("fail", "Clave", "Es una clave SECRETA. No debe estar en una página web: use la clave publishable/anon.");
-      } else if (key.startsWith("sb_publishable_")) {
-        add("ok", "Clave", "Clave publishable.");
-      } else if (jwt) {
-        if (jwt.role === "service_role") {
-          add("fail", "Clave", "Es la clave service_role: da acceso total y NO debe estar en el navegador. Use la anon.");
-        } else if (jwt.exp && jwt.exp < Date.now() / 1000) {
-          add("fail", "Clave", "La clave expiró.");
-        } else if (jwt.ref && host && !host.startsWith(jwt.ref + ".")) {
-          add("warn", "Clave", `La clave pertenece a otro proyecto (${jwt.ref}).`);
-        } else {
-          add("ok", "Clave", `JWT con rol "${jwt.role}", vigente.`);
-        }
+      /* 2. Token */
+      if (!API_TOKEN || API_TOKEN.length < 20) {
+        add("fail", "Token", "API_TOKEN demasiado corto o vacío.");
       } else {
-        add("warn", "Clave", "Formato de clave no reconocido.");
+        add("ok", "Token", `Configurado (${API_TOKEN.length} caracteres).`);
       }
 
+      /* 3. Internet */
       if (!navigator.onLine) {
         add("fail", "Internet", "Este dispositivo no tiene conexión a Internet.");
         setDbState(false, { message: "Sin Internet" });
         return;
       }
 
+      /* 4. Endpoint raíz */
       try {
         const t0 = performance.now();
-        const res = await withTimeout(
-          supabaseClient.from(TABLE_NAME).select("*", { count: "exact", head: true }),
-          10000
-        );
+        const res = await withTimeout(fetch(`${API_URL}/`), 10000);
         const ms = Math.round(performance.now() - t0);
 
-        if (res.error) {
-          add("fail", "Acceso a la tabla", interpretDbError(res.error, res.status));
-          setDbState(false, res.error);
+        if (!res.ok) {
+          add("fail", "Endpoint raíz", `HTTP ${res.status} al consultar /`);
+          setDbState(false, { message: `HTTP ${res.status}` });
           return;
         }
 
-        setDbState(true);
-        add("ok", "Servidor y clave", `Respuesta HTTP ${res.status} en ${ms} ms.`);
-
-        if (res.count === 0) {
-          add("warn", "Lectura de la tabla", "0 filas visibles: la tabla está vacía o RLS oculta las filas (falta una política SELECT para el rol anon).");
+        const json = await res.json();
+        if (json && json.status === "ok") {
+          add("ok", "Servidor y endpoint", `Respuesta HTTP ${res.status} en ${ms} ms.`);
+          setDbState(true);
         } else {
-          add("ok", "Lectura de la tabla", `${res.count ?? "?"} filas visibles.`);
+          add("warn", "Endpoint raíz", "Responde pero formato inesperado.");
         }
       } catch (err) {
-        add("fail", "Acceso a la tabla", interpretDbError(err));
+        add("fail", "Endpoint raíz", interpretApiError(err));
         setDbState(false, err);
         return;
       }
 
+      /* 5. Última lectura */
       try {
-        const { data, error } = await withTimeout(
-          supabaseClient.from(TABLE_NAME).select("*").order("created_at", { ascending: false }).limit(1),
-          10000
-        );
-        if (error) throw error;
+        const row = await withTimeout(fetchLatest(), 10000);
 
-        if (!data || !data.length) {
-          add("warn", "Datos del ESP32", "Todavía no hay ninguna lectura registrada.");
+        if (!row || !row.created_at) {
+          add("warn", "Última lectura", "La API responde pero no hay datos guardados.");
         } else {
-          const row = data[0];
           noteReading(row.created_at);
           const age = Date.now() - new Date(row.created_at).getTime();
           const extra = [
             row.wifi ? `red "${row.wifi}"` : null,
+            row.ip_local ? `IP ${row.ip_local}` : null,
             row.rssi != null ? `RSSI ${row.rssi} dBm` : null,
             row.bateriaVolt != null ? `batería ${Number(row.bateriaVolt).toFixed(2)} V` : null
           ].filter(Boolean).join(" · ");
 
           if (age < -10000) {
-            add("warn", "Reloj de este dispositivo", `La última lectura figura ${formatAge(-age)} en el futuro: el reloj de este dispositivo está atrasado y el estado Conectado/Desconectado puede fallar.`);
+            add("warn", "Reloj del dispositivo", `La última lectura figura ${formatAge(-age)} en el futuro. Reloj desajustado.`);
           } else if (age <= ESP_CONNECTED_MAX_AGE_MS) {
-            add("ok", "Datos del ESP32", `Transmitiendo · última lectura hace ${formatAge(age)}.${extra ? " " + extra : ""}`);
+            add("ok", "Última lectura", `Transmitiendo · hace ${formatAge(age)}.${extra ? " " + extra : ""}`);
           } else {
-            add("warn", "Datos del ESP32", `Supabase responde bien, pero el ESP32 no envía desde hace ${formatAge(age)}. Revise alimentación, WiFi y el monitor serie (HTTP 201 = OK, 401/403 = clave o política INSERT, 404 = tabla).`);
+            add("warn", "Última lectura", `La API responde, pero el ESP32 no envía desde hace ${formatAge(age)}. Revise alimentación y WiFi del ESP32.`);
           }
         }
       } catch (err) {
-        add("fail", "Datos del ESP32", interpretDbError(err));
+        add("fail", "Última lectura", interpretApiError(err));
         return;
       }
 
-      const espActive = lastSeenAt && (Date.now() - lastSeenAt.getTime() <= ESP_CONNECTED_MAX_AGE_MS);
-      if (realtimeStatus === "SUBSCRIBED") {
-        if (realtimeEvents === 0 && espActive && Date.now() - pageLoadedAt > 30000) {
-          add("warn", "Realtime", "Canal suscrito, pero no llegan lecturas nuevas al instante. Active Realtime para la tabla (Database → Publications → supabase_realtime). No es crítico: la gráfica se refresca igual cada 30 s.");
+      /* 6. Rango */
+      try {
+        const data = await withTimeout(fetchRange(2), 10000);
+        const count = Array.isArray(data) ? data.length : 0;
+        if (count === 0) {
+          add("warn", "Rango 2 h", "Sin datos en las últimas 2 horas.");
         } else {
-          add("ok", "Realtime", `Canal activo · ${realtimeEvents} evento(s) recibidos.`);
+          add("ok", "Rango 2 h", `${count} fila(s) disponibles.`);
         }
-      } else if (realtimeStatus === "CHANNEL_ERROR" || realtimeStatus === "TIMED_OUT") {
-        add("warn", "Realtime", `Canal con error (${realtimeStatus}). La app sigue funcionando por consulta periódica.`);
-      } else {
-        add("warn", "Realtime", `Estado del canal: ${realtimeStatus}.`);
+      } catch (err) {
+        add("warn", "Rango 2 h", interpretApiError(err));
       }
+
+      /* 7. Polling */
+      add("ok", "Polling", `Consultando /latest cada ${POLL_INTERVAL_MS / 1000} s.`);
 
     } finally {
       const fails = steps.filter(s => s.state === "fail").length;
       const warns = steps.filter(s => s.state === "warn").length;
       renderDiag(steps, false);
 
-      if (fails) setDiagSummary("fail", "✖ Problema de acceso a Supabase");
-      else if (warns) setDiagSummary("warn", "⚠ Acceso a Supabase correcto, con advertencias");
-      else setDiagSummary("ok", "✔ Acceso a Supabase correcto");
+      if (fails) setDiagSummary("fail", "✖ Problema de acceso a Cloudflare");
+      else if (warns) setDiagSummary("warn", "⚠ API correcta, con advertencias");
+      else setDiagSummary("ok", "✔ API Cloudflare correcta");
 
       diagRunning = false;
       updateConnectionBadge();
     }
+  }
+
+  /* Test de bloqueo: prueba varios dominios para saber qué tipo de filtro aplica */
+  async function testBlocking() {
+    if (diagRunning) return;
+    diagRunning = true;
+
+    const steps = [];
+    const add = (state, label, detail) => {
+      steps.push({ state, label, detail });
+      renderDiag(steps, true);
+    };
+
+    renderDiag(steps, true);
+    setDiagSummary("run", "Testeando bloqueos...");
+
+    const targets = [
+      { url: "https://www.google.com",       label: "Google" },
+      { url: "https://api.github.com",       label: "GitHub API" },
+      { url: "https://api.cloudflare.com",   label: "Cloudflare API" },
+      { url: "https://firebase.google.com",  label: "Firebase" },
+      { url: "https://ovaqbqkahttkmmtlmxha.supabase.co", label: "Supabase (antiguo)" },
+      { url: `${API_URL}/`,                  label: "Tu Worker" }
+    ];
+
+    for (const t of targets) {
+      try {
+        const t0 = performance.now();
+        await withTimeout(fetch(t.url, { mode: "no-cors" }), 5000);
+        const ms = Math.round(performance.now() - t0);
+        add("ok", t.label, `Responde en ${ms} ms.`);
+      } catch (err) {
+        const msg = String(err && err.message || err);
+        if (msg === "TIMEOUT") {
+          add("fail", t.label, "Bloqueado o sin respuesta en 5 s.");
+        } else if (/failed to fetch|networkerror/i.test(msg)) {
+          add("fail", t.label, "Bloqueado por la red o sin salida.");
+        } else {
+          add("warn", t.label, msg.substring(0, 80));
+        }
+      }
+    }
+
+    const fails = steps.filter(s => s.state === "fail").length;
+    if (fails === 0) setDiagSummary("ok", "✔ Ningún dominio bloqueado");
+    else if (fails >= 5) setDiagSummary("fail", "✖ Red muy restrictiva (VPN o router 4G)");
+    else setDiagSummary("warn", `⚠ ${fails} dominio(s) bloqueado(s)`);
+
+    renderDiag(steps, false);
+    diagRunning = false;
   }
 
   /* ACTUALIZAR INDICADOR VISUAL DE FECHA / HORA DE VENTANA */
@@ -945,7 +1006,6 @@
     const pressureChk = document.getElementById("chk-pressure");
     const pressureChecked = pressureChk ? pressureChk.checked : false;
 
-    // Las series de P.H. solo se muestran en modo P.H.
     const showPressure = (workMode === "ph") && pressureChecked && pressureTestVisible;
 
     tempChart.setDatasetVisibility(0, s1);
@@ -954,7 +1014,6 @@
     tempChart.setDatasetVisibility(3, showPressure);
     tempChart.setDatasetVisibility(4, showPressure);
 
-    // El eje derecho solo existe en modo P.H.
     tempChart.options.scales.pressure.display = showPressure;
 
     tempChart.update();
@@ -1012,14 +1071,59 @@
     }
 
     const wifi = row.wifi || row.ssid || null;
+    const ip = row.ip_local || row.ip || null;
 
-    return { ...row, s1, s2, delta, bateria, bateriaVolt: vBat, wifi };
+    return { ...row, s1, s2, delta, bateria, bateriaVolt: vBat, wifi, ip };
+  }
+
+  /* BARRA SUPERIOR: BATERÍA Y WIFI (estado ABSOLUTO) */
+  function renderBatteryAndWifi() {
+    if (!latestAbsolute) return;
+
+    if (latestAbsolute.bateriaVolt !== null) {
+      const v = latestAbsolute.bateriaVolt;
+      const pct = latestAbsolute.bateria;
+      document.getElementById("bat-val").textContent = `${pct}% · ${v.toFixed(2)}V`;
+
+      const batBar = document.getElementById("bat-bar");
+      const batIcon = document.getElementById("bat-icon");
+      const batBanner = document.getElementById("bat-alert-banner");
+      const batMsg = document.getElementById("bat-alert-msg");
+
+      batBar.style.width = `${pct}%`;
+
+      if (pct <= 20 || v <= 3.10) {
+        batBar.className = "bg-rose-500 h-full transition-all duration-500";
+        batIcon.className = "w-3.5 h-3.5 text-rose-500";
+        batBanner.classList.remove("hidden");
+
+        if (v <= 3.10) {
+          batMsg.textContent = `Batería en nivel crítico (${v.toFixed(2)}V). El dispositivo entrará en modo de corte/protección.`;
+        } else {
+          batMsg.textContent = `Nivel por debajo del 20% (${v.toFixed(2)}V). Cargue el dispositivo pronto.`;
+        }
+      } else if (pct <= 50) {
+        batBar.className = "bg-amber-500 h-full transition-all duration-500";
+        batIcon.className = "w-3.5 h-3.5 text-amber-400";
+        batBanner.classList.add("hidden");
+      } else {
+        batBar.className = "bg-emerald-500 h-full transition-all duration-500";
+        batIcon.className = "w-3.5 h-3.5 text-emerald-400";
+        batBanner.classList.add("hidden");
+      }
+    }
+
+    if (latestAbsolute.wifi) {
+      document.getElementById("wifi-val").textContent = `Wifi: "${latestAbsolute.wifi}"`;
+    }
+    if (latestAbsolute.ip) {
+      document.getElementById("wifi-val").textContent += ` · IP: ${latestAbsolute.ip}`;
+    }
   }
 
   /* PRUEBA DE HERMETICIDAD — BALANCE EVAP/COND CONFIGURABLE */
   const ATM_PSI = 14.696;
 
-  // Pesos configurables por el usuario (en porcentaje, 0-100). Por defecto 60/40.
   let phS1Weight = parseInt(localStorage.getItem("ph-s1-weight"));
   if (!Number.isFinite(phS1Weight) || phS1Weight < 0 || phS1Weight > 100) phS1Weight = 60;
   let phS2Weight = 100 - phS1Weight;
@@ -1046,7 +1150,6 @@
     if (s2Val) s2Val.textContent = `${phS2Weight} %`;
     if (modelLabel) modelLabel.textContent = `${phS1Weight}/${phS2Weight}`;
 
-    // Aviso si hay una referencia tomada con un modelo distinto
     if (pressureReference && pressureReference.model !== `${phS1Weight}/${phS2Weight}`) {
       const msg = document.getElementById("n2-status-msg");
       if (msg) {
@@ -1119,7 +1222,6 @@
     const checkbox = document.getElementById("chk-pressure");
     if (checkbox) checkbox.checked = pressureTestVisible;
 
-    // Restaurar el balance Evap/Cond configurado (por defecto 60/40)
     const savedWeight = parseInt(localStorage.getItem("ph-s1-weight"));
     setPHWeight(Number.isFinite(savedWeight) && savedWeight >= 0 && savedWeight <= 100 ? savedWeight : 60);
   }
@@ -1207,21 +1309,13 @@
     if (isFetching) return;
     isFetching = true;
 
-    const rangeMs = selectedHoursRange * 60 * 60 * 1000;
-    const startTime = new Date(windowEndTime.getTime() - rangeMs);
-
     try {
-      const { data, error } = await supabaseClient
-        .from(TABLE_NAME)
-        .select("*")
-        .gte("created_at", startTime.toISOString())
-        .lte("created_at", windowEndTime.toISOString())
-        .order("created_at", { ascending: true });
+      const data = await fetchRange(selectedHoursRange);
+      rawData = Array.isArray(data) ? data : [];
 
-      if (error) throw error;
-
-      rawData = data || [];
-      if (rawData.length) noteReading(rawData[rawData.length - 1].created_at);
+      if (rawData.length) {
+        noteReading(rawData[rawData.length - 1].created_at);
+      }
       setDbState(true);
       renderData();
 
@@ -1235,7 +1329,7 @@
     }
   }
 
-  /* RENDERIZADO DE INTERFAZ Y BATERÍA CON ALERTAS */
+  /* RENDERIZADO DE INTERFAZ */
   function renderData() {
     updateTimeWindowLabel();
 
@@ -1294,42 +1388,6 @@
       const lastTime = new Date(latest.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       document.getElementById("temp1-time").textContent = `Última: ${lastTime}`;
       document.getElementById("temp2-time").textContent = `Última: ${lastTime}`;
-
-      if (latest.bateriaVolt !== null) {
-        const v = latest.bateriaVolt;
-        const pct = latest.bateria;
-        document.getElementById("bat-val").textContent = `${pct}% · ${v.toFixed(2)}V`;
-        const batBar = document.getElementById("bat-bar");
-        const batIcon = document.getElementById("bat-icon");
-        const batBanner = document.getElementById("bat-alert-banner");
-        const batMsg = document.getElementById("bat-alert-msg");
-
-        batBar.style.width = `${pct}%`;
-
-        if (pct <= 20 || v <= 3.10) {
-          batBar.className = "bg-rose-500 h-full transition-all duration-500";
-          batIcon.className = "w-3.5 h-3.5 text-rose-500";
-          batBanner.classList.remove("hidden");
-
-          if (v <= 3.10) {
-            batMsg.textContent = `Batería en nivel crítico (${v.toFixed(2)}V). El dispositivo entrará en modo de corte/protección.`;
-          } else {
-            batMsg.textContent = `Nivel por debajo del 20% (${v.toFixed(2)}V). Cargue el dispositivo pronto.`;
-          }
-        } else if (pct <= 50) {
-          batBar.className = "bg-amber-500 h-full transition-all duration-500";
-          batIcon.className = "w-3.5 h-3.5 text-amber-400";
-          batBanner.classList.add("hidden");
-        } else {
-          batBar.className = "bg-emerald-500 h-full transition-all duration-500";
-          batIcon.className = "w-3.5 h-3.5 text-emerald-400";
-          batBanner.classList.add("hidden");
-        }
-      }
-
-      if (latest.wifi) {
-        document.getElementById("wifi-val").textContent = `Wifi: "${latest.wifi}"`;
-      }
 
       const dataIsFresh = isDataFresh(latest.created_at);
 
@@ -1400,23 +1458,7 @@
     fetchData();
     pollLatest();
 
-    supabaseClient
-      .channel("public:" + TABLE_NAME)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: TABLE_NAME }, payload => {
-        realtimeEvents++;
-        if (payload.new && payload.new.created_at) noteReading(payload.new.created_at);
-
-        if (isLive) {
-          rawData.push(payload.new);
-          windowEndTime = new Date();
-          renderData();
-        }
-        updateConnectionBadge();
-      })
-      .subscribe(status => {
-        realtimeStatus = status;
-      });
-
+    /* Polling cada 30 s para la gráfica */
     setInterval(() => {
       if (isLive) {
         windowEndTime = new Date();
@@ -1424,9 +1466,13 @@
       }
     }, 30000);
 
+    /* Polling cada 10 s para estado del sistema (barra superior) */
     setInterval(pollLatest, POLL_INTERVAL_MS);
+
+    /* Actualizar badge cada 2 s */
     setInterval(updateConnectionBadge, 2000);
 
+    /* Al volver a la pestaña, refrescar */
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) {
         pollLatest();
