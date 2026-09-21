@@ -367,7 +367,7 @@
         <span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>
         <span class="text-[11px]">ΔT</span>
       </label>
-      <label id="pressure-chart-selector" class="flex items-center gap-1.5 cursor-pointer">
+      <label id="pressure-chart-selector" class="hidden flex items-center gap-1.5 cursor-pointer">
         <input type="checkbox" id="chk-pressure" checked onchange="togglePressureMode(this.checked)">
         <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span>
         <span class="text-[11px]">P.H.</span>
@@ -464,10 +464,10 @@
       interaction: { mode: "index", intersect: false },
       scales: {
         x: { ticks: { color: "#94a3b8", font: { size: 10 }, maxTicksLimit: 8 }, grid: { color: "#334155" } },
-        y: { grace: "5%", ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "#334155" } },
+        y: { grace: "5%", ticks: { color: "#94a3b8", font: { size: 10 }, stepSize: 2 }, grid: { color: "#334155" } },
         pressure: {
           position: "right",
-          display: true,
+          display: false,
           grace: "5%",
           ticks: { color: "#34d399", font: { size: 10 } },
           grid: { drawOnChartArea: false }
@@ -942,13 +942,21 @@
     const s1 = document.getElementById("chk-s1").checked;
     const s2 = document.getElementById("chk-s2").checked;
     const delta = document.getElementById("chk-delta").checked;
-    const pressure = document.getElementById("chk-pressure").checked && pressureTestVisible;
+    const pressureChk = document.getElementById("chk-pressure");
+    const pressureChecked = pressureChk ? pressureChk.checked : false;
+
+    // Las series de P.H. solo se muestran en modo P.H.
+    const showPressure = (workMode === "ph") && pressureChecked && pressureTestVisible;
 
     tempChart.setDatasetVisibility(0, s1);
     tempChart.setDatasetVisibility(1, s2);
     tempChart.setDatasetVisibility(2, delta);
-    tempChart.setDatasetVisibility(3, pressure);
-    tempChart.setDatasetVisibility(4, pressure);
+    tempChart.setDatasetVisibility(3, showPressure);
+    tempChart.setDatasetVisibility(4, showPressure);
+
+    // El eje derecho solo existe en modo P.H.
+    tempChart.options.scales.pressure.display = showPressure;
+
     tempChart.update();
   }
 
