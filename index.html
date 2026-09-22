@@ -90,8 +90,6 @@
       cursor: not-allowed;
     }
 
-    /* Bloquea todas las transiciones/animaciones CSS mientras se cambia de tema,
-       para evitar el parpadeo al alternar el modo ePaper */
     body.theme-switching,
     body.theme-switching * {
       transition: none !important;
@@ -107,7 +105,6 @@
   <!-- BARRA SUPERIOR -->
   <div class="flex flex-wrap justify-between items-center bg-slate-800/60 border border-slate-700/50 px-3 py-1.5 rounded-xl text-xs gap-2">
     <div class="flex items-center gap-3 text-slate-400">
-      <!-- BATERÍA -->
       <div class="flex items-center gap-1.5">
         <svg id="bat-icon" class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
@@ -118,7 +115,6 @@
         </div>
       </div>
 
-      <!-- WIFI -->
       <div class="flex items-center gap-1 text-[11px] text-slate-300 border-l border-slate-700 pl-2.5">
         <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071a10 10 0 0114.142 0M1.42 9.428a16 16 0 0121.16 0"/>
@@ -128,7 +124,6 @@
     </div>
 
     <div class="flex items-center gap-2">
-      <!-- EPAPER -->
       <button id="btn-epaper" onclick="toggleEPaperMode()" title="Modo Sol / Alto Contraste" class="px-2 py-0.5 text-[10px] font-bold rounded border border-slate-600 bg-slate-800 text-slate-300 transition active:scale-95 flex items-center gap-1">
         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
@@ -136,35 +131,29 @@
         <span id="epaper-btn-text">ePaper</span>
       </button>
 
-      <!-- DIAGNÓSTICO CLOUDFLARE -->
       <button id="btn-diag" onclick="openDiagnostics()" title="Diagnóstico de Cloudflare" class="px-2 py-0.5 text-[10px] font-bold rounded border border-slate-600 bg-slate-800 text-slate-300 transition active:scale-95 flex items-center gap-1.5">
         <span id="diag-dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
         <span>API</span>
       </button>
 
-      <!-- ESTADO: Conectado / Desconectado / Historial -->
       <div id="status-badge" onclick="openDiagnostics()" title="Toque para diagnosticar" class="px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 cursor-pointer">
         Verificando...
       </div>
     </div>
   </div>
 
-  <!-- BANNER DE ALERTA BATERÍA BAJA -->
   <div id="bat-alert-banner" class="hidden bg-rose-600/20 border border-rose-500/50 p-2 rounded-xl text-center text-rose-300 text-xs animate-pulse">
     ⚠️ <strong>¡ALERTA DE BATERÍA BAJA!</strong> <span id="bat-alert-msg">Nivel por debajo del 20%. Cargue el dispositivo pronto.</span>
   </div>
 
-  <!-- BANNER DE DATOS OBSOLETOS -->
   <div id="stale-banner" class="hidden bg-amber-600/20 border border-amber-500/50 p-2 rounded-xl text-center text-amber-300 text-xs">
     ⏸ <strong>Datos congelados.</strong> El ESP32 no envía lecturas desde hace más de 35 s. Las alarmas están en pausa hasta recibir datos nuevos.
   </div>
 
-  <!-- TITULO -->
   <header class="text-center py-1">
     <h1 class="text-2xl font-bold text-sky-400">Termometro DataBase</h1>
   </header>
 
-  <!-- MODO DE TRABAJO -->
   <div class="bg-slate-800 border border-slate-700/60 p-1 rounded-xl shadow-md">
     <div class="grid grid-cols-2 gap-1 bg-slate-900/70 p-1 rounded-lg">
       <button id="mode-thermometer" onclick="setWorkMode('thermometer')"
@@ -268,7 +257,6 @@
 
     <input type="datetime-local" id="n2-time-init" class="hidden">
 
-    <!-- BALANCE EVAP/COND (reparto configurable) -->
     <div class="mt-2 bg-slate-900/50 border border-slate-700/50 rounded-lg p-2 text-left">
       <div class="flex justify-between items-center mb-1.5">
         <label class="text-[9px] text-slate-400 font-semibold uppercase tracking-wider">Balance Evap/Cond</label>
@@ -328,7 +316,6 @@
 
   <!-- CONTROLES DE NAVEGACIÓN Y RANGO DE TIEMPO -->
   <div class="bg-slate-800 border border-slate-700/60 p-2 rounded-xl shadow-md space-y-2">
-    <!-- SELECTOR DE HORAS -->
     <div class="grid grid-cols-5 gap-1 bg-slate-900/70 p-1 rounded-lg text-[10px] font-bold text-center">
       <button id="btn-range-2" onclick="setTimeRange(2)" class="py-1 rounded-md transition">2h</button>
       <button id="btn-range-4" onclick="setTimeRange(4)" class="py-1 rounded-md transition">4h</button>
@@ -337,13 +324,11 @@
       <button id="btn-range-24" onclick="setTimeRange(24)" class="py-1 rounded-md transition">24h</button>
     </div>
 
-    <!-- INDICADOR VISUAL DEL RANGO DE FECHA/HORA ACTUAL -->
     <div class="text-center bg-slate-900/50 border border-slate-700/40 rounded-lg py-1 px-2">
       <span class="text-[9px] text-slate-400">Ventana visible:</span>
       <div id="time-window-label" class="text-[11px] font-mono font-semibold text-sky-400">Calculando rango...</div>
     </div>
 
-    <!-- BOTONES ATRÁS / ACTUAL / ADELANTE -->
     <div class="flex items-center justify-center gap-3">
       <button onclick="navigateWindow(-1)" id="btn-prev-nav" title="Retroceder" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition active:scale-95">‹</button>
       <button onclick="goLive()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition flex items-center gap-1.5">
@@ -355,29 +340,45 @@
 
   <!-- SELECTORES GRÁFICA -->
   <div class="bg-slate-800 border border-slate-700/60 p-3 rounded-xl shadow-md space-y-2.5">
-    <div class="flex justify-around items-center bg-slate-900/70 border border-slate-700/50 py-1.5 px-2 rounded-lg text-xs">
-      <label class="flex items-center gap-1.5 cursor-pointer">
-        <input type="checkbox" id="chk-s1" checked onchange="updateChartVisibility()">
-        <span class="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block"></span>
-        <span class="text-[11px]">Sonda 1</span>
-      </label>
 
-      <label class="flex items-center gap-1.5 cursor-pointer">
-        <input type="checkbox" id="chk-s2" checked onchange="updateChartVisibility()">
-        <span class="w-2.5 h-2.5 rounded-full bg-rose-400 inline-block"></span>
-        <span class="text-[11px]">Sonda 2</span>
-      </label>
+    <!-- FILA DE CONTROLES: checkboxes a la izquierda, botón Full a la derecha -->
+    <div class="flex justify-between items-center gap-2 flex-wrap bg-slate-900/70 border border-slate-700/50 py-1.5 px-2 rounded-lg text-xs">
 
-      <label class="flex items-center gap-1.5 cursor-pointer">
-        <input type="checkbox" id="chk-delta" checked onchange="toggleDeltaT(this.checked)">
-        <span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>
-        <span class="text-[11px]">ΔT</span>
-      </label>
-      <label id="pressure-chart-selector" class="hidden flex items-center gap-1.5 cursor-pointer">
-        <input type="checkbox" id="chk-pressure" checked onchange="togglePressureMode(this.checked)">
-        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span>
-        <span class="text-[11px]">P.H.</span>
-      </label>
+      <!-- Checkboxes de series -->
+      <div class="flex items-center gap-3 flex-wrap">
+        <label class="flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" id="chk-s1" checked onchange="updateChartVisibility()">
+          <span class="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block"></span>
+          <span class="text-[11px]">Sonda 1</span>
+        </label>
+
+        <label class="flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" id="chk-s2" checked onchange="updateChartVisibility()">
+          <span class="w-2.5 h-2.5 rounded-full bg-rose-400 inline-block"></span>
+          <span class="text-[11px]">Sonda 2</span>
+        </label>
+
+        <label class="flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" id="chk-delta" checked onchange="toggleDeltaT(this.checked)">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>
+          <span class="text-[11px]">ΔT</span>
+        </label>
+
+        <label id="pressure-chart-selector" class="hidden flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" id="chk-pressure" checked onchange="togglePressureMode(this.checked)">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span>
+          <span class="text-[11px]">P.H.</span>
+        </label>
+      </div>
+
+      <!-- Botón Full screen -->
+      <button onclick="openGraphFullscreen()" title="Ver gráfica a pantalla completa"
+        class="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-semibold transition active:scale-95 flex items-center gap-1 shrink-0">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+        </svg>
+        Full
+      </button>
     </div>
 
     <!-- GRÁFICA -->
@@ -719,7 +720,6 @@
     setDiagSummary("run", "Ejecutando pruebas...");
 
     try {
-      /* 1. URL */
       let host = "";
       try { host = new URL(API_URL).hostname; } catch (_) {}
 
@@ -729,21 +729,18 @@
       }
       add("ok", "URL del Worker", host);
 
-      /* 2. Token */
       if (!API_TOKEN || API_TOKEN.length < 20) {
         add("fail", "Token", "API_TOKEN demasiado corto o vacío.");
       } else {
         add("ok", "Token", `Configurado (${API_TOKEN.length} caracteres).`);
       }
 
-      /* 3. Internet */
       if (!navigator.onLine) {
         add("fail", "Internet", "Este dispositivo no tiene conexión a Internet.");
         setDbState(false, { message: "Sin Internet" });
         return;
       }
 
-      /* 4. Endpoint raíz */
       try {
         const t0 = performance.now();
         const res = await withTimeout(fetch(`${API_URL}/`), 10000);
@@ -768,7 +765,6 @@
         return;
       }
 
-      /* 5. Última lectura */
       try {
         const row = await withTimeout(fetchLatest(), 10000);
 
@@ -797,7 +793,6 @@
         return;
       }
 
-      /* 6. Rango */
       try {
         const data = await withTimeout(fetchRange(2), 10000);
         const count = Array.isArray(data) ? data.length : 0;
@@ -810,7 +805,6 @@
         add("warn", "Rango 2 h", interpretApiError(err));
       }
 
-      /* 7. Polling */
       add("ok", "Polling", `Consultando /latest cada ${POLL_INTERVAL_MS / 1000} s.`);
 
     } finally {
@@ -827,7 +821,6 @@
     }
   }
 
-  /* Test de bloqueo: prueba varios dominios para saber qué tipo de filtro aplica */
   async function testBlocking() {
     if (diagRunning) return;
     diagRunning = true;
@@ -968,8 +961,6 @@
   }
 
   function applyEPaperState() {
-    // Congela todas las transiciones/animaciones CSS mientras cambiamos de tema,
-    // así los estilos !important se aplican de golpe en vez de "arrastrarse".
     document.body.classList.add("theme-switching");
 
     const btnText = document.getElementById("epaper-btn-text");
@@ -997,11 +988,8 @@
       tempChart.options.scales.pressure.grid.color = "#334155";
     }
 
-    // Una sola actualización del chart, sin animación: elimina el doble
-    // redibujado que antes causaba el parpadeo (antes: update() + renderData()->update()).
     tempChart.update("none");
 
-    // Quita el bloqueo de transiciones en el siguiente frame, ya con todo pintado.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         document.body.classList.remove("theme-switching");
@@ -1491,6 +1479,16 @@
     tempChart.update();
   }
 
+  /* ============================================================
+     ABRIR GRÁFICA A PANTALLA COMPLETA
+     ============================================================ */
+
+  function openGraphFullscreen() {
+    const url = `./grafica.html?hours=${selectedHoursRange}`;
+    if ("vibrate" in navigator) navigator.vibrate(15);
+    window.location.href = url;
+  }
+
   /* INICIALIZACIÓN DE LA APLICACIÓN */
   window.addEventListener("DOMContentLoaded", () => {
     loadSavedAlarms();
@@ -1501,7 +1499,6 @@
     fetchData();
     pollLatest();
 
-    /* Polling cada 30 s para la gráfica */
     setInterval(() => {
       if (isLive) {
         windowEndTime = new Date();
@@ -1509,13 +1506,9 @@
       }
     }, 30000);
 
-    /* Polling cada 10 s para estado del sistema (barra superior) */
     setInterval(pollLatest, POLL_INTERVAL_MS);
-
-    /* Actualizar badge cada 2 s */
     setInterval(updateConnectionBadge, 2000);
 
-    /* Al volver a la pestaña, refrescar */
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) {
         pollLatest();
