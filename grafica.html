@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gráfica Live · Termómetro</title>
+
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: system-ui, -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    #chart-container {
+      position: absolute;
+      inset: 0;
+      touch-action: none;
+    }
+
+    #topbar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      z-index: 20;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    #topbar.hidden-ui {
+      opacity: 0;
+      transform: translateY(-100%);
+      pointer-events: none;
+    }
+
+    #bottombar {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      z-index: 20;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    #bottombar.hidden-ui {
+      opacity: 0;
+      transform: translateY(100%);
+      pointer-events: none;
+    }
+
+    /* Hint de girar teléfono */
+    #portrait-hint {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: #0f172a;
+      z-index: 100;
+      text-align: center;
+      padding: 2rem;
+    }
+    @media (orientation: portrait) and (max-width: 1023px) {
+      #portrait-hint.force-hint { display: flex; }
+    }
+    #portrait-hint.hidden { display: none !important; }
+
+    .rotate-icon {
+      animation: rotate 2s ease-in-out infinite;
+      display: inline-block;
+    }
+    @keyframes rotate {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(90deg); }
+    }
+
+    /* Rango de horas */
+    .range-btn {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #94a3b8;
+      background: transparent;
+      border: 1px solid #334155;
+      transition: all 0.15s;
+      cursor: pointer;
+    }
+    .range-btn.active {
+      background: #0284c7;
+      color: white;
+      border-color: #0284c7;
+    }
+
+    /* Backdrop semitransparente para barras */
+    .ui-bar {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-color: rgba(51, 65, 85, 0.6);
+    }
+
+    body.epaper-mode {
+      background: #fff !important;
+      color: #000 !important;
+    }
+    body.epaper-mode .ui-bar {
+      background: rgba(255, 255, 255, 0.95) !important;
+      color: #000 !important;
+      border-color: #000 !important;
+    }
+    body.epaper-mode #topbar,
+    body.epaper-mode #bottombar,
+    body.epaper-mode #topbar *,
+    body.epaper-mode #bottombar * {
+      color: #000 !important;
+    }
+    body.epaper-mode .range-btn {
+      border-color: #000;
+      color: #000;
+    }
+    body.epaper-mode .range-btn.active {
+      background: #000;
+      color: #fff;
+    }
+
+    /* Pills del selector de series */
+    .series-toggle {
+      border-color: #334155;
+      background: #1e293b;
+      color: #94a3b8;
+      opacity: 0.45;
+    }
+    .series-toggle.active {
+      opacity: 1;
+      color: #e2e8f0;
+      background: #334155;
+      border-color: #475569;
+    }
+    body.epaper-mode .series-toggle {
+      background: #fff !important;
+      border-color: #000 !important;
+      color: #000 !important;
+      opacity: 0.4;
+    }
+    body.epaper-mode .series-toggle.active {
+      opacity: 1;
+      background: #000 !important;
+      color: #fff !important;
+      border-color: #000 !important;
+    }
+    body.epaper-mode .series-toggle.active span {
+      color: #fff !important;
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- HINT DE GIRAR TELÉFONO -->
+<div id="portrait-hint">
+  <div>
+    <div class="rotate-icon text-6xl mb-4">📱</div>
+    <div class="text-xl font-bold mb-2">Gira el teléfono</div>
+    <div class="text-sm text-slate-400 mb-6">Para ver la gráfica a pantalla completa</div>
+    <button onclick="enterFullscreen()" class="px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold">
+      Intentar pantalla completa
+    </button>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<div id="topbar" class="ui-bar border-b">
+  <div class="flex items-center gap-2 px-3 py-2">
+    <!-- Volver -->
+    <button onclick="exitAndGoBack()" title="Salir de la gráfica"
+      class="px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold border border-rose-500 shadow-lg flex items-center gap-1.5 active:scale-95 transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+      <span>Salir</span>
+    </button>
+
+    <!-- Título + estado -->
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-bold text-sky-400 truncate">Gráfica Live</span>
+        <div id="status-badge" class="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+          Verificando...
+        </div>
+      </div>
+      <div id="time-range-label" class="text-[10px] text-slate-400 font-mono">--</div>
+    </div>
+
+    <!-- Rango de horas -->
+    <div class="flex items-center gap-1">
+      <button class="range-btn" data-hours="2" onclick="setHours(2)">2h</button>
+      <button class="range-btn" data-hours="4" onclick="setHours(4)">4h</button>
+      <button class="range-btn" data-hours="8" onclick="setHours(8)">8h</button>
+      <button class="range-btn" data-hours="12" onclick="setHours(12)">12h</button>
+      <button class="range-btn" data-hours="24" onclick="setHours(24)">24h</button>
+    </div>
+  </div>
+</div>
+
+<!-- GRÁFICA -->
+<div id="chart-container">
+  <canvas id="tempChart"></canvas>
+</div>
+
+<!-- BOTTOMBAR -->
+<div id="bottombar" class="ui-bar border-t">
+  <div class="flex items-center justify-between px-3 py-2 text-[11px] gap-2 flex-wrap">
+
+    <!-- Batería -->
+    <div class="flex items-center gap-1.5 shrink-0">
+      <svg id="bat-icon" class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+      </svg>
+      <span id="bat-val" class="font-mono text-slate-300">--% · --.--V</span>
+    </div>
+
+    <!-- Selector de series (toggle pills) -->
+    <div class="flex items-center gap-1 shrink-0">
+      <button id="toggle-s1" onclick="toggleSeries(0)" title="Mostrar Sonda 1"
+        class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
+        <span class="w-2 h-2 rounded-full" style="background:#38bdf8"></span>
+        <span>S1</span>
+      </button>
+
+      <button id="toggle-s2" onclick="toggleSeries(1)" title="Mostrar Sonda 2"
+        class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
+        <span class="w-2 h-2 rounded-full" style="background:#f87171"></span>
+        <span>S2</span>
+      </button>
+
+      <button id="toggle-dt" onclick="toggleSeries(2)" title="Mostrar ΔT"
+        class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
+        <span class="w-2 h-2 rounded-full" style="background:#fbbf24"></span>
+        <span>ΔT</span>
+      </button>
+    </div>
+
+    <!-- WiFi + IP -->
+    <div class="flex items-center gap-1 text-slate-300 min-w-0">
+      <svg class="w-4 h-4 text-sky-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071a10 10 0 0114.142 0M1.42 9.428a16 16 0 0121.16 0"/>
+      </svg>
+      <span id="wifi-val" class="truncate max-w-[180px]">--</span>
+    </div>
+
+    <!-- Controles -->
+    <div class="flex items-center gap-1.5 shrink-0">
+      <button onclick="resetZoom()" title="Reset zoom"
+        class="p-1.5 rounded bg-slate-800/70 hover:bg-slate-700 text-slate-200 border border-slate-700">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+      </button>
+
+      <button onclick="toggleFullscreen()" title="Pantalla completa"
+        class="p-1.5 rounded bg-slate-800/70 hover:bg-slate-700 text-slate-200 border border-slate-700">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+        </svg>
+      </button>
+
+      <button onclick="toggleEPaper()" title="Alto contraste"
+        class="p-1.5 rounded bg-slate-800/70 hover:bg-slate-700 text-slate-200 border border-slate-700">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+        </svg>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  /* ============================================================
+     CONFIGURACIÓN
+     ============================================================ */
+
+  const API_URL = "https://api-termometro.manuelaa1990.workers.dev";
+  const POLL_INTERVAL_MS = 10000;
+  const ESP_CONNECTED_MAX_AGE_MS = 35000;
+
+  const params = new URLSearchParams(location.search);
+  let selectedHours = parseInt(params.get("hours")) || 4;
+  if (![2, 4, 8, 12, 24].includes(selectedHours)) selectedHours = 4;
+
+  let rawData = [];
+  let isFetching = false;
+  let isPolling = false;
+  let lastSeenAt = null;
+  let latestAbsolute = null;
+  let isEPaper = localStorage.getItem("epaper-mode") === "true";
+
+  // Estado de las series: [S1, S2, ΔT]
+  let seriesState = JSON.parse(localStorage.getItem("graph-series") || "[true,true,true]");
+  if (!Array.isArray(seriesState) || seriesState.length !== 3) {
+    seriesState = [true, true, true];
+  }
+
+  /* ============================================================
+     GRÁFICA
+     ============================================================ */
+
+  const ctx = document.getElementById("tempChart").getContext("2d");
+
+  const tempChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: "Sonda 1",
+          borderColor: "#38bdf8",
+          backgroundColor: "rgba(56,189,248,.08)",
+          data: [],
+          borderWidth: 2.5,
+          tension: 0.25,
+          pointRadius: 0,
+          pointHoverRadius: 6,
+          fill: true
+        },
+        {
+          label: "Sonda 2",
+          borderColor: "#f87171",
+          backgroundColor: "rgba(248,113,113,.08)",
+          data: [],
+          borderWidth: 2.5,
+          tension: 0.25,
+          pointRadius: 0,
+          pointHoverRadius: 6,
+          fill: true
+        },
+        {
+          label: "ΔT",
+          borderColor: "#fbbf24",
+          backgroundColor: "rgba(251,191,36,.08)",
+          data: [],
+          borderWidth: 2.5,
+          tension: 0.25,
+          pointRadius: 0,
+          pointHoverRadius: 6,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: "index", intersect: false },
+      layout: { padding: { top: 8, right: 16, bottom: 8, left: 8 } },
+      scales: {
+        x: {
+          ticks: {
+            color: "#94a3b8",
+            font: { size: 12 },
+            maxTicksLimit: 10,
+            autoSkip: true,
+            maxRotation: 0
+          },
+          grid: { color: "rgba(51, 65, 85, 0.5)" }
+        },
+        y: {
+          grace: "5%",
+          ticks: { color: "#94a3b8", font: { size: 12 }, stepSize: 2 },
+          grid: { color: "rgba(51, 65, 85, 0.5)" }
+        }
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: "top",
+          labels: {
+            color: "#cbd5e1",
+            font: { size: 13, weight: "600" },
+            boxWidth: 20,
+            boxHeight: 3,
+            padding: 16,
+            usePointStyle: false
+          }
+        },
+        tooltip: {
+          backgroundColor: "rgba(15,23,42,0.95)",
+          borderColor: "#334155",
+          borderWidth: 1,
+          titleColor: "#e2e8f0",
+          bodyColor: "#cbd5e1",
+          padding: 10,
+          titleFont: { size: 13 },
+          bodyFont: { size: 13 },
+          callbacks: {
+            label: function (context) {
+              const v = context.parsed.y;
+              if (v === null || v === undefined) return context.dataset.label + ": --";
+              return context.dataset.label + ": " + v.toFixed(2) + " °C";
+            }
+          }
+        },
+        zoom: {
+          limits: {
+            x: { min: "original", max: "original" }
+          },
+          pan: {
+            enabled: true,
+            mode: "x",
+            modifierKey: null,
+            threshold: 5
+          },
+          zoom: {
+            wheel: { enabled: true, speed: 0.05 },
+            pinch: { enabled: true },
+            drag: { enabled: false },
+            mode: "x"
+          }
+        }
+      }
+    }
+  });
+
+  /* ============================================================
+     FETCH
+     ============================================================ */
+
+  function withTimeout(promise, ms) {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("TIMEOUT")), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+  }
+
+  async function fetchJSON(path) {
+    const res = await withTimeout(fetch(API_URL + path), 10000);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  async function fetchRange(hours) {
+    const data = await fetchJSON(`/range?hours=${hours}`);
+    return Array.isArray(data) ? data : [];
+  }
+
+  async function fetchLatest() {
+    return fetchJSON("/latest");
+  }
+
+  /* ============================================================
+     PROCESAR ROW
+     ============================================================ */
+
+  function processRow(row) {
+    if (!row) return null;
+    const raw1 = (row.temp1 === null || row.temp1 <= -127 || row.temp1 < -50 || row.temp1 > 125) ? null : Number(row.temp1);
+    const raw2 = (row.temp2 === null || row.temp2 <= -127 || row.temp2 < -50 || row.temp2 > 125) ? null : Number(row.temp2);
+    const delta = (raw1 !== null && raw2 !== null) ? Math.abs(raw1 - raw2) : null;
+
+    const vBat = (row.bateriaVolt !== undefined && row.bateriaVolt !== null) ? Number(row.bateriaVolt) : null;
+    let bateria = null;
+    if (vBat !== null && !isNaN(vBat)) {
+      const pct = ((vBat - 3.10) / (4.20 - 3.10)) * 100;
+      bateria = Math.max(0, Math.min(100, Math.round(pct)));
+    }
+
+    return {
+      ...row,
+      s1: raw1,
+      s2: raw2,
+      delta,
+      bateria,
+      bateriaVolt: vBat,
+      wifi: row.wifi || row.ssid || null,
+      ip: row.ip_local || row.ip || null
+    };
+  }
+
+  function formatAge(ms) {
+    const s = Math.max(0, Math.round(ms / 1000));
+    if (s < 60) return `${s} s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m} min`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} h ${m % 60} min`;
+    return `${Math.floor(h / 24)} d`;
+  }
+
+  /* ============================================================
+     RENDER
+     ============================================================ */
+
+  function renderChart() {
+    const processed = rawData.map(processRow).filter(Boolean);
+
+    const labels = [];
+    const s1Data = [];
+    const s2Data = [];
+    const deltaData = [];
+
+    processed.forEach(r => {
+      const d = new Date(r.created_at);
+      const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      labels.push(time);
+      s1Data.push(r.s1);
+      s2Data.push(r.s2);
+      deltaData.push(r.delta);
+    });
+
+    tempChart.data.labels = labels;
+    tempChart.data.datasets[0].data = s1Data;
+    tempChart.data.datasets[1].data = s2Data;
+    tempChart.data.datasets[2].data = deltaData;
+
+    // Auto-escalado del eje Y — solo con series VISIBLES
+    const visibleData = [];
+    if (seriesState[0]) visibleData.push(...s1Data);
+    if (seriesState[1]) visibleData.push(...s2Data);
+    if (seriesState[2]) visibleData.push(...deltaData);
+
+    const allTemps = visibleData.filter(v => v !== null && Number.isFinite(v));
+    if (allTemps.length) {
+      const tMin = Math.min(...allTemps);
+      const tMax = Math.max(...allTemps);
+      const margin = Math.max(1, (tMax - tMin) * 0.15);
+      tempChart.options.scales.y.min = Math.floor((tMin - margin) / 2) * 2;
+      tempChart.options.scales.y.max = Math.ceil((tMax + margin) / 2) * 2;
+    } else {
+      tempChart.options.scales.y.min = undefined;
+      tempChart.options.scales.y.max = undefined;
+    }
+
+    tempChart.update("none");
+    updateTimeRangeLabel();
+  }
+
+  function renderStatusBar() {
+    if (!latestAbsolute) return;
+
+    const bat = latestAbsolute;
+    if (bat.bateriaVolt !== null) {
+      const v = bat.bateriaVolt;
+      const pct = bat.bateria;
+      document.getElementById("bat-val").textContent = `${pct}% · ${v.toFixed(2)}V`;
+
+      const icon = document.getElementById("bat-icon");
+      if (pct <= 20) icon.className = "w-4 h-4 text-rose-500";
+      else if (pct <= 50) icon.className = "w-4 h-4 text-amber-400";
+      else icon.className = "w-4 h-4 text-emerald-400";
+    }
+
+    const wifi = bat.wifi || "?";
+    const ip = bat.ip ? ` · ${bat.ip}` : "";
+    document.getElementById("wifi-val").textContent = `${wifi}${ip}`;
+  }
+
+  function updateTimeRangeLabel() {
+    const now = new Date();
+    const start = new Date(now.getTime() - selectedHours * 3600 * 1000);
+    const opts = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
+    document.getElementById("time-range-label").textContent =
+      `${start.toLocaleDateString([], opts)} → ${now.toLocaleDateString([], opts)} · ${selectedHours}h · ${rawData.length} pts`;
+  }
+
+  function updateStatusBadge() {
+    const badge = document.getElementById("status-badge");
+    if (!badge) return;
+
+    const age = lastSeenAt ? Date.now() - lastSeenAt.getTime() : null;
+    let text, style;
+
+    if (age !== null && age <= ESP_CONNECTED_MAX_AGE_MS) {
+      text = "En vivo · " + formatAge(age);
+      style = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+    } else if (age !== null) {
+      text = "Desconectado · " + formatAge(age);
+      style = "bg-rose-500/20 text-rose-400 border-rose-500/30";
+    } else {
+      text = "Sin datos";
+      style = "bg-amber-500/20 text-amber-400 border-amber-500/30";
+    }
+
+    badge.textContent = text;
+    badge.className = "px-2 py-0.5 text-[10px] font-semibold rounded-full border " + style;
+  }
+
+  /* ============================================================
+     FETCH LOOP
+     ============================================================ */
+
+  async function refreshRange() {
+    if (isFetching) return;
+    isFetching = true;
+    try {
+      const data = await fetchRange(selectedHours);
+      rawData = data;
+      if (data.length) {
+        const last = data[data.length - 1];
+        if (last.created_at) {
+          const t = new Date(last.created_at).getTime();
+          if (!lastSeenAt || t > lastSeenAt.getTime()) lastSeenAt = new Date(t);
+        }
+      }
+      renderChart();
+      updateStatusBadge();
+    } catch (err) {
+      console.error("Error rango:", err);
+      updateStatusBadge();
+    } finally {
+      isFetching = false;
+    }
+  }
+
+  async function refreshLatest() {
+    if (isPolling || document.hidden) return;
+    isPolling = true;
+    try {
+      const row = await fetchLatest();
+      if (row && row.created_at) {
+        const t = new Date(row.created_at).getTime();
+        if (!lastSeenAt || t > lastSeenAt.getTime()) lastSeenAt = new Date(t);
+        latestAbsolute = processRow(row);
+        renderStatusBar();
+      }
+      updateStatusBadge();
+    } catch (err) {
+      console.error("Error latest:", err);
+      updateStatusBadge();
+    } finally {
+      isPolling = false;
+    }
+  }
+
+  /* ============================================================
+     SELECTOR DE SERIES
+     ============================================================ */
+
+  function applySeriesVisibility() {
+    seriesState.forEach((visible, i) => {
+      tempChart.setDatasetVisibility(i, visible);
+    });
+
+    // Actualizar apariencia de los botones
+    const ids = ["toggle-s1", "toggle-s2", "toggle-dt"];
+    ids.forEach((id, i) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.classList.toggle("active", seriesState[i]);
+    });
+
+    localStorage.setItem("graph-series", JSON.stringify(seriesState));
+
+    // Recalcular rango Y según series visibles
+    renderChart();
+  }
+
+  function toggleSeries(index) {
+    if (index < 0 || index > 2) return;
+
+    const newState = [...seriesState];
+    newState[index] = !newState[index];
+
+    // Evitar que todas queden ocultas a la vez
+    if (!newState.some(v => v)) return;
+
+    seriesState = newState;
+    if ("vibrate" in navigator) navigator.vibrate(15);
+    applySeriesVisibility();
+  }
+
+  /* ============================================================
+     CONTROLES DE UI
+     ============================================================ */
+
+  function setHours(h) {
+    selectedHours = h;
+    localStorage.setItem("graph-hours", h);
+    document.querySelectorAll(".range-btn").forEach(b => {
+      b.classList.toggle("active", parseInt(b.dataset.hours) === h);
+    });
+    if (tempChart.resetZoom) tempChart.resetZoom();
+    refreshRange();
+  }
+
+  function resetZoom() {
+    if (tempChart.resetZoom) tempChart.resetZoom();
+    if ("vibrate" in navigator) navigator.vibrate(15);
+  }
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      enterFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }
+
+  async function enterFullscreen() {
+    try {
+      const el = document.documentElement;
+      if (el.requestFullscreen) await el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+
+      // Intentar bloquear orientación landscape
+      try {
+        if (screen.orientation && screen.orientation.lock) {
+          await screen.orientation.lock("landscape");
+        }
+      } catch (_) {}
+
+      document.getElementById("portrait-hint").classList.add("hidden");
+    } catch (err) {
+      console.warn("Fullscreen no disponible:", err);
+    }
+  }
+
+  function toggleEPaper() {
+    isEPaper = !isEPaper;
+    localStorage.setItem("epaper-mode", isEPaper ? "true" : "false");
+    applyEPaper();
+  }
+
+  function applyEPaper() {
+    document.body.classList.toggle("epaper-mode", isEPaper);
+
+    if (isEPaper) {
+      tempChart.options.scales.x.ticks.color = "#000";
+      tempChart.options.scales.x.grid.color = "#cbd5e1";
+      tempChart.options.scales.y.ticks.color = "#000";
+      tempChart.options.scales.y.grid.color = "#cbd5e1";
+      tempChart.options.plugins.legend.labels.color = "#000";
+    } else {
+      tempChart.options.scales.x.ticks.color = "#94a3b8";
+      tempChart.options.scales.x.grid.color = "rgba(51, 65, 85, 0.5)";
+      tempChart.options.scales.y.ticks.color = "#94a3b8";
+      tempChart.options.scales.y.grid.color = "rgba(51, 65, 85, 0.5)";
+      tempChart.options.plugins.legend.labels.color = "#cbd5e1";
+    }
+    tempChart.update();
+  }
+
+  async function exitAndGoBack() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      if (screen.orientation && screen.orientation.unlock) {
+        try { screen.orientation.unlock(); } catch (_) {}
+      }
+    } catch (_) {}
+
+    // Volver a la app principal
+    location.href = "./index.html";
+  }
+
+  /* Doble tap para mostrar/ocultar UI */
+  let lastTap = 0;
+  document.getElementById("chart-container").addEventListener("touchend", (e) => {
+    const now = Date.now();
+    if (now - lastTap < 300) {
+      e.preventDefault();
+      document.getElementById("topbar").classList.toggle("hidden-ui");
+      document.getElementById("bottombar").classList.toggle("hidden-ui");
+    }
+    lastTap = now;
+  }, { passive: false });
+
+  /* Botón de pantalla completa del hint */
+  document.querySelector("#portrait-hint button")?.addEventListener("click", enterFullscreen);
+
+  /* ============================================================
+     BOTÓN FÍSICO "ATRÁS" DEL MÓVIL
+     ============================================================ */
+
+  history.pushState({ page: "grafica" }, "", location.href);
+
+  window.addEventListener("popstate", (e) => {
+    exitAndGoBack();
+  });
+
+  /* ============================================================
+     INICIALIZACIÓN
+     ============================================================ */
+
+  window.addEventListener("DOMContentLoaded", async () => {
+    // Aplicar rango guardado
+    const savedHours = parseInt(localStorage.getItem("graph-hours"));
+    if (savedHours && [2, 4, 8, 12, 24].includes(savedHours)) {
+      selectedHours = savedHours;
+    }
+
+    document.querySelectorAll(".range-btn").forEach(b => {
+      b.classList.toggle("active", parseInt(b.dataset.hours) === selectedHours);
+    });
+
+    applyEPaper();
+
+    // Aplicar estado guardado de las series
+    applySeriesVisibility();
+
+    // Detectar orientación
+    if (window.matchMedia("(orientation: portrait)").matches && window.innerWidth < 1024) {
+      document.getElementById("portrait-hint").classList.add("force-hint");
+    }
+
+    // Escuchar cambios de orientación
+    window.matchMedia("(orientation: portrait)").addEventListener("change", (e) => {
+      const hint = document.getElementById("portrait-hint");
+      if (e.matches && window.innerWidth < 1024) {
+        hint.classList.add("force-hint");
+      } else {
+        hint.classList.remove("force-hint");
+      }
+    });
+
+    // Cargar datos iniciales
+    await refreshRange();
+    await refreshLatest();
+
+    // Polling
+    setInterval(refreshRange, 30000);
+    setInterval(refreshLatest, POLL_INTERVAL_MS);
+    setInterval(updateStatusBadge, 2000);
+
+    // Al volver a la pestaña, refrescar
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        refreshRange();
+        refreshLatest();
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
