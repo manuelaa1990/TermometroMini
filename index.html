@@ -89,6 +89,14 @@
       opacity: 0.3;
       cursor: not-allowed;
     }
+
+    /* Bloquea todas las transiciones/animaciones CSS mientras se cambia de tema,
+       para evitar el parpadeo al alternar el modo ePaper */
+    body.theme-switching,
+    body.theme-switching * {
+      transition: none !important;
+      animation: none !important;
+    }
   </style>
 </head>
 
@@ -960,6 +968,10 @@
   }
 
   function applyEPaperState() {
+    // Congela todas las transiciones/animaciones CSS mientras cambiamos de tema,
+    // así los estilos !important se aplican de golpe en vez de "arrastrarse".
+    document.body.classList.add("theme-switching");
+
     const btnText = document.getElementById("epaper-btn-text");
     const btnEPaper = document.getElementById("btn-epaper");
 
@@ -984,8 +996,17 @@
       tempChart.options.scales.pressure.ticks.color = "#34d399";
       tempChart.options.scales.pressure.grid.color = "#334155";
     }
-    tempChart.update();
-    renderData();
+
+    // Una sola actualización del chart, sin animación: elimina el doble
+    // redibujado que antes causaba el parpadeo (antes: update() + renderData()->update()).
+    tempChart.update("none");
+
+    // Quita el bloqueo de transiciones en el siguiente frame, ya con todo pintado.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.body.classList.remove("theme-switching");
+      });
+    });
   }
 
   function toggleDeltaT(showState) {
@@ -1053,6 +1074,29 @@
     renderData();
   }
 
+  /* CURVA DE DESCARGA 18650 (Li-ion, en reposo/carga ligera) — voltaje → % */
+  const BATTERY_CURVE = [
+    [4.20, 100], [4.06, 90], [3.98, 80], [3.92, 70],
+    [3.87, 60],  [3.82, 50], [3.79, 40], [3.77, 30],
+    [3.74, 20],  [3.68, 10], [3.45, 5],  [3.00, 0]
+  ];
+
+  function voltageToPercent(v) {
+    if (!Number.isFinite(v)) return null;
+    if (v >= BATTERY_CURVE[0][0]) return 100;
+    if (v <= BATTERY_CURVE[BATTERY_CURVE.length - 1][0]) return 0;
+
+    for (let i = 0; i < BATTERY_CURVE.length - 1; i++) {
+      const [vHigh, pHigh] = BATTERY_CURVE[i];
+      const [vLow, pLow] = BATTERY_CURVE[i + 1];
+      if (v <= vHigh && v >= vLow) {
+        const ratio = (v - vLow) / (vHigh - vLow);
+        return Math.round(pLow + ratio * (pHigh - pLow));
+      }
+    }
+    return 0;
+  }
+
   function processRow(row) {
     if (!row) return null;
     const raw1 = (row.temp1 === null || row.temp1 <= -127 || row.temp1 < -50 || row.temp1 > 125) ? null : Number(row.temp1);
@@ -1066,8 +1110,7 @@
 
     let bateria = null;
     if (vBat !== null && !isNaN(vBat)) {
-      const pct = ((vBat - 3.10) / (4.20 - 3.10)) * 100;
-      bateria = Math.max(0, Math.min(100, Math.round(pct)));
+      bateria = voltageToPercent(vBat);
     }
 
     const wifi = row.wifi || row.ssid || null;
