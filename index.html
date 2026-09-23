@@ -15,7 +15,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Versión fijada: evita que una actualización mayor de Chart.js rompa la app -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 
   <style>
     body.epaper-mode {
@@ -24,11 +25,9 @@
       font-weight:600;
     }
 
-    body.epaper-mode .bg-slate-900,
-    body.epaper-mode .bg-slate-800,
-    body.epaper-mode .bg-slate-700,
-    body.epaper-mode .bg-slate-900\/70,
-    body.epaper-mode .bg-slate-800\/60 {
+    /* Cualquier fondo oscuro pasa a blanco (incluye las cajas /50 y las tarjetas en alarma) */
+    body.epaper-mode [class*="bg-slate-"],
+    body.epaper-mode .bg-rose-900\/40 {
       background:#fff !important;
       color:#000 !important;
       border-color:#000 !important;
@@ -39,6 +38,7 @@
     body.epaper-mode header,
     body.epaper-mode h1,
     body.epaper-mode span,
+    body.epaper-mode label,
     body.epaper-mode strong {
       color:#000 !important;
     }
@@ -147,7 +147,7 @@
   </div>
 
   <div id="stale-banner" class="hidden bg-amber-600/20 border border-amber-500/50 p-2 rounded-xl text-center text-amber-300 text-xs">
-    ⏸ <strong>Datos congelados.</strong> El ESP32 no envía lecturas desde hace más de 35 s. Las alarmas están en pausa hasta recibir datos nuevos.
+    ⏸ <strong>Datos congelados.</strong> No llegan lecturas nuevas desde hace más de 35 s (ESP32 o conexión). Las alarmas están en pausa hasta recibir datos nuevos.
   </div>
 
   <header class="text-center py-1">
@@ -246,7 +246,7 @@
     <div class="grid grid-cols-[1fr_auto] gap-2 items-end mt-1.5">
       <div class="text-left">
         <label class="block text-[9px] text-slate-400 mb-0.5">Presión medida (PSI)</label>
-        <input type="number" id="n2-p-init" value="150" min="0" step="0.5"
+        <input type="number" id="n2-p-init" value="150" min="0" step="0.5" oninput="savePressureInput()"
           class="w-full bg-slate-900 border border-slate-700 text-emerald-400 font-bold px-2 py-1.5 rounded focus:outline-none">
       </div>
       <button onclick="acceptPressurePoint()"
@@ -297,13 +297,19 @@
       </div>
 
       <div class="flex justify-center flex-wrap gap-x-4 gap-y-0.5 text-[9px] font-mono text-slate-400 mt-1">
-        <span>Δ real: <strong id="n2-diff" class="text-slate-200">--.-</strong> PSI</span>
+        <span title="Última medida menos la presión que se esperaba a la temperatura de ESA medida. Negativo = presión por debajo de lo esperado (posible fuga).">Δ real: <strong id="n2-diff" class="text-slate-200">--.-</strong> PSI</span>
         <span>Ref.: <strong id="n2-p-ref" class="text-slate-200">--.-</strong> PSI</span>
         <span>Tef: <strong id="n2-t-ref" class="text-slate-200">--.-</strong> °C</span>
         <span id="n2-elapsed">Tiempo: --</span>
       </div>
 
       <div id="n2-status-msg" class="text-[8px] text-slate-500 mt-0.5"></div>
+
+      <div class="flex justify-center mt-1.5">
+        <button onclick="resetPressureTest()" class="px-2 py-0.5 text-[9px] font-semibold rounded border border-slate-600 text-slate-400 hover:text-white transition active:scale-95">
+          Nueva prueba (borrar referencia)
+        </button>
+      </div>
     </div>
   </div>
 
@@ -329,6 +335,8 @@
       <div id="time-window-label" class="text-[11px] font-mono font-semibold text-sky-400">Calculando rango...</div>
     </div>
 
+    <div id="history-notice" class="hidden text-center text-[10px] text-amber-400 px-2"></div>
+
     <div class="flex items-center justify-center gap-3">
       <button onclick="navigateWindow(-1)" id="btn-prev-nav" title="Retroceder" class="p-2 px-4 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition active:scale-95">‹</button>
       <button onclick="goLive()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition flex items-center gap-1.5">
@@ -341,10 +349,8 @@
   <!-- SELECTORES GRÁFICA -->
   <div class="bg-slate-800 border border-slate-700/60 p-3 rounded-xl shadow-md space-y-2.5">
 
-    <!-- FILA DE CONTROLES: checkboxes a la izquierda, botón Full a la derecha -->
     <div class="flex justify-between items-center gap-2 flex-wrap bg-slate-900/70 border border-slate-700/50 py-1.5 px-2 rounded-lg text-xs">
 
-      <!-- Checkboxes de series -->
       <div class="flex items-center gap-3 flex-wrap">
         <label class="flex items-center gap-1.5 cursor-pointer">
           <input type="checkbox" id="chk-s1" checked onchange="updateChartVisibility()">
@@ -371,7 +377,6 @@
         </label>
       </div>
 
-      <!-- Botón Full screen -->
       <button onclick="openGraphFullscreen()" title="Ver gráfica a pantalla completa"
         class="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-semibold transition active:scale-95 flex items-center gap-1 shrink-0">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -382,7 +387,7 @@
     </div>
 
     <!-- GRÁFICA -->
-    <div class="relative h-64 md:h-80">
+    <div id="chart-wrap" class="relative h-64 md:h-80 transition-opacity">
       <canvas id="tempChart"></canvas>
     </div>
   </div>
@@ -417,58 +422,137 @@
      ============================================================ */
 
   const API_URL   = "https://api-termometro.manuelaa1990.workers.dev";
+  // OJO: este token queda visible para cualquiera que abra la página.
+  // Hoy las lecturas (GET) NO lo envían; solo sirve si el Worker lo exigiera.
   const API_TOKEN = "trm_2026_xK9pL3mN7qR2sT5vW8yZ1bC4dF6gH0jA";
 
-  /* VARIABLES GLOBALES */
-  let selectedHoursRange = parseInt(localStorage.getItem("selected-hours-range")) || 2;
+  /* HISTORIAL
+     Mientras el Worker solo entienda /range?hours=N, se pide "desde ahora hacia atrás"
+     y se filtra en el cliente. Cuando el Worker soporte /range?from=ISO&to=ISO,
+     cambie WORKER_SUPPORTS_FROM_TO a true y desaparece el límite de horas. */
+  const WORKER_SUPPORTS_FROM_TO = false;
+  const MAX_HOURS_BACK = 72;
+
+  /* GRÁFICA */
+  const MAX_CHART_POINTS = 1200;      // por encima, se promedian buckets para que el móvil no sufra
+  const GAP_MS = 5 * 60 * 1000;       // hueco sin datos > 5 min => se corta la línea
+  const TICK_STEP_MIN = { 2: 20, 4: 30, 8: 60, 12: 120, 24: 180 };
+
+  /* ESTADO */
+  const VALID_RANGES = [2, 4, 8, 12, 24];
+  let selectedHoursRange = parseInt(localStorage.getItem("selected-hours-range"));
+  if (!VALID_RANGES.includes(selectedHoursRange)) selectedHoursRange = 2;
+
   let windowEndTime = new Date();
   let isLive = true;
   let rawData = [];
-  let isInverted = false;
+  let viewLatest = null;          // última fila procesada de la ventana visible
+  let latestAbsolute = null;      // última lectura absoluta (batería / wifi)
+  let isInverted = localStorage.getItem("probes-inverted") === "true";
   let isEPaper = false;
-  let isFetching = false;
   let alarmActive = false;
 
-  /* ESTADO DEL SISTEMA (independiente de la ventana visible) */
-  let latestAbsolute = null;
-
-  /* ESTADO DE CONEXIÓN */
   const ESP_CONNECTED_MAX_AGE_MS = 35000;
   const POLL_INTERVAL_MS = 10000;
-  const pageLoadedAt = Date.now();
 
   let lastSeenAt = null;
   let dbOk = null;
   let dbError = null;
   let isPolling = false;
   let diagRunning = false;
+  let fetchSeq = 0;
 
-  /* HABILITAR VIBRACIÓN AL TOCAR PANTALLA */
-  function enableVibrationOnTouch() {
-    if ("vibrate" in navigator) {
-      navigator.vibrate(10);
-    }
+  /* Modo de trabajo y presión (declarados arriba para evitar problemas de orden) */
+  let workMode = localStorage.getItem("work-mode") === "ph" ? "ph" : "thermometer";
+  const ATM_PSI = 14.696;
+  let phS1Weight = parseInt(localStorage.getItem("ph-s1-weight"));
+  if (!Number.isFinite(phS1Weight) || phS1Weight < 0 || phS1Weight > 100) phS1Weight = 60;
+  let phS2Weight = 100 - phS1Weight;
+  let pressureReference = null;
+  let pressureLastMeasured = null;
+  let pressureMeasurements = [];
+  let pressureTestVisible = localStorage.getItem("pressure-test-visible") !== "false";
+
+  /* ============================================================
+     UTILIDADES
+     ============================================================ */
+
+  const $ = id => document.getElementById(id);
+  const setText = (id, txt) => { const el = $(id); if (el) el.textContent = txt; };
+
+  function toNum(v) {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
   }
 
-  /* SISTEMA DE VIBRACIÓN DE ALARMA CADA 10 SEGUNDOS */
+  /* Filtra valores imposibles del DS18B20 (-127 = desconectado) */
+  function cleanTemp(v) {
+    const n = toNum(v);
+    return (n !== null && n > -50 && n <= 125) ? n : null;
+  }
+
+  function enableVibrationOnTouch() {
+    if ("vibrate" in navigator) navigator.vibrate(10);
+  }
+
+  /* Vibración de alarma cada 10 s */
   setInterval(() => {
-    if (alarmActive && "vibrate" in navigator) {
-      navigator.vibrate(1000);
-    }
+    if (alarmActive && "vibrate" in navigator) navigator.vibrate(1000);
   }, 10000);
 
-  /* GRÁFICA INICIALIZACIÓN */
-  const ctx = document.getElementById("tempChart").getContext("2d");
+  /* ============================================================
+     GRÁFICA
+     ============================================================ */
+
+  const SERIES_STYLE = {
+    color: [
+      { borderColor: "#38bdf8", backgroundColor: "rgba(56,189,248,.05)", borderDash: [], fill: true },
+      { borderColor: "#f87171", backgroundColor: "rgba(248,113,113,.05)", borderDash: [], fill: true },
+      { borderColor: "#fbbf24", backgroundColor: "rgba(251,191,36,.05)", borderDash: [], fill: true },
+      { borderColor: "#34d399", backgroundColor: "rgba(52,211,153,.03)", borderDash: [], fill: false },
+      { pointBackgroundColor: "#a7f3d0", pointBorderColor: "#059669" }
+    ],
+    epaper: [
+      { borderColor: "#000", backgroundColor: "transparent", borderDash: [], fill: false },
+      { borderColor: "#000", backgroundColor: "transparent", borderDash: [8, 5], fill: false },
+      { borderColor: "#444", backgroundColor: "transparent", borderDash: [2, 4], fill: false },
+      { borderColor: "#000", backgroundColor: "transparent", borderDash: [12, 3, 2, 3], fill: false },
+      { pointBackgroundColor: "#000", pointBorderColor: "#000" }
+    ]
+  };
+
+  function formatXTick(value, index) {
+    const d = new Date(value);
+    const hm = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const dm = d.toLocaleDateString([], { day: "2-digit", month: "2-digit" });
+    if (index === 0 || (d.getHours() === 0 && d.getMinutes() === 0)) return [hm, dm];
+    return hm;
+  }
+
+  /* Marcas del eje X en horas "redondas" locales */
+  function buildTimeTicks(scale) {
+    const min = scale.min, max = scale.max;
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return;
+    const stepMs = (TICK_STEP_MIN[selectedHoursRange] || 60) * 60000;
+    const off = new Date().getTimezoneOffset() * 60000;
+    const ticks = [];
+    for (let t = Math.ceil((min - off) / stepMs) * stepMs + off; t <= max; t += stepMs) {
+      ticks.push({ value: t });
+    }
+    scale.ticks = ticks;
+  }
+
+  const ctx = $("tempChart").getContext("2d");
   const tempChart = new Chart(ctx, {
     type: "line",
     data: {
-      labels: [],
       datasets: [
-        { label: "SONDA 1", borderColor: "#38bdf8", backgroundColor: "rgba(56,189,248,.05)", data: [], borderWidth: 2, tension: .2, pointRadius: 1, fill: true },
-        { label: "SONDA 2", borderColor: "#f87171", backgroundColor: "rgba(248,113,113,.05)", data: [], borderWidth: 2, tension: .2, pointRadius: 1, fill: true },
-        { label: "ΔT", borderColor: "#fbbf24", backgroundColor: "rgba(251,191,36,.05)", data: [], borderWidth: 2, tension: .2, pointRadius: 1, fill: true },
-        { label: "P.H. Esperada", borderColor: "#34d399", backgroundColor: "rgba(52,211,153,.03)", data: [], borderWidth: 2, tension: .15, pointRadius: 1, fill: false, yAxisID: "pressure" },
-        { label: "P.H. Medida", borderColor: "#a7f3d0", backgroundColor: "rgba(167,243,208,.0)", data: [], borderWidth: 0, tension: 0, pointRadius: 4, pointHoverRadius: 5, showLine: false, fill: false, yAxisID: "pressure" }
+        { label: "SONDA 1", data: [], borderWidth: 2, tension: .2, pointRadius: 1, ...SERIES_STYLE.color[0] },
+        { label: "SONDA 2", data: [], borderWidth: 2, tension: .2, pointRadius: 1, ...SERIES_STYLE.color[1] },
+        { label: "ΔT", data: [], borderWidth: 2, tension: .2, pointRadius: 1, ...SERIES_STYLE.color[2] },
+        { label: "P.H. Esperada", data: [], borderWidth: 2, tension: .15, pointRadius: 1, yAxisID: "pressure", ...SERIES_STYLE.color[3] },
+        { label: "P.H. Medida", data: [], borderWidth: 0, tension: 0, pointRadius: 5, pointHoverRadius: 6, pointBorderWidth: 1, showLine: false, fill: false, yAxisID: "pressure", ...SERIES_STYLE.color[4] }
       ]
     },
     options: {
@@ -477,8 +561,13 @@
       animation: false,
       interaction: { mode: "index", intersect: false },
       scales: {
-        x: { ticks: { color: "#94a3b8", font: { size: 10 }, maxTicksLimit: 8 }, grid: { color: "#334155" } },
-        y: { grace: "5%", ticks: { color: "#94a3b8", font: { size: 10 }, stepSize: 2 }, grid: { color: "#334155" } },
+        x: {
+          type: "linear",
+          ticks: { color: "#94a3b8", font: { size: 10 }, autoSkip: false, maxRotation: 0, callback: formatXTick },
+          grid: { color: "#334155" },
+          afterBuildTicks: buildTimeTicks
+        },
+        y: { grace: "5%", ticks: { color: "#94a3b8", font: { size: 10 }, maxTicksLimit: 8 }, grid: { color: "#334155" } },
         pressure: {
           position: "right",
           display: false,
@@ -491,6 +580,10 @@
         legend: { display: false },
         tooltip: {
           callbacks: {
+            title: function(items) {
+              if (!items.length) return "";
+              return new Date(items[0].parsed.x).toLocaleString([], { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+            },
             label: function(context) {
               const value = context.parsed.y;
               if (value === null || value === undefined) return context.dataset.label + ": DESC";
@@ -543,7 +636,7 @@
   }
 
   function updateConnectionBadge() {
-    const badge = document.getElementById("status-badge");
+    const badge = $("status-badge");
     if (!badge) return;
 
     const age = lastSeenAt ? Math.max(0, Date.now() - lastSeenAt.getTime()) : null;
@@ -577,7 +670,7 @@
   }
 
   function updateDiagDot() {
-    const dot = document.getElementById("diag-dot");
+    const dot = $("diag-dot");
     if (!dot) return;
     dot.className = "w-1.5 h-1.5 rounded-full " +
       (dbOk === true ? "bg-emerald-400" : dbOk === false ? "bg-rose-500" : "bg-slate-500");
@@ -627,8 +720,41 @@
     return fetchJSON(`/range?hours=${hours}`);
   }
 
+  function hoursBackFor(startMs) {
+    return Math.ceil((Date.now() - startMs) / 3600000) + 1;
+  }
+
+  /* Pide los datos de una ventana [startMs, endMs] */
+  async function fetchWindow(startMs, endMs) {
+    if (WORKER_SUPPORTS_FROM_TO) {
+      const from = encodeURIComponent(new Date(startMs).toISOString());
+      const to = encodeURIComponent(new Date(endMs).toISOString());
+      return fetchJSON(`/range?from=${from}&to=${to}`);
+    }
+    const hoursBack = hoursBackFor(startMs);
+    if (hoursBack > MAX_HOURS_BACK) throw new Error("LIMIT");
+    return fetchRange(hoursBack);
+  }
+
+  function getWindow() {
+    const end = isLive ? Date.now() : windowEndTime.getTime();
+    return { start: end - selectedHoursRange * 3600000, end };
+  }
+
+  function setNotice(text) {
+    const el = $("history-notice");
+    if (!el) return;
+    el.textContent = text || "";
+    el.classList.toggle("hidden", !text);
+  }
+
+  function setLoading(on) {
+    const w = $("chart-wrap");
+    if (w) w.classList.toggle("opacity-50", !!on && !isLive);
+  }
+
   /* ============================================================
-     POLL: última lectura absoluta (barra superior)
+     POLL: última lectura absoluta (barra superior + valor en vivo)
      ============================================================ */
 
   async function pollLatest() {
@@ -640,6 +766,7 @@
         noteReading(row.created_at);
         latestAbsolute = processRow(row);
         renderBatteryAndWifi();
+        if (isLive) mergeLiveRow(row);
       }
       setDbState(true);
     } catch (err) {
@@ -648,6 +775,21 @@
       isPolling = false;
       updateConnectionBadge();
     }
+  }
+
+  /* Añade la lectura nueva a la ventana en vivo sin esperar al refresco de 30 s */
+  function mergeLiveRow(row) {
+    const t = new Date(row.created_at).getTime();
+    if (!Number.isFinite(t)) return;
+    const { start, end } = getWindow();
+    if (t < start || t > end + 60000) return;
+
+    const lastT = rawData.length ? new Date(rawData[rawData.length - 1].created_at).getTime() : -Infinity;
+    if (t <= lastT) return;
+
+    rawData = rawData.filter(r => new Date(r.created_at).getTime() >= start);
+    rawData.push(row);
+    renderData();
   }
 
   /* ============================================================
@@ -679,7 +821,7 @@
   const DIAG_COLORS = { ok: "text-emerald-400", warn: "text-amber-400", fail: "text-rose-400", run: "text-slate-400" };
 
   function renderDiag(steps, running) {
-    const list = document.getElementById("diag-list");
+    const list = $("diag-list");
     list.innerHTML = steps.map(s => `
       <div class="flex gap-2 items-start text-left border-b border-slate-700/50 py-1.5">
         <span class="${DIAG_COLORS[s.state]} font-bold w-4 shrink-0 text-center">${DIAG_ICONS[s.state]}</span>
@@ -692,19 +834,23 @@
   }
 
   function setDiagSummary(state, text) {
-    const el = document.getElementById("diag-summary");
+    const el = $("diag-summary");
     el.textContent = text;
     el.className = "text-xs font-bold text-center py-1 " + DIAG_COLORS[state];
   }
 
   function openDiagnostics() {
-    document.getElementById("diag-modal").classList.remove("hidden");
+    $("diag-modal").classList.remove("hidden");
     runDiagnostics();
   }
 
   function closeDiagnostics() {
-    document.getElementById("diag-modal").classList.add("hidden");
+    $("diag-modal").classList.add("hidden");
   }
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") closeDiagnostics();
+  });
 
   async function runDiagnostics() {
     if (diagRunning) return;
@@ -728,12 +874,6 @@
         return;
       }
       add("ok", "URL del Worker", host);
-
-      if (!API_TOKEN || API_TOKEN.length < 20) {
-        add("fail", "Token", "API_TOKEN demasiado corto o vacío.");
-      } else {
-        add("ok", "Token", `Configurado (${API_TOKEN.length} caracteres).`);
-      }
 
       if (!navigator.onLine) {
         add("fail", "Internet", "Este dispositivo no tiene conexión a Internet.");
@@ -777,7 +917,7 @@
             row.wifi ? `red "${row.wifi}"` : null,
             row.ip_local ? `IP ${row.ip_local}` : null,
             row.rssi != null ? `RSSI ${row.rssi} dBm` : null,
-            row.bateriaVolt != null ? `batería ${Number(row.bateriaVolt).toFixed(2)} V` : null
+            row.bateriaVolt != null && Number.isFinite(Number(row.bateriaVolt)) ? `batería ${Number(row.bateriaVolt).toFixed(2)} V` : null
           ].filter(Boolean).join(" · ");
 
           if (age < -10000) {
@@ -805,6 +945,9 @@
         add("warn", "Rango 2 h", interpretApiError(err));
       }
 
+      add("ok", "Historial", WORKER_SUPPORTS_FROM_TO
+        ? "Modo /range?from&to (sin límite de horas)."
+        : `Modo /range?hours=N, retroceso máximo ${MAX_HOURS_BACK} h.`);
       add("ok", "Polling", `Consultando /latest cada ${POLL_INTERVAL_MS / 1000} s.`);
 
     } finally {
@@ -835,12 +978,11 @@
     setDiagSummary("run", "Testeando bloqueos...");
 
     const targets = [
-      { url: "https://www.google.com",       label: "Google" },
-      { url: "https://api.github.com",       label: "GitHub API" },
-      { url: "https://api.cloudflare.com",   label: "Cloudflare API" },
-      { url: "https://firebase.google.com",  label: "Firebase" },
-      { url: "https://ovaqbqkahttkmmtlmxha.supabase.co", label: "Supabase (antiguo)" },
-      { url: `${API_URL}/`,                  label: "Tu Worker" }
+      { url: "https://www.google.com",      label: "Google" },
+      { url: "https://api.github.com",      label: "GitHub API" },
+      { url: "https://api.cloudflare.com",  label: "Cloudflare API" },
+      { url: "https://firebase.google.com", label: "Firebase" },
+      { url: `${API_URL}/`,                 label: "Tu Worker" }
     ];
 
     for (const t of targets) {
@@ -863,50 +1005,46 @@
 
     const fails = steps.filter(s => s.state === "fail").length;
     if (fails === 0) setDiagSummary("ok", "✔ Ningún dominio bloqueado");
-    else if (fails >= 5) setDiagSummary("fail", "✖ Red muy restrictiva (VPN o router 4G)");
+    else if (fails >= targets.length - 1) setDiagSummary("fail", "✖ Red muy restrictiva (VPN o router 4G)");
     else setDiagSummary("warn", `⚠ ${fails} dominio(s) bloqueado(s)`);
 
     renderDiag(steps, false);
     diagRunning = false;
   }
 
-  /* ACTUALIZAR INDICADOR VISUAL DE FECHA / HORA DE VENTANA */
-  function updateTimeWindowLabel() {
-    const rangeMs = selectedHoursRange * 60 * 60 * 1000;
-    const startTime = new Date(windowEndTime.getTime() - rangeMs);
+  /* ============================================================
+     VENTANA DE TIEMPO Y NAVEGACIÓN
+     ============================================================ */
 
-    const formatOpts = { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
-    const startStr = startTime.toLocaleDateString([], formatOpts);
-    const endStr = windowEndTime.toLocaleDateString([], formatOpts);
+  function updateTimeWindowLabel() {
+    const { start, end } = getWindow();
+    const formatOpts = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
+    const startStr = new Date(start).toLocaleString([], formatOpts);
+    const endStr = new Date(end).toLocaleString([], formatOpts);
 
     const liveBadge = isLive ? " <span class='text-emerald-400 font-bold'>(En vivo)</span>" : "";
-    document.getElementById("time-window-label").innerHTML = `${startStr} ➔ ${endStr}${liveBadge}`;
+    $("time-window-label").innerHTML = `${startStr} ➔ ${endStr}${liveBadge}`;
   }
 
-  /* MODO RANGO DE TIEMPO */
   function setTimeRange(hours) {
     selectedHoursRange = hours;
     localStorage.setItem("selected-hours-range", hours);
+    if (isLive) windowEndTime = new Date();
     updateRangeUI();
-    if (isLive) {
-      windowEndTime = new Date();
-    }
     fetchData();
   }
 
   function updateRangeUI() {
-    [2, 4, 8, 12, 24].forEach(h => {
-      const btn = document.getElementById(`btn-range-${h}`);
+    VALID_RANGES.forEach(h => {
+      const btn = $(`btn-range-${h}`);
       if (btn) {
-        if (h === selectedHoursRange) {
-          btn.className = "py-1 rounded-md transition bg-sky-600 text-white shadow font-bold";
-        } else {
-          btn.className = "py-1 rounded-md transition text-slate-400 hover:text-slate-200 hover:bg-slate-800";
-        }
+        btn.className = h === selectedHoursRange
+          ? "py-1 rounded-md transition bg-sky-600 text-white shadow font-bold"
+          : "py-1 rounded-md transition text-slate-400 hover:text-slate-200 hover:bg-slate-800";
       }
     });
 
-    const prevBtn = document.getElementById("btn-prev-nav");
+    const prevBtn = $("btn-prev-nav");
     if (prevBtn) prevBtn.title = `Atrás ${selectedHoursRange} Horas`;
 
     updateNextButtonState();
@@ -914,17 +1052,87 @@
   }
 
   function updateNextButtonState() {
-    const btn = document.getElementById("btn-next");
+    const btn = $("btn-next");
     if (!btn) return;
-
-    const now = Date.now();
-    const atPresent = isLive || windowEndTime.getTime() >= now - 5000;
+    const atPresent = isLive || windowEndTime.getTime() >= Date.now() - 5000;
     btn.disabled = atPresent;
     btn.title = atPresent ? "Ya estás en el presente" : `Adelante ${selectedHoursRange} Horas`;
   }
 
-  /* MODOS DE TRABAJO */
-  let workMode = localStorage.getItem("work-mode") === "ph" ? "ph" : "thermometer";
+  function navigateWindow(direction) {
+    const rangeMs = selectedHoursRange * 3600000;
+    const base = isLive ? Date.now() : windowEndTime.getTime();
+    const newEnd = base + direction * rangeMs;
+
+    if (newEnd >= Date.now() - 5000) { goLive(); return; }
+
+    if (!WORKER_SUPPORTS_FROM_TO && hoursBackFor(newEnd - rangeMs) > MAX_HOURS_BACK) {
+      setNotice(`Límite de historial: el Worker actual solo permite retroceder ${MAX_HOURS_BACK} h.`);
+      return;
+    }
+
+    isLive = false;
+    windowEndTime = new Date(newEnd);
+    updateConnectionBadge();
+    updateRangeUI();
+    fetchData();
+  }
+
+  function goLive() {
+    isLive = true;
+    windowEndTime = new Date();
+    setNotice("");
+    updateConnectionBadge();
+    updateRangeUI();
+    fetchData();
+  }
+
+  async function fetchData() {
+    const mySeq = ++fetchSeq;
+    if (isLive) windowEndTime = new Date();
+    const { start, end } = getWindow();
+    setLoading(true);
+
+    try {
+      const data = await fetchWindow(start, end);
+      if (mySeq !== fetchSeq) return;   // llegó una petición más nueva
+
+      const tolerance = isLive ? 60000 : 0;   // relojes del ESP32 ligeramente adelantados
+      rawData = (Array.isArray(data) ? data : [])
+        .filter(r => {
+          const t = new Date(r.created_at).getTime();
+          return Number.isFinite(t) && t >= start && t <= end + tolerance;
+        })
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+      if (isLive && rawData.length) noteReading(rawData[rawData.length - 1].created_at);
+
+      setDbState(true);
+      setNotice(!rawData.length && !isLive
+        ? "Sin datos en esta ventana (el ESP32 no envió o el Worker no llega tan atrás)."
+        : "");
+      renderData();
+
+    } catch (err) {
+      if (mySeq !== fetchSeq) return;
+      if (err && err.message === "LIMIT") {
+        setNotice(`Límite de historial: el Worker actual solo permite retroceder ${MAX_HOURS_BACK} h.`);
+      } else {
+        console.error("Error al obtener datos:", err);
+        setDbState(false, err);
+      }
+    } finally {
+      if (mySeq === fetchSeq) {
+        setLoading(false);
+        updateRangeUI();
+        updateConnectionBadge();
+      }
+    }
+  }
+
+  /* ============================================================
+     MODOS, ePAPER, ALARMAS GUARDADAS
+     ============================================================ */
 
   function setWorkMode(mode) {
     workMode = mode === "ph" ? "ph" : "thermometer";
@@ -932,26 +1140,27 @@
 
     const isPH = workMode === "ph";
 
-    document.getElementById("mode-thermometer").className =
+    $("mode-thermometer").className =
       isPH
         ? "py-1.5 text-[10px] font-bold rounded-lg transition text-slate-400 hover:text-slate-200"
         : "py-1.5 text-[10px] font-bold rounded-lg transition bg-sky-600 text-white shadow";
 
-    document.getElementById("mode-ph").className =
+    $("mode-ph").className =
       isPH
         ? "py-1.5 text-[10px] font-bold rounded-lg transition bg-emerald-600 text-white shadow"
         : "py-1.5 text-[10px] font-bold rounded-lg transition text-slate-400 hover:text-slate-200";
 
-    document.getElementById("s1-title").textContent = isPH ? "SONDA 1 · TEMP. EXTERIOR" : "SONDA 1";
-    document.getElementById("s2-title").textContent = isPH ? "SONDA 2 · TEMP. INTERIOR" : "SONDA 2";
+    setText("s1-title", isPH ? "SONDA 1 · TEMP. EXTERIOR" : "SONDA 1");
+    setText("s2-title", isPH ? "SONDA 2 · TEMP. INTERIOR" : "SONDA 2");
 
-    const phSelector = document.getElementById("pressure-chart-selector");
+    const phSelector = $("pressure-chart-selector");
     if (phSelector) phSelector.classList.toggle("hidden", !isPH);
 
-    if (isPH) togglePressureMode(true);
-    else togglePressureMode(false);
-
-    updateChartVisibility();
+    if (isPH) {
+      pressureTestVisible = true;
+      localStorage.setItem("pressure-test-visible", "true");
+    }
+    applyPressureVisibility();
   }
 
   function toggleEPaperMode() {
@@ -963,29 +1172,26 @@
   function applyEPaperState() {
     document.body.classList.add("theme-switching");
 
-    const btnText = document.getElementById("epaper-btn-text");
-    const btnEPaper = document.getElementById("btn-epaper");
+    const btnText = $("epaper-btn-text");
+    const btnEPaper = $("btn-epaper");
+    const sc = tempChart.options.scales;
+
+    SERIES_STYLE[isEPaper ? "epaper" : "color"].forEach((st, i) => Object.assign(tempChart.data.datasets[i], st));
 
     if (isEPaper) {
       document.body.classList.add("epaper-mode");
       btnText.textContent = "Modo Color";
       btnEPaper.className = "px-2 py-0.5 text-[10px] font-bold rounded border-2 border-black bg-black text-white transition flex items-center gap-1";
-      tempChart.options.scales.x.ticks.color = "#000";
-      tempChart.options.scales.x.grid.color = "#cbd5e1";
-      tempChart.options.scales.y.ticks.color = "#000";
-      tempChart.options.scales.y.grid.color = "#cbd5e1";
-      tempChart.options.scales.pressure.ticks.color = "#000";
-      tempChart.options.scales.pressure.grid.color = "#cbd5e1";
+      sc.x.ticks.color = "#000";        sc.x.grid.color = "#cbd5e1";
+      sc.y.ticks.color = "#000";        sc.y.grid.color = "#cbd5e1";
+      sc.pressure.ticks.color = "#000"; sc.pressure.grid.color = "#cbd5e1";
     } else {
       document.body.classList.remove("epaper-mode");
       btnText.textContent = "ePaper";
       btnEPaper.className = "px-2 py-0.5 text-[10px] font-bold rounded border border-slate-600 bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-1";
-      tempChart.options.scales.x.ticks.color = "#94a3b8";
-      tempChart.options.scales.x.grid.color = "#334155";
-      tempChart.options.scales.y.ticks.color = "#94a3b8";
-      tempChart.options.scales.y.grid.color = "#334155";
-      tempChart.options.scales.pressure.ticks.color = "#34d399";
-      tempChart.options.scales.pressure.grid.color = "#334155";
+      sc.x.ticks.color = "#94a3b8";        sc.x.grid.color = "#334155";
+      sc.y.ticks.color = "#94a3b8";        sc.y.grid.color = "#334155";
+      sc.pressure.ticks.color = "#34d399"; sc.pressure.grid.color = "#334155";
     }
 
     tempChart.update("none");
@@ -998,21 +1204,20 @@
   }
 
   function toggleDeltaT(showState) {
-    const checkbox = document.getElementById("chk-delta");
-    const card = document.getElementById("card-delta");
+    const checkbox = $("chk-delta");
+    const card = $("card-delta");
     if (typeof showState !== "boolean") showState = checkbox.checked;
     else checkbox.checked = showState;
 
-    if (showState) card.classList.remove("hidden");
-    else card.classList.add("hidden");
+    card.classList.toggle("hidden", !showState);
     updateChartVisibility();
   }
 
   function updateChartVisibility() {
-    const s1 = document.getElementById("chk-s1").checked;
-    const s2 = document.getElementById("chk-s2").checked;
-    const delta = document.getElementById("chk-delta").checked;
-    const pressureChk = document.getElementById("chk-pressure");
+    const s1 = $("chk-s1").checked;
+    const s2 = $("chk-s2").checked;
+    const delta = $("chk-delta").checked;
+    const pressureChk = $("chk-pressure");
     const pressureChecked = pressureChk ? pressureChk.checked : false;
 
     const showPressure = (workMode === "ph") && pressureChecked && pressureTestVisible;
@@ -1024,8 +1229,13 @@
     tempChart.setDatasetVisibility(4, showPressure);
 
     tempChart.options.scales.pressure.display = showPressure;
-
     tempChart.update();
+  }
+
+  function applyInvertButton() {
+    $("btn-invert").className = isInverted
+      ? "p-2 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/60 transition-all shadow-md active:scale-90 ring-2 ring-amber-500/30"
+      : "p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition-all shadow-md active:scale-90";
   }
 
   function loadSavedAlarms() {
@@ -1034,10 +1244,12 @@
     const ad = localStorage.getItem("alarmDeltaMin-input");
     const np = localStorage.getItem("n2-p-init");
 
-    if (a1 !== null) document.getElementById("alarm1-input").value = a1;
-    if (a2 !== null) document.getElementById("alarm2-input").value = a2;
-    if (ad !== null) document.getElementById("alarmDeltaMin-input").value = ad;
-    if (np !== null) document.getElementById("n2-p-init").value = np;
+    if (a1 !== null) $("alarm1-input").value = a1;
+    if (a2 !== null) $("alarm2-input").value = a2;
+    if (ad !== null) $("alarmDeltaMin-input").value = ad;
+    if (np !== null) $("n2-p-init").value = np;
+
+    applyInvertButton();
 
     if (localStorage.getItem("epaper-mode") === "true") {
       isEPaper = true;
@@ -1046,23 +1258,28 @@
   }
 
   function saveAndRender() {
-    localStorage.setItem("alarm1-input", document.getElementById("alarm1-input").value);
-    localStorage.setItem("alarm2-input", document.getElementById("alarm2-input").value);
-    localStorage.setItem("alarmDeltaMin-input", document.getElementById("alarmDeltaMin-input").value);
-    localStorage.setItem("n2-p-init", document.getElementById("n2-p-init").value);
-    renderData();
+    localStorage.setItem("alarm1-input", $("alarm1-input").value);
+    localStorage.setItem("alarm2-input", $("alarm2-input").value);
+    localStorage.setItem("alarmDeltaMin-input", $("alarmDeltaMin-input").value);
+    evaluateAlarms();
+  }
+
+  function savePressureInput() {
+    localStorage.setItem("n2-p-init", $("n2-p-init").value);
   }
 
   function toggleInvert() {
     isInverted = !isInverted;
-    const btn = document.getElementById("btn-invert");
-    btn.className = isInverted
-      ? "p-2 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/60 transition-all shadow-md active:scale-90 ring-2 ring-amber-500/30"
-      : "p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition-all shadow-md active:scale-90";
+    localStorage.setItem("probes-inverted", isInverted ? "true" : "false");
+    applyInvertButton();
     renderData();
   }
 
-  /* CURVA DE DESCARGA 18650 (Li-ion, en reposo/carga ligera) — voltaje → % */
+  /* ============================================================
+     BATERÍA Y WIFI
+     ============================================================ */
+
+  /* Curva de descarga 18650 (Li-ion, reposo/carga ligera): voltaje → % */
   const BATTERY_CURVE = [
     [4.20, 100], [4.06, 90], [3.98, 80], [3.92, 70],
     [3.87, 60],  [3.82, 50], [3.79, 40], [3.77, 30],
@@ -1087,19 +1304,15 @@
 
   function processRow(row) {
     if (!row) return null;
-    const raw1 = (row.temp1 === null || row.temp1 <= -127 || row.temp1 < -50 || row.temp1 > 125) ? null : Number(row.temp1);
-    const raw2 = (row.temp2 === null || row.temp2 <= -127 || row.temp2 < -50 || row.temp2 > 125) ? null : Number(row.temp2);
+    const raw1 = cleanTemp(row.temp1);
+    const raw2 = cleanTemp(row.temp2);
 
     const s1 = isInverted ? raw2 : raw1;
     const s2 = isInverted ? raw1 : raw2;
     const delta = (s1 !== null && s2 !== null) ? Math.abs(s1 - s2) : null;
 
-    const vBat = (row.bateriaVolt !== undefined && row.bateriaVolt !== null) ? Number(row.bateriaVolt) : null;
-
-    let bateria = null;
-    if (vBat !== null && !isNaN(vBat)) {
-      bateria = voltageToPercent(vBat);
-    }
+    const vBat = toNum(row.bateriaVolt);
+    const bateria = vBat !== null ? voltageToPercent(vBat) : null;
 
     const wifi = row.wifi || row.ssid || null;
     const ip = row.ip_local || row.ip || null;
@@ -1107,57 +1320,52 @@
     return { ...row, s1, s2, delta, bateria, bateriaVolt: vBat, wifi, ip };
   }
 
-  /* BARRA SUPERIOR: BATERÍA Y WIFI (estado ABSOLUTO) */
   function renderBatteryAndWifi() {
     if (!latestAbsolute) return;
 
-    if (latestAbsolute.bateriaVolt !== null) {
+    if (latestAbsolute.bateriaVolt !== null && latestAbsolute.bateria !== null) {
       const v = latestAbsolute.bateriaVolt;
       const pct = latestAbsolute.bateria;
-      document.getElementById("bat-val").textContent = `${pct}% · ${v.toFixed(2)}V`;
+      setText("bat-val", `${pct}% · ${v.toFixed(2)}V`);
 
-      const batBar = document.getElementById("bat-bar");
-      const batIcon = document.getElementById("bat-icon");
-      const batBanner = document.getElementById("bat-alert-banner");
-      const batMsg = document.getElementById("bat-alert-msg");
+      const batBar = $("bat-bar");
+      const batIcon = $("bat-icon");
+      const batBanner = $("bat-alert-banner");
+      const batMsg = $("bat-alert-msg");
 
       batBar.style.width = `${pct}%`;
 
       if (pct <= 20 || v <= 3.10) {
         batBar.className = "bg-rose-500 h-full transition-all duration-500";
-        batIcon.className = "w-3.5 h-3.5 text-rose-500";
+        batIcon.setAttribute("class", "w-3.5 h-3.5 text-rose-500");
         batBanner.classList.remove("hidden");
 
-        if (v <= 3.10) {
-          batMsg.textContent = `Batería en nivel crítico (${v.toFixed(2)}V). El dispositivo entrará en modo de corte/protección.`;
-        } else {
-          batMsg.textContent = `Nivel por debajo del 20% (${v.toFixed(2)}V). Cargue el dispositivo pronto.`;
-        }
+        batMsg.textContent = v <= 3.10
+          ? `Batería en nivel crítico (${v.toFixed(2)}V). El dispositivo entrará en modo de corte/protección.`
+          : `Nivel por debajo del 20% (${v.toFixed(2)}V). Cargue el dispositivo pronto.`;
       } else if (pct <= 50) {
         batBar.className = "bg-amber-500 h-full transition-all duration-500";
-        batIcon.className = "w-3.5 h-3.5 text-amber-400";
+        batIcon.setAttribute("class", "w-3.5 h-3.5 text-amber-400");
         batBanner.classList.add("hidden");
       } else {
         batBar.className = "bg-emerald-500 h-full transition-all duration-500";
-        batIcon.className = "w-3.5 h-3.5 text-emerald-400";
+        batIcon.setAttribute("class", "w-3.5 h-3.5 text-emerald-400");
         batBanner.classList.add("hidden");
       }
     }
 
-    if (latestAbsolute.wifi) {
-      document.getElementById("wifi-val").textContent = `Wifi: "${latestAbsolute.wifi}"`;
-    }
-    if (latestAbsolute.ip) {
-      document.getElementById("wifi-val").textContent += ` · IP: ${latestAbsolute.ip}`;
-    }
+    /* Se reconstruye el texto completo cada vez (antes se acumulaba " · IP:" en cada sondeo) */
+    let txt = latestAbsolute.wifi ? `Wifi: "${latestAbsolute.wifi}"` : 'Wifi: "Sin conexión"';
+    if (latestAbsolute.ip) txt += ` · IP: ${latestAbsolute.ip}`;
+    const wifiEl = $("wifi-val");
+    wifiEl.textContent = txt;
+    const rssi = toNum(latestAbsolute.rssi);
+    wifiEl.title = rssi !== null ? `Señal: ${rssi} dBm` : "";
   }
 
-  /* PRUEBA DE HERMETICIDAD — BALANCE EVAP/COND CONFIGURABLE */
-  const ATM_PSI = 14.696;
-
-  let phS1Weight = parseInt(localStorage.getItem("ph-s1-weight"));
-  if (!Number.isFinite(phS1Weight) || phS1Weight < 0 || phS1Weight > 100) phS1Weight = 60;
-  let phS2Weight = 100 - phS1Weight;
+  /* ============================================================
+     PRUEBA DE HERMETICIDAD (N₂ compensado por temperatura)
+     ============================================================ */
 
   function setPHWeight(value) {
     let v = parseInt(value);
@@ -1166,53 +1374,51 @@
 
     phS1Weight = v;
     phS2Weight = 100 - v;
-
     localStorage.setItem("ph-s1-weight", v);
 
-    const rangeEl = document.getElementById("ph-s1-weight-range");
-    const numEl = document.getElementById("ph-s1-weight-num");
-    const s2Bar = document.getElementById("ph-s2-bar");
-    const s2Val = document.getElementById("ph-s2-val");
-    const modelLabel = document.getElementById("ph-model-label");
-
+    const rangeEl = $("ph-s1-weight-range");
+    const numEl = $("ph-s1-weight-num");
     if (rangeEl && Number(rangeEl.value) !== v) rangeEl.value = v;
     if (numEl && Number(numEl.value) !== v) numEl.value = v;
-    if (s2Bar) s2Bar.style.width = `${phS2Weight}%`;
-    if (s2Val) s2Val.textContent = `${phS2Weight} %`;
-    if (modelLabel) modelLabel.textContent = `${phS1Weight}/${phS2Weight}`;
+    $("ph-s2-bar").style.width = `${phS2Weight}%`;
+    setText("ph-s2-val", `${phS2Weight} %`);
+    setText("ph-model-label", `${phS1Weight}/${phS2Weight}`);
 
-    if (pressureReference && pressureReference.model !== `${phS1Weight}/${phS2Weight}`) {
-      const msg = document.getElementById("n2-status-msg");
-      if (msg) {
-        msg.textContent = `⚠ Referencia tomada con balance ${pressureReference.model}. Cambiar a ${phS1Weight}/${phS2Weight} alterará la presión esperada.`;
-        msg.className = "text-[8px] text-amber-400 font-bold mt-0.5";
-      }
-    }
-
-    renderData();
+    renderData();   // la referencia se recalcula con el balance actual, así que ya no hay desajuste
   }
 
-  let pressureReference = null;
-  let pressureLastMeasured = null;
-  let pressureMeasurements = [];
-  let pressureTestVisible = localStorage.getItem("pressure-test-visible") !== "false";
-
   function effectiveNitrogenTemperature(s1C, s2C) {
-    const s1 = Number(s1C);
-    const s2 = Number(s2C);
-    if (!Number.isFinite(s1) || !Number.isFinite(s2)) return null;
+    const s1 = toNum(s1C);
+    const s2 = toNum(s2C);
+    if (s1 === null || s2 === null) return null;
     return (phS1Weight / 100) * s1 + (phS2Weight / 100) * s2;
   }
 
-  function togglePressureMode(showState) {
-    pressureTestVisible = !!showState;
-    localStorage.setItem("pressure-test-visible", pressureTestVisible ? "true" : "false");
-    document.getElementById("card-pressure-test").classList.toggle("hidden", !pressureTestVisible);
-    document.getElementById("restore-pressure-test").classList.toggle("hidden", pressureTestVisible);
+  /* Temperatura efectiva a partir de las lecturas CRUDAS de cada sonda,
+     respetando la inversión y el balance actuales */
+  function effTempFromRaw(raw1, raw2) {
+    const s1 = isInverted ? raw2 : raw1;
+    const s2 = isInverted ? raw1 : raw2;
+    return effectiveNitrogenTemperature(s1, s2);
+  }
 
-    const checkbox = document.getElementById("chk-pressure");
-    if (checkbox) checkbox.checked = pressureTestVisible;
-    updateChartVisibility();
+  function getRefTempC() {
+    if (!pressureReference) return null;
+    const r = pressureReference;
+    // Referencias antiguas no tienen raw1/raw2: se usan tempS1C/tempS2C
+    const raw1 = toNum(r.raw1) !== null ? toNum(r.raw1) : toNum(r.tempS1C);
+    const raw2 = toNum(r.raw2) !== null ? toNum(r.raw2) : toNum(r.tempS2C);
+    const t = effTempFromRaw(raw1, raw2);
+    return t !== null ? t : toNum(r.tempRefC);
+  }
+
+  function getMeasTempC(m) {
+    const raw1 = toNum(m.raw1), raw2 = toNum(m.raw2);
+    if (raw1 !== null && raw2 !== null) {
+      const t = effTempFromRaw(raw1, raw2);
+      if (t !== null) return t;
+    }
+    return toNum(m.tempC);
   }
 
   function estimatePressureGauge(pGaugeRef, tRefC, tCurrentC) {
@@ -1223,6 +1429,39 @@
     if (!Number.isFinite(pRefAbs) || !Number.isFinite(tRefK) || !Number.isFinite(tCurrentK) || tRefK <= 0 || tCurrentK <= 0) return null;
 
     return pRefAbs * (tCurrentK / tRefK) - ATM_PSI;
+  }
+
+  function applyPressureVisibility() {
+    const isPH = workMode === "ph";
+    $("card-pressure-test").classList.toggle("hidden", !(isPH && pressureTestVisible));
+    $("restore-pressure-test").classList.toggle("hidden", !(isPH && !pressureTestVisible));
+    const checkbox = $("chk-pressure");
+    if (checkbox) checkbox.checked = pressureTestVisible;
+    updateChartVisibility();
+  }
+
+  function togglePressureMode(showState) {
+    pressureTestVisible = !!showState;
+    localStorage.setItem("pressure-test-visible", pressureTestVisible ? "true" : "false");
+    applyPressureVisibility();
+  }
+
+  function setPressureMsg(text, level) {
+    const msg = $("n2-status-msg");
+    if (!msg) return;
+    msg.textContent = text || "";
+    msg.className = level === "err" ? "text-[8px] text-rose-400 font-bold mt-0.5"
+                  : level === "warn" ? "text-[8px] text-amber-400 font-bold mt-0.5"
+                  : "text-[8px] text-slate-500 mt-0.5";
+  }
+
+  function showPressureHint() {
+    if (!pressureReference) {
+      setPressureMsg("Sin referencia: la primera medición que acepte fija la referencia de la prueba.");
+    } else {
+      const t = new Date(pressureReference.timestamp).toLocaleString([], { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+      setPressureMsg(`Referencia fijada el ${t} · ${pressureMeasurements.length} medición(es).`);
+    }
   }
 
   function loadPressureState() {
@@ -1245,242 +1484,303 @@
     } catch (_) {
       pressureReference = null;
       pressureLastMeasured = null;
+      pressureMeasurements = [];
     }
-
-    document.getElementById("card-pressure-test").classList.toggle("hidden", !pressureTestVisible);
-    document.getElementById("restore-pressure-test").classList.toggle("hidden", pressureTestVisible);
-
-    const checkbox = document.getElementById("chk-pressure");
-    if (checkbox) checkbox.checked = pressureTestVisible;
 
     const savedWeight = parseInt(localStorage.getItem("ph-s1-weight"));
     setPHWeight(Number.isFinite(savedWeight) && savedWeight >= 0 && savedWeight <= 100 ? savedWeight : 60);
+    showPressureHint();
   }
 
-  function getLatestTemperatureRecord() {
-    if (!rawData.length) return null;
-    const row = [...rawData].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).at(-1);
-    return processRow(row);
+  function resetPressureTest() {
+    if (!confirm("¿Borrar la referencia y las mediciones de la prueba actual?")) return;
+    pressureReference = null;
+    pressureLastMeasured = null;
+    pressureMeasurements = [];
+    localStorage.removeItem("pressure-reference");
+    localStorage.removeItem("pressure-last-measured");
+    localStorage.removeItem("pressure-measurements");
+    showPressureHint();
+    renderData();
   }
 
-  async function acceptPressurePoint() {
+  function acceptPressurePoint() {
     if (!isLive) {
-      const msg = document.getElementById("n2-status-msg");
-      msg.textContent = "Pulse Actual antes de registrar una medición.";
-      msg.className = "text-[8px] text-rose-400 font-bold mt-0.5";
+      setPressureMsg("Pulse Actual antes de registrar una medición.", "err");
       return;
     }
 
-    const pressureGauge = Number(document.getElementById("n2-p-init").value);
-    const record = getLatestTemperatureRecord();
-
-    if (!Number.isFinite(pressureGauge) || pressureGauge < 0) {
-      const msg = document.getElementById("n2-status-msg");
-      msg.textContent = "Presión no válida.";
-      msg.className = "text-[8px] text-rose-400 font-bold mt-0.5";
+    const pressureGauge = toNum($("n2-p-init").value);
+    if (pressureGauge === null || pressureGauge < 0) {
+      setPressureMsg("Presión no válida.", "err");
       return;
     }
 
-    if (!record || record.s1 === null || record.s2 === null || !Number.isFinite(Number(record.s1)) || !Number.isFinite(Number(record.s2))) {
-      const msg = document.getElementById("n2-status-msg");
-      msg.textContent = "Esperando lecturas válidas de Sonda 1 y Sonda 2.";
-      msg.className = "text-[8px] text-rose-400 font-bold mt-0.5";
+    const record = viewLatest;
+    if (!record) {
+      setPressureMsg("Esperando lecturas del ESP32.", "err");
+      return;
+    }
+    if (!isDataFresh(record.created_at)) {
+      setPressureMsg("Los datos están desactualizados: espere una lectura nueva antes de aceptar.", "err");
       return;
     }
 
-    const tEff = effectiveNitrogenTemperature(record.s1, record.s2);
+    const raw1 = cleanTemp(record.temp1);
+    const raw2 = cleanTemp(record.temp2);
+    if (raw1 === null || raw2 === null) {
+      setPressureMsg("Esperando lecturas válidas de Sonda 1 y Sonda 2.", "err");
+      return;
+    }
+
+    const tEff = effTempFromRaw(raw1, raw2);
     if (tEff === null) return;
 
-    const now = new Date();
-    const timestamp = now.toISOString();
+    const timestamp = new Date().toISOString();
+    const point = { timestamp, pressureGauge, tempC: tEff, raw1, raw2 };
 
     if (!pressureReference) {
       pressureReference = {
         timestamp,
         pressureGauge,
-        tempS1C: Number(record.s1),
-        tempS2C: Number(record.s2),
-        tempRefC: Number(tEff),
+        tempS1C: isInverted ? raw2 : raw1,
+        tempS2C: isInverted ? raw1 : raw2,
+        raw1,
+        raw2,
+        tempRefC: tEff,
         model: `${phS1Weight}/${phS2Weight}`
       };
-
-      pressureLastMeasured = { timestamp, pressureGauge, tempC: Number(tEff) };
-      pressureMeasurements = [{ timestamp, pressureGauge, tempC: Number(tEff) }];
+      pressureMeasurements = [point];
     } else {
-      pressureLastMeasured = { timestamp, pressureGauge, tempC: Number(tEff) };
-      pressureMeasurements.push({ timestamp, pressureGauge, tempC: Number(tEff) });
+      pressureMeasurements.push(point);
+      if (pressureMeasurements.length > 500) pressureMeasurements = pressureMeasurements.slice(-500);
     }
+    pressureLastMeasured = point;
 
     localStorage.setItem("pressure-reference", JSON.stringify(pressureReference));
     localStorage.setItem("pressure-last-measured", JSON.stringify(pressureLastMeasured));
     localStorage.setItem("pressure-measurements", JSON.stringify(pressureMeasurements));
 
+    showPressureHint();
     renderData();
   }
 
-  /* NAVEGACIÓN Y OBTENCIÓN DE DATOS */
-  function navigateWindow(direction) {
-    isLive = false;
-    updateConnectionBadge();
-    const rangeMs = selectedHoursRange * 60 * 60 * 1000;
-    windowEndTime = new Date(windowEndTime.getTime() + (direction * rangeMs));
-    updateNextButtonState();
-    fetchData();
-  }
+  function updatePressurePanel() {
+    const latest = viewLatest;
+    const ref = pressureReference;
 
-  function goLive() {
-    isLive = true;
-    updateConnectionBadge();
-    windowEndTime = new Date();
-    updateNextButtonState();
-    fetchData();
-  }
-
-  async function fetchData() {
-    if (isFetching) return;
-    isFetching = true;
-
-    try {
-      const data = await fetchRange(selectedHoursRange);
-      rawData = Array.isArray(data) ? data : [];
-
-      if (rawData.length) {
-        noteReading(rawData[rawData.length - 1].created_at);
-      }
-      setDbState(true);
-      renderData();
-
-    } catch (err) {
-      console.error("Error al obtener datos:", err);
-      setDbState(false, err);
-    } finally {
-      isFetching = false;
-      updateRangeUI();
-      updateConnectionBadge();
-    }
-  }
-
-  /* RENDERIZADO DE INTERFAZ */
-  function renderData() {
-    updateTimeWindowLabel();
-
-    const alarm1Val = parseFloat(document.getElementById("alarm1-input").value);
-    const alarm2Val = parseFloat(document.getElementById("alarm2-input").value);
-    const alarmDeltaMinVal = parseFloat(document.getElementById("alarmDeltaMin-input").value);
-
-    let a1Active = false;
-    let a2Active = false;
-    let aDeltaActive = false;
-
-    const processed = rawData.map(r => processRow(r)).filter(r => r !== null);
-
-    const labels = [];
-    const s1Data = [];
-    const s2Data = [];
-    const deltaData = [];
-    const pressureExpData = [];
-    const pressureMeasData = [];
-
-    let minS1 = Infinity, maxS1 = -Infinity;
-    let minS2 = Infinity, maxS2 = -Infinity;
-    let minDelta = Infinity, maxDelta = -Infinity;
-
-    processed.forEach(r => {
-      const timeStr = new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      labels.push(timeStr);
-
-      s1Data.push(r.s1);
-      s2Data.push(r.s2);
-      deltaData.push(r.delta);
-
-      if (r.s1 !== null) { minS1 = Math.min(minS1, r.s1); maxS1 = Math.max(maxS1, r.s1); }
-      if (r.s2 !== null) { minS2 = Math.min(minS2, r.s2); maxS2 = Math.max(maxS2, r.s2); }
-      if (r.delta !== null) { minDelta = Math.min(minDelta, r.delta); maxDelta = Math.max(maxDelta, r.delta); }
-
-      if (pressureReference && r.s1 !== null && r.s2 !== null) {
-        const tEff = effectiveNitrogenTemperature(r.s1, r.s2);
-        const pCalc = tEff !== null ? estimatePressureGauge(pressureReference.pressureGauge, pressureReference.tempRefC, tEff) : null;
-        pressureExpData.push(pCalc !== null ? parseFloat(pCalc.toFixed(1)) : null);
-      } else {
-        pressureExpData.push(null);
-      }
-
-      const pMeas = pressureMeasurements.find(m => Math.abs(new Date(m.timestamp).getTime() - new Date(r.created_at).getTime()) < 30000);
-      pressureMeasData.push(pMeas ? pMeas.pressureGauge : null);
-    });
-
-    const latest = processed.length > 0 ? processed[processed.length - 1] : null;
-
-    if (latest) {
-      document.getElementById("temp1-val").textContent = latest.s1 !== null ? `${latest.s1.toFixed(1)} °C` : "--.- °C";
-      document.getElementById("temp2-val").textContent = latest.s2 !== null ? `${latest.s2.toFixed(1)} °C` : "--.- °C";
-      document.getElementById("delta-val").textContent = latest.delta !== null ? `${latest.delta.toFixed(1)} °C` : "--.- °C";
-
-      const lastTime = new Date(latest.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      document.getElementById("temp1-time").textContent = `Última: ${lastTime}`;
-      document.getElementById("temp2-time").textContent = `Última: ${lastTime}`;
-
-      const dataIsFresh = isDataFresh(latest.created_at);
-
-      if (dataIsFresh) {
-        if (latest.s1 !== null && latest.s1 >= alarm1Val) a1Active = true;
-        if (latest.s2 !== null && latest.s2 >= alarm2Val) a2Active = true;
-        if (latest.delta !== null && latest.delta <= alarmDeltaMinVal) aDeltaActive = true;
-      }
-
-      const staleBanner = document.getElementById("stale-banner");
-      if (staleBanner) staleBanner.classList.toggle("hidden", dataIsFresh);
+    if (!ref) {
+      setText("n2-p-calc", "---.- PSI");
+      setText("n2-p-last", "---.- PSI");
+      setText("n2-diff", "--.-");
+      setText("n2-p-ref", "--.-");
+      setText("n2-t-ref", "--.-");
+      setText("n2-elapsed", "Tiempo: --");
+      return;
     }
 
-    document.getElementById("s1-min").textContent = minS1 !== Infinity ? minS1.toFixed(1) : "--.-";
-    document.getElementById("s1-max").textContent = maxS1 !== -Infinity ? maxS1.toFixed(1) : "--.-";
-    document.getElementById("s2-min").textContent = minS2 !== Infinity ? minS2.toFixed(1) : "--.-";
-    document.getElementById("s2-max").textContent = maxS2 !== -Infinity ? maxS2.toFixed(1) : "--.-";
-    document.getElementById("delta-min").textContent = minDelta !== Infinity ? minDelta.toFixed(1) : "--.-";
-    document.getElementById("delta-max").textContent = maxDelta !== -Infinity ? maxDelta.toFixed(1) : "--.-";
+    const tRef = getRefTempC();
+    setText("n2-p-ref", ref.pressureGauge.toFixed ? Number(ref.pressureGauge).toFixed(1) : "--.-");
+    setText("n2-t-ref", tRef !== null ? tRef.toFixed(1) : "--.-");
 
-    document.getElementById("card-s1").className = a1Active
+    /* Presión esperada AHORA (última fila visible) */
+    let pCalc = null;
+    if (latest && latest.s1 !== null && latest.s2 !== null && tRef !== null) {
+      const tEff = effectiveNitrogenTemperature(latest.s1, latest.s2);
+      pCalc = tEff !== null ? estimatePressureGauge(ref.pressureGauge, tRef, tEff) : null;
+    }
+    setText("n2-p-calc", pCalc !== null ? `${pCalc.toFixed(1)} PSI` : "---.- PSI");
+
+    /* Última medida y su desviación respecto a lo esperado A LA TEMPERATURA DE ESA MEDIDA */
+    if (pressureLastMeasured) {
+      setText("n2-p-last", `${Number(pressureLastMeasured.pressureGauge).toFixed(1)} PSI`);
+      const tMeas = getMeasTempC(pressureLastMeasured);
+      const pExpAtMeas = (tRef !== null && tMeas !== null) ? estimatePressureGauge(ref.pressureGauge, tRef, tMeas) : null;
+      const diff = pExpAtMeas !== null ? pressureLastMeasured.pressureGauge - pExpAtMeas : null;
+      setText("n2-diff", diff !== null ? `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}` : "--.-");
+    } else {
+      setText("n2-p-last", "---.- PSI");
+      setText("n2-diff", "--.-");
+    }
+
+    const elapsedMs = Date.now() - new Date(ref.timestamp).getTime();
+    setText("n2-elapsed", `Tiempo: ${(elapsedMs / 3600000).toFixed(1)}h`);
+  }
+
+  /* ============================================================
+     ALARMAS (se reevalúan también cada 2 s para detectar datos congelados)
+     ============================================================ */
+
+  function evaluateAlarms() {
+    const alarm1Val = parseFloat($("alarm1-input").value);
+    const alarm2Val = parseFloat($("alarm2-input").value);
+    const alarmDeltaMinVal = parseFloat($("alarmDeltaMin-input").value);
+
+    const latest = viewLatest;
+    const fresh = !!(isLive && latest && isDataFresh(latest.created_at));
+
+    let a1Active = false, a2Active = false, aDeltaActive = false;
+
+    if (fresh) {
+      if (latest.s1 !== null && latest.s1 >= alarm1Val) a1Active = true;
+      if (latest.s2 !== null && latest.s2 >= alarm2Val) a2Active = true;
+      if (latest.delta !== null && latest.delta <= alarmDeltaMinVal) aDeltaActive = true;
+    }
+
+    const showStale = isLive && dbOk !== null && !fresh;
+    const staleBanner = $("stale-banner");
+    if (staleBanner) staleBanner.classList.toggle("hidden", !showStale);
+
+    $("card-s1").className = a1Active
       ? "bg-rose-900/40 border-2 border-rose-500 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all animate-pulse"
       : "bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all";
 
-    document.getElementById("card-s2").className = a2Active
+    $("card-s2").className = a2Active
       ? "bg-rose-900/40 border-2 border-rose-500 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all animate-pulse"
       : "bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all";
 
-    document.getElementById("card-delta").className = aDeltaActive
+    $("card-delta").className = aDeltaActive
       ? "bg-rose-900/40 border-2 border-rose-500 py-2.5 px-3 rounded-xl shadow-md text-center transition-all animate-pulse"
       : "bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center transition-all";
 
     alarmActive = a1Active || a2Active || aDeltaActive;
 
-    if (pressureReference && latest && latest.s1 !== null && latest.s2 !== null) {
-      const tEff = effectiveNitrogenTemperature(latest.s1, latest.s2);
-      const pCalc = tEff !== null ? estimatePressureGauge(pressureReference.pressureGauge, pressureReference.tempRefC, tEff) : null;
+    const dm = $("delta-status-msg");
+    if (dm) {
+      dm.textContent = !latest ? "Esperando datos..."
+        : aDeltaActive ? "ΔT por debajo del mínimo"
+        : latest.delta === null ? "Falta una sonda"
+        : "OK";
+    }
+  }
 
-      document.getElementById("n2-p-calc").textContent = pCalc !== null ? `${pCalc.toFixed(1)} PSI` : "---.- PSI";
-      document.getElementById("n2-p-last").textContent = pressureLastMeasured ? `${pressureLastMeasured.pressureGauge.toFixed(1)} PSI` : "---.- PSI";
+  /* ============================================================
+     RENDER
+     ============================================================ */
 
-      const diff = (pressureLastMeasured && pCalc !== null) ? (pressureLastMeasured.pressureGauge - pCalc) : null;
-      document.getElementById("n2-diff").textContent = diff !== null ? `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}` : "--.-";
-      document.getElementById("n2-p-ref").textContent = `${pressureReference.pressureGauge.toFixed(1)}`;
-      document.getElementById("n2-t-ref").textContent = `${pressureReference.tempRefC.toFixed(1)}`;
+  /* Promedia buckets cuando hay demasiados puntos (los mín/máx se calculan con TODOS los datos) */
+  function downsample(pts, maxPts) {
+    if (pts.length <= maxPts) return pts;
+    const k = Math.ceil(pts.length / maxPts);
+    const out = [];
+    for (let i = 0; i < pts.length; i += k) {
+      const g = pts.slice(i, i + k);
+      const avg = key => {
+        const v = g.map(p => p[key]).filter(x => x !== null);
+        return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+      };
+      out.push({
+        t: g.reduce((a, p) => a + p.t, 0) / g.length,
+        s1: avg("s1"), s2: avg("s2"), delta: avg("delta")
+      });
+    }
+    return out;
+  }
 
-      const elapsedMs = new Date().getTime() - new Date(pressureReference.timestamp).getTime();
-      const elapsedHrs = (elapsedMs / (1000 * 60 * 60)).toFixed(1);
-      document.getElementById("n2-elapsed").textContent = `Tiempo: ${elapsedHrs}h`;
+  function renderData() {
+    if (isLive) windowEndTime = new Date();
+    updateTimeWindowLabel();
+    const { start, end } = getWindow();
+
+    const processed = rawData.map(processRow).filter(r => r !== null);
+
+    /* Estadísticas con todos los datos de la ventana */
+    let minS1 = Infinity, maxS1 = -Infinity;
+    let minS2 = Infinity, maxS2 = -Infinity;
+    let minDelta = Infinity, maxDelta = -Infinity;
+
+    processed.forEach(r => {
+      if (r.s1 !== null) { minS1 = Math.min(minS1, r.s1); maxS1 = Math.max(maxS1, r.s1); }
+      if (r.s2 !== null) { minS2 = Math.min(minS2, r.s2); maxS2 = Math.max(maxS2, r.s2); }
+      if (r.delta !== null) { minDelta = Math.min(minDelta, r.delta); maxDelta = Math.max(maxDelta, r.delta); }
+    });
+
+    /* Series de la gráfica: {x: ms, y: valor}, con huecos donde no hubo datos */
+    const allPts = processed.map(r => ({ t: new Date(r.created_at).getTime(), s1: r.s1, s2: r.s2, delta: r.delta }));
+    const pts = downsample(allPts, MAX_CHART_POINTS);
+
+    const d1 = [], d2 = [], dd = [], dpe = [], dpm = [];
+    const real = [];   // {i, t}: posición en los arrays de cada punto real
+    const tRef = getRefTempC();
+    const refT = pressureReference ? new Date(pressureReference.timestamp).getTime() : null;
+    let prevT = null;
+
+    pts.forEach(p => {
+      if (prevT !== null && p.t - prevT > GAP_MS) {
+        const g = (p.t + prevT) / 2;
+        [d1, d2, dd, dpe, dpm].forEach(a => a.push({ x: g, y: null }));
+      }
+
+      d1.push({ x: p.t, y: p.s1 });
+      d2.push({ x: p.t, y: p.s2 });
+      dd.push({ x: p.t, y: p.delta });
+
+      let pCalc = null;
+      if (pressureReference && tRef !== null && p.t >= refT - 60000 && p.s1 !== null && p.s2 !== null) {
+        const tEff = effectiveNitrogenTemperature(p.s1, p.s2);
+        const v = tEff !== null ? estimatePressureGauge(pressureReference.pressureGauge, tRef, tEff) : null;
+        pCalc = v !== null ? parseFloat(v.toFixed(1)) : null;
+      }
+      dpe.push({ x: p.t, y: pCalc });
+      dpm.push({ x: p.t, y: null });
+
+      real.push({ i: d1.length - 1, t: p.t });
+      prevT = p.t;
+    });
+
+    /* Cada medición manual se pinta en el punto de la serie más cercano en el tiempo */
+    pressureMeasurements.forEach(m => {
+      const mt = new Date(m.timestamp).getTime();
+      if (mt < start || mt > end + 60000 || !real.length) return;
+      let best = null, bestDiff = Infinity;
+      real.forEach(r => {
+        const d = Math.abs(r.t - mt);
+        if (d < bestDiff) { bestDiff = d; best = r; }
+      });
+      if (best && bestDiff <= GAP_MS) dpm[best.i].y = m.pressureGauge;
+    });
+
+    const latest = processed.length > 0 ? processed[processed.length - 1] : null;
+    viewLatest = latest;
+
+    if (latest) {
+      setText("temp1-val", latest.s1 !== null ? `${latest.s1.toFixed(1)} °C` : "--.- °C");
+      setText("temp2-val", latest.s2 !== null ? `${latest.s2.toFixed(1)} °C` : "--.- °C");
+      setText("delta-val", latest.delta !== null ? `${latest.delta.toFixed(1)} °C` : "--.- °C");
+
+      const lastTime = new Date(latest.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      setText("temp1-time", `Última: ${lastTime}`);
+      setText("temp2-time", `Última: ${lastTime}`);
+    } else {
+      setText("temp1-val", "--.- °C");
+      setText("temp2-val", "--.- °C");
+      setText("delta-val", "--.- °C");
+      setText("temp1-time", "Sin datos en la ventana");
+      setText("temp2-time", "Sin datos en la ventana");
     }
 
-    tempChart.data.labels = labels;
-    tempChart.data.datasets[0].data = s1Data;
-    tempChart.data.datasets[1].data = s2Data;
-    tempChart.data.datasets[2].data = deltaData;
-    tempChart.data.datasets[3].data = pressureExpData;
-    tempChart.data.datasets[4].data = pressureMeasData;
+    setText("s1-min", minS1 !== Infinity ? minS1.toFixed(1) : "--.-");
+    setText("s1-max", maxS1 !== -Infinity ? maxS1.toFixed(1) : "--.-");
+    setText("s2-min", minS2 !== Infinity ? minS2.toFixed(1) : "--.-");
+    setText("s2-max", maxS2 !== -Infinity ? maxS2.toFixed(1) : "--.-");
+    setText("delta-min", minDelta !== Infinity ? minDelta.toFixed(1) : "--.-");
+    setText("delta-max", maxDelta !== -Infinity ? maxDelta.toFixed(1) : "--.-");
+
+    evaluateAlarms();
+    updatePressurePanel();
+
+    tempChart.options.scales.x.min = start;
+    tempChart.options.scales.x.max = end;
+    tempChart.data.datasets[0].data = d1;
+    tempChart.data.datasets[1].data = d2;
+    tempChart.data.datasets[2].data = dd;
+    tempChart.data.datasets[3].data = dpe;
+    tempChart.data.datasets[4].data = dpm;
     tempChart.update();
   }
 
   /* ============================================================
-     ABRIR GRÁFICA A PANTALLA COMPLETA
+     PANTALLA COMPLETA
      ============================================================ */
 
   function openGraphFullscreen() {
@@ -1489,33 +1789,34 @@
     window.location.href = url;
   }
 
-  /* INICIALIZACIÓN DE LA APLICACIÓN */
+  /* ============================================================
+     INICIALIZACIÓN
+     ============================================================ */
+
   window.addEventListener("DOMContentLoaded", () => {
     loadSavedAlarms();
     loadPressureState();
     setWorkMode(workMode);
-    updateNextButtonState();
+    updateRangeUI();
     updateConnectionBadge();
     fetchData();
     pollLatest();
 
     setInterval(() => {
-      if (isLive) {
-        windowEndTime = new Date();
-        fetchData();
-      }
+      if (isLive) fetchData();
     }, 30000);
 
     setInterval(pollLatest, POLL_INTERVAL_MS);
-    setInterval(updateConnectionBadge, 2000);
+
+    setInterval(() => {
+      updateConnectionBadge();
+      evaluateAlarms();       // detecta datos congelados sin esperar al siguiente fetch
+    }, 2000);
 
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) {
         pollLatest();
-        if (isLive) {
-          windowEndTime = new Date();
-          fetchData();
-        }
+        if (isLive) fetchData();
       }
     });
   });
