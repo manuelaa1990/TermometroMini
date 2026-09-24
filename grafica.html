@@ -332,7 +332,7 @@
   }
 
   /* ============================================================
-     PARSER DE FECHAS UTC (CLAVE PARA SOLUCIONAR EL PANTALLAZO EN BLANCO)
+     PARSER DE FECHAS UTC
      ============================================================ */
 
   function parseTimestamp(dateStr) {
@@ -546,7 +546,7 @@
   }
 
   /* ============================================================
-     RENDER CON REENCUADRE EXACTO DE FECHAS
+     RENDER CON RANGOS FIJOS (IDÉNTICO A INDEX.HTML)
      ============================================================ */
 
   function renderChart() {
@@ -562,7 +562,7 @@
       const currentTime = parseTimestamp(r.created_at);
       if (!currentTime) return;
 
-      // Inyectar hueco nulo si el espacio sin datos supera MAX_GAP_MS
+      // Insertar corte si hay un espacio sin datos > 2 min
       if (lastTime !== null && (currentTime - lastTime) > MAX_GAP_MS) {
         const gapTime = lastTime + 1000;
         s1Data.push({ x: gapTime, y: null });
@@ -581,25 +581,17 @@
     tempChart.data.datasets[1].data = s2Data;
     tempChart.data.datasets[2].data = deltaData;
 
-    // FIJAR LÍMITES EN EL EJE X SIN OCULTAR DATOS
-    if (processed.length > 0) {
-      const firstTime = parseTimestamp(processed[0].created_at);
-      const lastTimeData = parseTimestamp(processed[processed.length - 1].created_at);
+    // FIJAR EJE X SEGÚN EL RANGO SELECCIONADO (COMO INDEX.HTML)
+    const now = Date.now();
+    const windowMs = selectedHours * 3600 * 1000;
 
-      if (offsetHours === 0) {
-        // En vivo: la ventana finaliza en el instante actual o el último punto de datos
-        const end = Math.max(Date.now(), lastTimeData);
-        tempChart.options.scales.x.max = end;
-        tempChart.options.scales.x.min = end - (selectedHours * 3600 * 1000);
-      } else {
-        // Historial: encuadra exactamente entre el primer y último registro del lote devuelto
-        tempChart.options.scales.x.min = firstTime;
-        tempChart.options.scales.x.max = lastTimeData;
-      }
+    if (offsetHours === 0) {
+      tempChart.options.scales.x.min = now - windowMs;
+      tempChart.options.scales.x.max = now;
     } else {
-      const end = Date.now() - (offsetHours * 3600 * 1000);
+      const end = now - (offsetHours * 3600 * 1000);
+      tempChart.options.scales.x.min = end - windowMs;
       tempChart.options.scales.x.max = end;
-      tempChart.options.scales.x.min = end - (selectedHours * 3600 * 1000);
     }
 
     // Auto-escalado Y considerando datos numéricos válidos
