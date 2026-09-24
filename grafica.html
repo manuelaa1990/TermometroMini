@@ -9,8 +9,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js + Adaptador de Fechas + Plugin Zoom -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2"></script>
 
   <style>
@@ -184,7 +188,7 @@
   <div class="flex items-center gap-2 px-3 py-2">
     <!-- Volver -->
     <button onclick="exitAndGoBack()" title="Salir de la gráfica"
-      class="px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold border border-rose-500 shadow-lg flex items-center gap-1.5 active:scale-95 transition">
+      class="px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold border border-rose-500 shadow-lg flex items-center gap-1.5 active:scale-95 transition shrink-0">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
       </svg>
@@ -195,21 +199,21 @@
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
         <span class="text-sm font-bold text-sky-400 truncate">Gráfica Live</span>
-        <div id="status-badge" class="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+        <div id="status-badge" class="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 truncate">
           Verificando...
         </div>
       </div>
-      <div id="time-range-label" class="text-[10px] text-slate-400 font-mono">--</div>
+      <div id="time-range-label" class="text-[10px] text-slate-400 font-mono truncate">--</div>
     </div>
 
     <!-- Navegación y Rango de horas -->
     <div class="flex items-center gap-1 shrink-0 overflow-x-auto">
       <!-- Navegación Historial -->
-      <button class="range-btn flex items-center justify-center w-8" onclick="navigateHistory(1)" title="Más antiguo">
+      <button class="range-btn flex items-center justify-center w-8 h-7" onclick="navigateHistory(1)" title="Más antiguo">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
       </button>
-      <button id="btn-actual" class="range-btn bg-sky-600 text-white border-sky-600 hidden" onclick="navigateHistory(0, true)">Live</button>
-      <button id="btn-forward" class="range-btn flex items-center justify-center w-8 hidden" onclick="navigateHistory(-1)" title="Más reciente">
+      <button id="btn-actual" class="range-btn bg-sky-600 text-white border-sky-600 hidden h-7" onclick="navigateHistory(0, true)">Live</button>
+      <button id="btn-forward" class="range-btn flex items-center justify-center w-8 h-7 hidden" onclick="navigateHistory(-1)" title="Más reciente">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
       </button>
 
@@ -306,7 +310,7 @@
   const API_URL = "https://api-termometro.manuelaa1990.workers.dev";
   const POLL_INTERVAL_MS = 10000;
   const ESP_CONNECTED_MAX_AGE_MS = 35000;
-  const MAX_GAP_MS = 2 * 60 * 1000; // 2 minutos sin datos = Espacio vacío
+  const MAX_GAP_MS = 2 * 60 * 1000; // 2 minutos sin datos = Corte de línea
 
   const params = new URLSearchParams(location.search);
   let selectedHours = parseInt(params.get("hours")) || 4;
@@ -328,7 +332,7 @@
   }
 
   /* ============================================================
-     GRÁFICA
+     GRÁFICA (CONFIGURACIÓN ESCALA TEMPORAL)
      ============================================================ */
 
   const ctx = document.getElementById("tempChart").getContext("2d");
@@ -336,7 +340,6 @@
   const tempChart = new Chart(ctx, {
     type: "line",
     data: {
-      labels: [],
       datasets: [
         {
           label: "Sonda 1",
@@ -384,12 +387,22 @@
       layout: { padding: { top: 8, right: 16, bottom: 8, left: 8 } },
       scales: {
         x: {
+          type: "time",
+          time: {
+            unit: "hour",
+            tooltipFormat: "dd/MM/yyyy, HH:mm",
+            displayFormats: {
+              minute: "HH:mm",
+              hour: "HH:mm",
+              day: "dd/MM"
+            }
+          },
           ticks: {
             color: "#94a3b8",
             font: { size: 12 },
-            maxTicksLimit: 10,
+            maxRotation: 0,
             autoSkip: true,
-            maxRotation: 0
+            maxTicksLimit: 10
           },
           grid: { color: "rgba(51, 65, 85, 0.5)" }
         },
@@ -524,7 +537,6 @@
   function renderChart() {
     const processed = rawData.map(processRow).filter(Boolean);
 
-    const labels = [];
     const s1Data = [];
     const s2Data = [];
     const deltaData = [];
@@ -532,41 +544,45 @@
     let lastTime = null;
 
     processed.forEach(r => {
-      const d = new Date(r.created_at);
-      const currentTime = d.getTime();
+      const currentTime = new Date(r.created_at).getTime();
 
-      // Inyectar hueco si el tiempo entre datos supera MAX_GAP_MS
+      // Inyectar un punto nulo si el tiempo sin transmisión supera MAX_GAP_MS
       if (lastTime !== null && (currentTime - lastTime) > MAX_GAP_MS) {
-        labels.push(""); 
-        s1Data.push(null);
-        s2Data.push(null);
-        deltaData.push(null);
+        const gapTime = lastTime + 1000;
+        s1Data.push({ x: gapTime, y: null });
+        s2Data.push({ x: gapTime, y: null });
+        deltaData.push({ x: gapTime, y: null });
       }
 
-      const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      labels.push(timeStr);
-      s1Data.push(r.s1);
-      s2Data.push(r.s2);
-      deltaData.push(r.delta);
+      s1Data.push({ x: currentTime, y: r.s1 });
+      s2Data.push({ x: currentTime, y: r.s2 });
+      deltaData.push({ x: currentTime, y: r.delta });
       
       lastTime = currentTime;
     });
 
-    tempChart.data.labels = labels;
     tempChart.data.datasets[0].data = s1Data;
     tempChart.data.datasets[1].data = s2Data;
     tempChart.data.datasets[2].data = deltaData;
 
-    // Auto-escalado del eje Y — solo con series VISIBLES y descartando los nulos
-    const visibleData = [];
-    if (seriesState[0]) visibleData.push(...s1Data);
-    if (seriesState[1]) visibleData.push(...s2Data);
-    if (seriesState[2]) visibleData.push(...deltaData);
+    // FIJAR LÍMITES TEMPORALES DEL EJE X PARA PRESERVAR EL ESPACIO VACÍO
+    const now = Date.now();
+    const end = now - (offsetHours * 3600 * 1000);
+    const start = end - (selectedHours * 3600 * 1000);
+    
+    tempChart.options.scales.x.min = start;
+    tempChart.options.scales.x.max = end;
 
-    const allTemps = visibleData.filter(v => v !== null && Number.isFinite(v));
-    if (allTemps.length) {
-      const tMin = Math.min(...allTemps);
-      const tMax = Math.max(...allTemps);
+    // Auto-escalado Y considerando únicamente datos numéricos válidos
+    const visibleTemps = [];
+    if (seriesState[0]) visibleTemps.push(...s1Data.map(d => d.y));
+    if (seriesState[1]) visibleTemps.push(...s2Data.map(d => d.y));
+    if (seriesState[2]) visibleTemps.push(...deltaData.map(d => d.y));
+
+    const validTemps = visibleTemps.filter(v => v !== null && Number.isFinite(v));
+    if (validTemps.length) {
+      const tMin = Math.min(...validTemps);
+      const tMax = Math.max(...validTemps);
       const margin = Math.max(1, (tMax - tMin) * 0.15);
       tempChart.options.scales.y.min = Math.floor((tMin - margin) / 2) * 2;
       tempChart.options.scales.y.max = Math.ceil((tMax + margin) / 2) * 2;
@@ -601,7 +617,6 @@
 
   function updateTimeRangeLabel() {
     const now = new Date();
-    // Calcular el rango basado en el offset
     const end = new Date(now.getTime() - offsetHours * 3600 * 1000);
     const start = new Date(end.getTime() - selectedHours * 3600 * 1000);
     const opts = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
@@ -615,7 +630,6 @@
 
     let text, style;
     
-    // Si estamos viendo el historial, cambiar el diseño del badge
     if (offsetHours > 0) {
       text = "Modo Historial";
       style = "bg-purple-500/20 text-purple-400 border-purple-500/30";
@@ -634,7 +648,7 @@
     }
 
     badge.textContent = text;
-    badge.className = "px-2 py-0.5 text-[10px] font-semibold rounded-full border " + style;
+    badge.className = "px-2 py-0.5 text-[10px] font-semibold rounded-full border truncate " + style;
   }
 
   /* ============================================================
@@ -648,7 +662,6 @@
       const data = await fetchRange(selectedHours, offsetHours);
       rawData = data;
       
-      // Solo actualizamos "lastSeenAt" si estamos viendo datos en tiempo real
       if (data.length && offsetHours === 0) {
         const last = data[data.length - 1];
         if (last.created_at) {
@@ -667,7 +680,6 @@
   }
 
   async function refreshLatest() {
-    // Si estamos viendo el historial, no hacemos polling del latest
     if (isPolling || document.hidden || offsetHours > 0) return;
     isPolling = true;
     try {
@@ -691,7 +703,6 @@
     if (reset) {
       offsetHours = 0;
     } else {
-      // 1 = Hacia atrás en el tiempo (historial), -1 = Hacia el presente
       offsetHours += (direction * selectedHours);
       if (offsetHours < 0) offsetHours = 0;
     }
@@ -700,9 +711,7 @@
     document.getElementById('btn-actual').classList.toggle('hidden', !isHistory);
     document.getElementById('btn-forward').classList.toggle('hidden', !isHistory);
 
-    // Obligatorio reiniciar el zoom para que aparezcan las nuevas coordenadas
     if (tempChart.resetZoom) tempChart.resetZoom();
-    
     refreshRange();
   }
 
@@ -746,7 +755,6 @@
     document.querySelectorAll(".range-btn[data-hours]").forEach(b => {
       b.classList.toggle("active", parseInt(b.dataset.hours) === h);
     });
-    // Al cambiar de rango, regresamos automáticamente a la vista en vivo
     navigateHistory(0, true); 
   }
 
