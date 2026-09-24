@@ -23,16 +23,14 @@
       -webkit-tap-highlight-color: transparent; user-select: none;
     }
     #chart-container { position: absolute; inset: 0; touch-action: none; }
-    #topbar {
-      position: absolute; top: 0; left: 0; right: 0; z-index: 20;
+    #topbar, #bottombar {
+      position: absolute; left: 0; right: 0; z-index: 20;
       transition: opacity 0.3s ease, transform 0.3s ease;
     }
+    #topbar { top: 0; } #bottombar { bottom: 0; }
     #topbar.hidden-ui { opacity: 0; transform: translateY(-100%); pointer-events: none; }
-    #bottombar {
-      position: absolute; bottom: 0; left: 0; right: 0; z-index: 20;
-      transition: opacity 0.3s ease, transform 0.3s ease;
-    }
     #bottombar.hidden-ui { opacity: 0; transform: translateY(100%); pointer-events: none; }
+
     #portrait-hint {
       position: absolute; inset: 0; display: none; align-items: center;
       justify-content: center; background: #0f172a; z-index: 100;
@@ -44,44 +42,31 @@
     #portrait-hint.hidden { display: none !important; }
     .rotate-icon { animation: rotate 2s ease-in-out infinite; display: inline-block; }
     @keyframes rotate { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } }
+
     .range-btn {
       padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
       color: #94a3b8; background: transparent; border: 1px solid #334155;
       transition: all 0.15s; cursor: pointer;
     }
     .range-btn.active { background: #0284c7; color: white; border-color: #0284c7; }
+
     .ui-bar {
       background: rgba(15, 23, 42, 0.85);
       backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
       border-color: rgba(51, 65, 85, 0.6);
     }
-    body.epaper-mode { background: #fff !important; color: #000 !important; }
-    body.epaper-mode .ui-bar {
-      background: rgba(255,255,255,0.95) !important; color: #000 !important; border-color: #000 !important;
-    }
-    body.epaper-mode #topbar, body.epaper-mode #bottombar,
-    body.epaper-mode #topbar *, body.epaper-mode #bottombar * { color: #000 !important; }
-    body.epaper-mode .range-btn { border-color: #000; color: #000; }
-    body.epaper-mode .range-btn.active { background: #000; color: #fff; }
     .series-toggle {
       border-color: #334155; background: #1e293b; color: #94a3b8; opacity: 0.45;
     }
     .series-toggle.active {
       opacity: 1; color: #e2e8f0; background: #334155; border-color: #475569;
     }
-    body.epaper-mode .series-toggle {
-      background: #fff !important; border-color: #000 !important;
-      color: #000 !important; opacity: 0.4;
-    }
-    body.epaper-mode .series-toggle.active {
-      opacity: 1; background: #000 !important; color: #fff !important; border-color: #000 !important;
-    }
-    body.epaper-mode .series-toggle.active span { color: #fff !important; }
   </style>
 </head>
 
 <body>
 
+<!-- HINT PORTRAIT -->
 <div id="portrait-hint">
   <div>
     <div class="rotate-icon text-6xl mb-4">📱</div>
@@ -93,9 +78,10 @@
   </div>
 </div>
 
+<!-- TOPBAR -->
 <div id="topbar" class="ui-bar border-b">
   <div class="flex items-center gap-2 px-3 py-2">
-    <button onclick="exitAndGoBack()" title="Salir de la gráfica"
+    <button onclick="exitAndGoBack()"
       class="px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold border border-rose-500 shadow-lg flex items-center gap-1.5 active:scale-95 transition shrink-0">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
@@ -121,9 +107,7 @@
       <button id="btn-forward" class="range-btn flex items-center justify-center w-8 h-7 hidden" onclick="navigateHistory(-1)" title="Más reciente">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
       </button>
-
       <div class="w-px h-4 bg-slate-700 mx-1"></div>
-
       <button class="range-btn" data-hours="2" onclick="setHours(2)">2h</button>
       <button class="range-btn" data-hours="4" onclick="setHours(4)">4h</button>
       <button class="range-btn" data-hours="8" onclick="setHours(8)">8h</button>
@@ -133,13 +117,14 @@
   </div>
 </div>
 
+<!-- GRÁFICA -->
 <div id="chart-container">
   <canvas id="tempChart"></canvas>
 </div>
 
+<!-- BOTTOMBAR -->
 <div id="bottombar" class="ui-bar border-t">
   <div class="flex items-center justify-between px-3 py-2 text-[11px] gap-2 flex-wrap">
-
     <div class="flex items-center gap-1.5 shrink-0">
       <svg id="bat-icon" class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
@@ -148,20 +133,14 @@
     </div>
 
     <div class="flex items-center gap-1 shrink-0">
-      <button id="toggle-s1" onclick="toggleSeries(0)" title="Mostrar Sonda 1"
-        class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
-        <span class="w-2 h-2 rounded-full" style="background:#38bdf8"></span>
-        <span>S1</span>
+      <button id="toggle-s1" onclick="toggleSeries(0)" class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
+        <span class="w-2 h-2 rounded-full" style="background:#38bdf8"></span><span>S1</span>
       </button>
-      <button id="toggle-s2" onclick="toggleSeries(1)" title="Mostrar Sonda 2"
-        class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
-        <span class="w-2 h-2 rounded-full" style="background:#f87171"></span>
-        <span>S2</span>
+      <button id="toggle-s2" onclick="toggleSeries(1)" class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
+        <span class="w-2 h-2 rounded-full" style="background:#f87171"></span><span>S2</span>
       </button>
-      <button id="toggle-dt" onclick="toggleSeries(2)" title="Mostrar ΔT"
-        class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
-        <span class="w-2 h-2 rounded-full" style="background:#fbbf24"></span>
-        <span>ΔT</span>
+      <button id="toggle-dt" onclick="toggleSeries(2)" class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
+        <span class="w-2 h-2 rounded-full" style="background:#fbbf24"></span><span>ΔT</span>
       </button>
     </div>
 
@@ -185,110 +164,193 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
         </svg>
       </button>
-      <button onclick="toggleEPaper()" title="Alto contraste"
-        class="p-1.5 rounded bg-slate-800/70 hover:bg-slate-700 text-slate-200 border border-slate-700">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-        </svg>
-      </button>
     </div>
   </div>
 </div>
 
 <script>
   /* ============================================================
-     CONFIGURACIÓN
+     CONFIG
      ============================================================ */
   const API_URL = "https://api-termometro.manuelaa1990.workers.dev";
-  const POLL_INTERVAL_MS = 10000;
-  const ESP_CONNECTED_MAX_AGE_MS = 35000;
-  const MAX_GAP_MS = 2 * 60 * 1000;
+  const POLL_MS = 10000;
+  const MAX_AGE_MS = 35000;
+  const GAP_MS = 2 * 60 * 1000;
+  const MAX_HISTORY_HOURS = 168; // 7 días máximo a cargar
 
-  const params = new URLSearchParams(location.search);
-  let selectedHours = parseInt(params.get("hours")) || 4;
-  if (![2, 4, 8, 12, 24].includes(selectedHours)) selectedHours = 4;
-
+  /* ============================================================
+     ESTADO
+     ============================================================ */
+  let selectedHours = 4;
   let offsetHours = 0;
-
-  let rawData = [];
-  let isFetching = false;
-  let isPolling = false;
+  let allData = [];          // TODOS los datos en memoria
+  let latestRow = null;
   let lastSeenAt = null;
-  let latestAbsolute = null;
-  let isEPaper = localStorage.getItem("epaper-mode") === "true";
-
-  // Flag: el usuario hizo zoom/pan manual → no reencuadrar el eje X en cada refresco
+  let isRefreshing = false;
   let userZoomed = false;
-
   let seriesState = JSON.parse(localStorage.getItem("graph-series") || "[true,true,true]");
-  if (!Array.isArray(seriesState) || seriesState.length !== 3) {
-    seriesState = [true, true, true];
+  if (!Array.isArray(seriesState) || seriesState.length !== 3) seriesState = [true,true,true];
+
+  /* ============================================================
+     UTILS
+     ============================================================ */
+  function parseTs(s) {
+    if (!s) return null;
+    let str = String(s).trim();
+    if (str.includes(" ")) str = str.replace(" ", "T");
+    if (!str.endsWith("Z") && !str.includes("+") && !str.includes("-", 10)) str += "Z";
+    const t = new Date(str).getTime();
+    return isNaN(t) ? null : t;
+  }
+
+  function processRow(row) {
+    if (!row) return null;
+    const t1 = (row.temp1 === null || row.temp1 < -50 || row.temp1 > 125) ? null : Number(row.temp1);
+    const t2 = (row.temp2 === null || row.temp2 < -50 || row.temp2 > 125) ? null : Number(row.temp2);
+    const dt = (t1 !== null && t2 !== null) ? Math.abs(t1 - t2) : null;
+    const vBat = Number(row.bateriaVolt);
+    const bat = Number.isFinite(vBat) && vBat > 0.5 ? vBat : null;
+    const pct = bat !== null ? Math.max(0, Math.min(100, Math.round(((bat - 3.10) / (4.20 - 3.10)) * 100))) : null;
+    return {
+      ...row, s1: t1, s2: t2, delta: dt,
+      bateria: pct, bateriaVolt: bat,
+      wifi: row.wifi || row.ssid || null,
+      ip: row.ip_local || row.ip || null
+    };
+  }
+
+  function withTimeout(p, ms) {
+    let timer;
+    const t = new Promise((_, rej) => { timer = setTimeout(() => rej(new Error("TIMEOUT")), ms); });
+    return Promise.race([p, t]).finally(() => clearTimeout(timer));
+  }
+
+  async function fetchJSON(path) {
+    const res = await withTimeout(fetch(API_URL + path), 12000);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  }
+
+  async function fetchRange(hours, offset = 0) {
+    const q = offset > 0 ? `/range?hours=${hours}&offset=${offset}` : `/range?hours=${hours}`;
+    const data = await fetchJSON(q);
+    return Array.isArray(data) ? data : [];
   }
 
   /* ============================================================
-     PARSER DE FECHAS UTC
+     CARGA INICIAL: descargar todo el historial en un solo paso
      ============================================================ */
-  function parseTimestamp(dateStr) {
-    if (!dateStr) return null;
-    let s = String(dateStr).trim();
-    if (s.includes(" ")) s = s.replace(" ", "T");
-    if (!s.endsWith("Z") && !s.includes("+") && !s.includes("-", 10)) {
-      s += "Z";
+  async function loadAllHistory() {
+    const chunks = [];
+    let gotBig = false;
+
+    // Intento 1: pedir 7 días de golpe
+    try {
+      const big = await fetchRange(MAX_HISTORY_HOURS);
+      if (big.length > 1) {
+        const t0 = parseTs(big[0].created_at);
+        const t1 = parseTs(big[big.length - 1].created_at);
+        const span = (t1 - t0) / 3600000;
+        console.log(`Intento 7d: ${big.length} pts, span ${span.toFixed(1)}h`);
+        if (span >= 12) {
+          chunks.push(big);
+          gotBig = true;
+        }
+      }
+    } catch (e) { console.warn("7d falló:", e); }
+
+    // Intento 2: si no sirvió, pedir en bloques de 24h con offset
+    if (!gotBig) {
+      console.log("Probando bloques de 24h...");
+      let prevFirst = null;
+      for (let i = 0; i < 8; i++) {
+        try {
+          const chunk = await fetchRange(24, i * 24);
+          if (!chunk.length) break;
+
+          const firstTs = parseTs(chunk[0].created_at);
+          // Si el primer timestamp es igual al anterior, el offset NO funciona
+          if (prevFirst !== null && Math.abs(firstTs - prevFirst) < 60000) {
+            console.log(`Offset no funciona en i=${i}, parando.`);
+            break;
+          }
+          prevFirst = firstTs;
+          chunks.push(chunk);
+          console.log(`Bloque ${i}: ${chunk.length} pts`);
+        } catch (e) {
+          console.warn(`Bloque ${i} falló:`, e);
+          break;
+        }
+      }
     }
-    const t = new Date(s).getTime();
-    return isNaN(t) ? null : t;
+
+    // Merge + dedupe
+    const seen = new Set();
+    const merged = [];
+    for (const chunk of chunks) {
+      for (const row of chunk) {
+        const key = row.created_at;
+        if (key && !seen.has(key)) {
+          seen.add(key);
+          merged.push(row);
+        }
+      }
+    }
+
+    // Ordenar ascendente
+    merged.sort((a, b) => (parseTs(a.created_at) || 0) - (parseTs(b.created_at) || 0));
+
+    allData = merged;
+
+    if (allData.length) {
+      const t0 = parseTs(allData[0].created_at);
+      const t1 = parseTs(allData[allData.length - 1].created_at);
+      console.log(`✅ Total: ${allData.length} pts, span ${((t1 - t0) / 3600000).toFixed(1)}h`);
+    } else {
+      console.warn("⚠️ Sin datos");
+    }
+  }
+
+  /* ============================================================
+     OBTENER EL SLICE VISIBLE (filtrado local, sin tocar la API)
+     ============================================================ */
+  function getSlice() {
+    if (!allData.length) return [];
+    const now = Date.now();
+    const endTime = now - offsetHours * 3600 * 1000;
+    const startTime = endTime - selectedHours * 3600 * 1000;
+    return allData.filter(r => {
+      const t = parseTs(r.created_at);
+      return t && t >= startTime && t <= endTime;
+    });
   }
 
   /* ============================================================
      GRÁFICA
      ============================================================ */
   const ctx = document.getElementById("tempChart").getContext("2d");
-
   const tempChart = new Chart(ctx, {
     type: "line",
     data: {
       datasets: [
-        {
-          label: "Sonda 1",
-          borderColor: "#38bdf8",
-          backgroundColor: "rgba(56,189,248,.08)",
-          data: [], borderWidth: 2.5, tension: 0.25,
-          pointRadius: 0, pointHoverRadius: 6, fill: true, spanGaps: false
-        },
-        {
-          label: "Sonda 2",
-          borderColor: "#f87171",
-          backgroundColor: "rgba(248,113,113,.08)",
-          data: [], borderWidth: 2.5, tension: 0.25,
-          pointRadius: 0, pointHoverRadius: 6, fill: true, spanGaps: false
-        },
-        {
-          label: "ΔT",
-          borderColor: "#fbbf24",
-          backgroundColor: "rgba(251,191,36,.08)",
-          data: [], borderWidth: 2.5, tension: 0.25,
-          pointRadius: 0, pointHoverRadius: 6, fill: false, spanGaps: false
-        }
+        { label: "Sonda 1", borderColor: "#38bdf8", backgroundColor: "rgba(56,189,248,.08)",
+          data: [], borderWidth: 2.5, tension: 0.25, pointRadius: 0, pointHoverRadius: 6, fill: true, spanGaps: false },
+        { label: "Sonda 2", borderColor: "#f87171", backgroundColor: "rgba(248,113,113,.08)",
+          data: [], borderWidth: 2.5, tension: 0.25, pointRadius: 0, pointHoverRadius: 6, fill: true, spanGaps: false },
+        { label: "ΔT", borderColor: "#fbbf24", backgroundColor: "rgba(251,191,36,.08)",
+          data: [], borderWidth: 2.5, tension: 0.25, pointRadius: 0, pointHoverRadius: 6, fill: false, spanGaps: false }
       ]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
+      responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: "index", intersect: false },
       layout: { padding: { top: 8, right: 16, bottom: 8, left: 8 } },
       scales: {
         x: {
           type: "time",
-          time: {
-            unit: "hour",
-            tooltipFormat: "dd/MM/yyyy, HH:mm",
-            displayFormats: { minute: "HH:mm", hour: "HH:mm", day: "dd/MM" }
-          },
-          ticks: {
-            color: "#94a3b8", font: { size: 12 },
-            maxRotation: 0, autoSkip: true, maxTicksLimit: 10
-          },
+          time: { unit: "hour", tooltipFormat: "dd/MM/yyyy, HH:mm",
+            displayFormats: { minute: "HH:mm", hour: "HH:mm", day: "dd/MM" } },
+          ticks: { color: "#94a3b8", font: { size: 12 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 },
           grid: { color: "rgba(51, 65, 85, 0.5)" }
         },
         y: {
@@ -300,36 +362,26 @@
       plugins: {
         legend: {
           display: true, position: "top",
-          labels: {
-            color: "#cbd5e1", font: { size: 13, weight: "600" },
-            boxWidth: 20, boxHeight: 3, padding: 16, usePointStyle: false
-          }
+          labels: { color: "#cbd5e1", font: { size: 13, weight: "600" }, boxWidth: 20, boxHeight: 3, padding: 16 }
         },
         tooltip: {
-          backgroundColor: "rgba(15,23,42,0.95)",
-          borderColor: "#334155", borderWidth: 1,
+          backgroundColor: "rgba(15,23,42,0.95)", borderColor: "#334155", borderWidth: 1,
           titleColor: "#e2e8f0", bodyColor: "#cbd5e1", padding: 10,
           titleFont: { size: 13 }, bodyFont: { size: 13 },
           callbacks: {
-            label: function (context) {
-              const v = context.parsed.y;
-              if (v === null || v === undefined || isNaN(v)) return context.dataset.label + ": --";
-              return context.dataset.label + ": " + v.toFixed(2) + " °C";
+            label: c => {
+              const v = c.parsed.y;
+              if (v === null || v === undefined || isNaN(v)) return c.dataset.label + ": --";
+              return c.dataset.label + ": " + v.toFixed(2) + " °C";
             }
           }
         },
         zoom: {
           limits: { x: { min: "original", max: "original" } },
-          pan: {
-            enabled: true, mode: "x", modifierKey: null, threshold: 5,
-            onPan: () => { userZoomed = true; }
-          },
+          pan: { enabled: true, mode: "x", modifierKey: null, threshold: 5, onPan: () => { userZoomed = true; } },
           zoom: {
-            wheel: { enabled: true, speed: 0.05 },
-            pinch: { enabled: true },
-            drag: { enabled: false },
-            mode: "x",
-            onZoom: () => { userZoomed = true; }
+            wheel: { enabled: true, speed: 0.05 }, pinch: { enabled: true },
+            drag: { enabled: false }, mode: "x", onZoom: () => { userZoomed = true; }
           }
         }
       }
@@ -337,64 +389,121 @@
   });
 
   /* ============================================================
-     FETCH
+     RENDER
      ============================================================ */
-  function withTimeout(promise, ms) {
-    let timer;
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error("TIMEOUT")), ms);
+  function renderChart() {
+    const slice = getSlice();
+    const processed = slice.map(processRow).filter(Boolean);
+
+    const s1 = [], s2 = [], dt = [];
+    let lastTs = null;
+
+    processed.forEach(r => {
+      const t = parseTs(r.created_at);
+      if (!t) return;
+      if (lastTs !== null && (t - lastTs) > GAP_MS) {
+        const gap = lastTs + 1000;
+        s1.push({ x: gap, y: null });
+        s2.push({ x: gap, y: null });
+        dt.push({ x: gap, y: null });
+      }
+      s1.push({ x: t, y: r.s1 });
+      s2.push({ x: t, y: r.s2 });
+      dt.push({ x: t, y: r.delta });
+      lastTs = t;
     });
-    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-  }
 
-  async function fetchJSON(path) {
-    const res = await withTimeout(fetch(API_URL + path), 10000);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  }
+    tempChart.data.datasets[0].data = s1;
+    tempChart.data.datasets[1].data = s2;
+    tempChart.data.datasets[2].data = dt;
 
-  async function fetchRange(hours, offset = 0) {
-    const url = offset > 0 ? `/range?hours=${hours}&offset=${offset}` : `/range?hours=${hours}`;
-    const data = await fetchJSON(url);
-    return Array.isArray(data) ? data : [];
-  }
-
-  async function fetchLatest() {
-    return fetchJSON("/latest");
-  }
-
-  /* ============================================================
-     PROCESAR ROW
-     ============================================================ */
-  function processRow(row) {
-    if (!row) return null;
-
-    const raw1 = (row.temp1 === null || row.temp1 <= -127 || row.temp1 < -50 || row.temp1 > 125) ? null : Number(row.temp1);
-    const raw2 = (row.temp2 === null || row.temp2 <= -127 || row.temp2 < -50 || row.temp2 > 125) ? null : Number(row.temp2);
-    const delta = (raw1 !== null && raw2 !== null) ? Math.abs(raw1 - raw2) : null;
-
-    // Batería: validar NaN antes de usarla
-    const vBatRaw = Number(row.bateriaVolt);
-    const vBat = Number.isFinite(vBatRaw) && vBatRaw > 0.5 ? vBatRaw : null;
-
-    let bateria = null;
-    if (vBat !== null) {
-      bateria = Math.max(0, Math.min(100, Math.round(((vBat - 3.10) / (4.20 - 3.10)) * 100)));
+    // Eje X: ventana fija según rango seleccionado
+    if (!userZoomed) {
+      const now = Date.now();
+      const windowMs = selectedHours * 3600 * 1000;
+      if (offsetHours === 0) {
+        tempChart.options.scales.x.min = now - windowMs;
+        tempChart.options.scales.x.max = now;
+      } else {
+        const end = now - offsetHours * 3600 * 1000;
+        tempChart.options.scales.x.min = end - windowMs;
+        tempChart.options.scales.x.max = end;
+      }
     }
 
-    return {
-      ...row,
-      s1: raw1,
-      s2: raw2,
-      delta,
-      bateria,
-      bateriaVolt: vBat,
-      wifi: row.wifi || row.ssid || null,
-      ip: row.ip_local || row.ip || null
-    };
+    // Eje Y auto-escalado
+    const temps = [];
+    if (seriesState[0]) temps.push(...s1.map(d => d.y));
+    if (seriesState[1]) temps.push(...s2.map(d => d.y));
+    if (seriesState[2]) temps.push(...dt.map(d => d.y));
+    const valid = temps.filter(v => v !== null && Number.isFinite(v));
+    if (valid.length) {
+      const tMin = Math.min(...valid), tMax = Math.max(...valid);
+      const margin = Math.max(1, (tMax - tMin) * 0.15);
+      tempChart.options.scales.y.min = Math.floor((tMin - margin) / 2) * 2;
+      tempChart.options.scales.y.max = Math.ceil((tMax + margin) / 2) * 2;
+    } else {
+      tempChart.options.scales.y.min = undefined;
+      tempChart.options.scales.y.max = undefined;
+    }
+
+    tempChart.update("none");
+    updateTimeLabel(processed);
   }
 
-  function formatAge(ms) {
+  function updateTimeLabel(processed) {
+    const el = document.getElementById("time-range-label");
+    if (!processed.length) {
+      el.textContent = `Sin datos en esta ventana · ${selectedHours}h`;
+      return;
+    }
+    const opts = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
+    const t0 = parseTs(processed[0].created_at);
+    const t1 = parseTs(processed[processed.length - 1].created_at);
+    const s0 = new Date(t0).toLocaleDateString([], opts);
+    const s1 = new Date(t1).toLocaleDateString([], opts);
+    el.textContent = `${s0} → ${s1} · ${selectedHours}h · ${processed.length} pts`;
+  }
+
+  function updateStatusBar() {
+    if (!latestRow) return;
+    if (Number.isFinite(latestRow.bateriaVolt)) {
+      const v = latestRow.bateriaVolt, p = latestRow.bateria;
+      document.getElementById("bat-val").textContent = `${p}% · ${v.toFixed(2)}V`;
+      const icon = document.getElementById("bat-icon");
+      if (p <= 20) icon.className = "w-4 h-4 text-rose-500";
+      else if (p <= 50) icon.className = "w-4 h-4 text-amber-400";
+      else icon.className = "w-4 h-4 text-emerald-400";
+    }
+    const wifi = latestRow.wifi || "?";
+    const ip = latestRow.ip ? ` · ${latestRow.ip}` : "";
+    document.getElementById("wifi-val").textContent = `${wifi}${ip}`;
+  }
+
+  function updateBadge() {
+    const b = document.getElementById("status-badge");
+    let text, style;
+    if (offsetHours > 0) {
+      text = "Modo Historial";
+      style = "bg-purple-500/20 text-purple-400 border-purple-500/30";
+    } else {
+      const age = lastSeenAt ? Date.now() - lastSeenAt.getTime() : null;
+      if (age !== null && age <= MAX_AGE_MS) {
+        text = "En vivo · " + fmtAge(age);
+        style = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+      } else if (age !== null) {
+        text = "Desconectado · " + fmtAge(age);
+        style = "bg-rose-500/20 text-rose-400 border-rose-500/30";
+      } else {
+        text = "Sin datos";
+        style = "bg-amber-500/20 text-amber-400 border-amber-500/30";
+      }
+    }
+    b.textContent = text;
+    b.className = "px-2 py-0.5 text-[10px] font-semibold rounded-full border truncate " + style;
+  }
+
+  function fmtAge(ms) {
     const s = Math.max(0, Math.round(ms / 1000));
     if (s < 60) return `${s} s`;
     const m = Math.floor(s / 60);
@@ -405,285 +514,131 @@
   }
 
   /* ============================================================
-     RENDER (CORREGIDO: EJE X DINÁMICO)
+     REFRESCOS
      ============================================================ */
-  function renderChart() {
-    // Ordenar defensivamente por timestamp ascendente
-    const processed = rawData.map(processRow).filter(Boolean);
-    processed.sort((a, b) => {
-      const ta = parseTimestamp(a.created_at) || 0;
-      const tb = parseTimestamp(b.created_at) || 0;
-      return ta - tb;
-    });
+  async function refreshLatest() {
+    try {
+      const row = await fetchJSON("/latest");
+      if (row && row.created_at) {
+        const t = parseTs(row.created_at);
+        if (t && (!lastSeenAt || t > lastSeenAt.getTime())) lastSeenAt = new Date(t);
+        latestRow = processRow(row);
 
-    const s1Data = [];
-    const s2Data = [];
-    const deltaData = [];
-
-    let lastTime = null;
-    let dataMin = Infinity;
-    let dataMax = -Infinity;
-
-    processed.forEach(r => {
-      const currentTime = parseTimestamp(r.created_at);
-      if (!currentTime) return;
-
-      // Guardamos el mínimo y máximo real de los datos
-      dataMin = Math.min(dataMin, currentTime);
-      dataMax = Math.max(dataMax, currentTime);
-
-      if (lastTime !== null && (currentTime - lastTime) > MAX_GAP_MS) {
-        const gapTime = lastTime + 1000;
-        s1Data.push({ x: gapTime, y: null });
-        s2Data.push({ x: gapTime, y: null });
-        deltaData.push({ x: gapTime, y: null });
+        // Agregar a allData si es nuevo
+        if (row.created_at) {
+          const exists = allData.some(r => r.created_at === row.created_at);
+          if (!exists) {
+            allData.push(row);
+            allData.sort((a, b) => (parseTs(a.created_at) || 0) - (parseTs(b.created_at) || 0));
+          }
+        }
+        updateStatusBar();
+        if (offsetHours === 0) renderChart();
       }
-
-      s1Data.push({ x: currentTime, y: r.s1 });
-      s2Data.push({ x: currentTime, y: r.s2 });
-      deltaData.push({ x: currentTime, y: r.delta });
-
-      lastTime = currentTime;
-    });
-
-    tempChart.data.datasets[0].data = s1Data;
-    tempChart.data.datasets[1].data = s2Data;
-    tempChart.data.datasets[2].data = deltaData;
-
-    // FIJAR EJE X (con expansión dinámica para que los datos siempre entren)
-    if (!userZoomed) {
-      const now = Date.now();
-      const windowMs = selectedHours * 3600 * 1000;
-
-      let xMin, xMax;
-
-      if (offsetHours === 0) {
-        xMin = now - windowMs;
-        xMax = now;
-      } else {
-        const end = now - (offsetHours * 3600 * 1000);
-        xMin = end - windowMs;
-        xMax = end;
-      }
-
-      // 🛠️ FIX: Si los datos están fuera de los límites, expandimos el rango
-      // para asegurarnos de que siempre se vean.
-      if (dataMin !== Infinity && dataMax !== -Infinity) {
-        // Damos un pequeño margen de 5 minutos para que no queden pegados al borde
-        const margen = 5 * 60 * 1000;
-        xMin = Math.min(xMin, dataMin - margen);
-        xMax = Math.max(xMax, dataMax + margen);
-      }
-
-      tempChart.options.scales.x.min = xMin;
-      tempChart.options.scales.x.max = xMax;
+      updateBadge();
+    } catch (e) {
+      console.error("Latest falló:", e);
+      updateBadge();
     }
-
-    // Auto-escalado Y considerando datos numéricos válidos
-    const visibleTemps = [];
-    if (seriesState[0]) visibleTemps.push(...s1Data.map(d => d.y));
-    if (seriesState[1]) visibleTemps.push(...s2Data.map(d => d.y));
-    if (seriesState[2]) visibleTemps.push(...deltaData.map(d => d.y));
-
-    const validTemps = visibleTemps.filter(v => v !== null && Number.isFinite(v));
-    if (validTemps.length) {
-      const tMin = Math.min(...validTemps);
-      const tMax = Math.max(...validTemps);
-      const margin = Math.max(1, (tMax - tMin) * 0.15);
-      tempChart.options.scales.y.min = Math.floor((tMin - margin) / 2) * 2;
-      tempChart.options.scales.y.max = Math.ceil((tMax + margin) / 2) * 2;
-    } else {
-      tempChart.options.scales.y.min = undefined;
-      tempChart.options.scales.y.max = undefined;
-    }
-
-    tempChart.update("none");
-    updateTimeRangeLabel(processed);
   }
 
-  function renderStatusBar() {
-    if (!latestAbsolute) return;
-
-    const bat = latestAbsolute;
-    if (Number.isFinite(bat.bateriaVolt)) {
-      const v = bat.bateriaVolt;
-      const pct = bat.bateria;
-      document.getElementById("bat-val").textContent = `${pct}% · ${v.toFixed(2)}V`;
-
-      const icon = document.getElementById("bat-icon");
-      if (pct <= 20) icon.className = "w-4 h-4 text-rose-500";
-      else if (pct <= 50) icon.className = "w-4 h-4 text-amber-400";
-      else icon.className = "w-4 h-4 text-emerald-400";
-    }
-
-    const wifi = bat.wifi || "?";
-    const ip = bat.ip ? ` · ${bat.ip}` : "";
-    document.getElementById("wifi-val").textContent = `${wifi}${ip}`;
-  }
-
-  function updateTimeRangeLabel(processed) {
-    if (!processed || !processed.length) {
-      document.getElementById("time-range-label").textContent = "--";
-      return;
-    }
-
-    const opts = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
-    const firstTime = parseTimestamp(processed[0].created_at);
-    const lastTime = parseTimestamp(processed[processed.length - 1].created_at);
-
-    const startStr = firstTime ? new Date(firstTime).toLocaleDateString([], opts) : "--";
-    const endStr = lastTime ? new Date(lastTime).toLocaleDateString([], opts) : "--";
-
-    document.getElementById("time-range-label").textContent =
-      `${startStr} → ${endStr} · ${selectedHours}h · ${processed.length} pts`;
-  }
-
-  function updateStatusBadge() {
-    const badge = document.getElementById("status-badge");
-    if (!badge) return;
-
-    let text, style;
-
-    if (offsetHours > 0) {
-      text = "Modo Historial";
-      style = "bg-purple-500/20 text-purple-400 border-purple-500/30";
-    } else {
-      const age = lastSeenAt ? Date.now() - lastSeenAt.getTime() : null;
-      if (age !== null && age <= ESP_CONNECTED_MAX_AGE_MS) {
-        text = "En vivo · " + formatAge(age);
-        style = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
-      } else if (age !== null) {
-        text = "Desconectado · " + formatAge(age);
-        style = "bg-rose-500/20 text-rose-400 border-rose-500/30";
-      } else {
-        text = "Sin datos";
-        style = "bg-amber-500/20 text-amber-400 border-amber-500/30";
+  async function refreshRecentHistory() {
+    if (isRefreshing) return;
+    isRefreshing = true;
+    try {
+      // Traer 24h recientes y mergear
+      const recent = await fetchRange(24);
+      const seen = new Set(allData.map(r => r.created_at));
+      let added = 0;
+      for (const row of recent) {
+        if (row.created_at && !seen.has(row.created_at)) {
+          allData.push(row);
+          added++;
+        }
       }
+      if (added > 0) {
+        allData.sort((a, b) => (parseTs(a.created_at) || 0) - (parseTs(b.created_at) || 0));
+        console.log(`Refresco: +${added} pts nuevos`);
+        if (offsetHours === 0) renderChart();
+      }
+    } catch (e) {
+      console.warn("Refresco falló:", e);
+    } finally {
+      isRefreshing = false;
     }
-
-    badge.textContent = text;
-    badge.className = "px-2 py-0.5 text-[10px] font-semibold rounded-full border truncate " + style;
   }
 
   /* ============================================================
-     FETCH LOOP Y NAVEGACIÓN
+     NAVEGACIÓN
      ============================================================ */
-  async function refreshRange() {
-    if (isFetching) return;
-    isFetching = true;
-    try {
-      const data = await fetchRange(selectedHours, offsetHours);
-      rawData = data;
-
-      if (data.length && offsetHours === 0) {
-        const last = data[data.length - 1];
-        if (last.created_at) {
-          const t = parseTimestamp(last.created_at);
-          if (t && (!lastSeenAt || t > lastSeenAt.getTime())) lastSeenAt = new Date(t);
-        }
-      }
-      renderChart();
-      updateStatusBadge();
-    } catch (err) {
-      console.error("Error rango:", err);
-      updateStatusBadge();
-    } finally {
-      isFetching = false;
-    }
-  }
-
-  async function refreshLatest() {
-    if (isPolling || document.hidden || offsetHours > 0) return;
-    isPolling = true;
-    try {
-      const row = await fetchLatest();
-      if (row && row.created_at) {
-        const t = parseTimestamp(row.created_at);
-        if (t && (!lastSeenAt || t > lastSeenAt.getTime())) lastSeenAt = new Date(t);
-        latestAbsolute = processRow(row);
-        renderStatusBar();
-      }
-      updateStatusBadge();
-    } catch (err) {
-      console.error("Error latest:", err);
-      updateStatusBadge();
-    } finally {
-      isPolling = false;
-    }
-  }
-
   function navigateHistory(direction, reset = false) {
     if (reset) {
       offsetHours = 0;
     } else {
-      offsetHours += (direction * selectedHours);
+      offsetHours += direction * selectedHours;
       if (offsetHours < 0) offsetHours = 0;
     }
-
-    userZoomed = false; // al cambiar de ventana, reencuadrar
+    userZoomed = false;
+    if (tempChart.resetZoom) tempChart.resetZoom();
 
     const isHistory = offsetHours > 0;
-    document.getElementById('btn-actual').classList.toggle('hidden', !isHistory);
-    document.getElementById('btn-forward').classList.toggle('hidden', !isHistory);
+    document.getElementById("btn-actual").classList.toggle("hidden", !isHistory);
+    document.getElementById("btn-forward").classList.toggle("hidden", !isHistory);
 
-    if (tempChart.resetZoom) tempChart.resetZoom();
-    refreshRange();
-  }
-
-  /* ============================================================
-     SELECTOR DE SERIES
-     ============================================================ */
-  function applySeriesVisibility() {
-    seriesState.forEach((visible, i) => {
-      tempChart.setDatasetVisibility(i, visible);
-    });
-
-    const ids = ["toggle-s1", "toggle-s2", "toggle-dt"];
-    ids.forEach((id, i) => {
-      const btn = document.getElementById(id);
-      if (btn) btn.classList.toggle("active", seriesState[i]);
-    });
-
-    localStorage.setItem("graph-series", JSON.stringify(seriesState));
     renderChart();
+    updateBadge();
   }
 
-  function toggleSeries(index) {
-    if (index < 0 || index > 2) return;
-    const newState = [...seriesState];
-    newState[index] = !newState[index];
-    if (!newState.some(v => v)) return;
-
-    seriesState = newState;
-    if ("vibrate" in navigator) navigator.vibrate(15);
-    applySeriesVisibility();
-  }
-
-  /* ============================================================
-     CONTROLES DE UI
-     ============================================================ */
   function setHours(h) {
     selectedHours = h;
     localStorage.setItem("graph-hours", h);
     document.querySelectorAll(".range-btn[data-hours]").forEach(b => {
       b.classList.toggle("active", parseInt(b.dataset.hours) === h);
     });
+    offsetHours = 0;
     userZoomed = false;
-    navigateHistory(0, true);
+    if (tempChart.resetZoom) tempChart.resetZoom();
+    document.getElementById("btn-actual").classList.add("hidden");
+    document.getElementById("btn-forward").classList.add("hidden");
+    renderChart();
+    updateBadge();
   }
 
+  /* ============================================================
+     SERIES
+     ============================================================ */
+  function applySeriesVisibility() {
+    seriesState.forEach((v, i) => tempChart.setDatasetVisibility(i, v));
+    ["toggle-s1","toggle-s2","toggle-dt"].forEach((id, i) => {
+      const b = document.getElementById(id);
+      if (b) b.classList.toggle("active", seriesState[i]);
+    });
+    localStorage.setItem("graph-series", JSON.stringify(seriesState));
+    renderChart();
+  }
+
+  function toggleSeries(i) {
+    if (i < 0 || i > 2) return;
+    const n = [...seriesState];
+    n[i] = !n[i];
+    if (!n.some(v => v)) return;
+    seriesState = n;
+    if ("vibrate" in navigator) navigator.vibrate(15);
+    applySeriesVisibility();
+  }
+
+  /* ============================================================
+     UI
+     ============================================================ */
   function resetZoom() {
     userZoomed = false;
     if (tempChart.resetZoom) tempChart.resetZoom();
-    if ("vibrate" in navigator) navigator.vibrate(15);
+    renderChart();
   }
 
   function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-      enterFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
+    if (!document.fullscreenElement) enterFullscreen();
+    else document.exitFullscreen();
   }
 
   async function enterFullscreen() {
@@ -692,39 +647,10 @@
       if (el.requestFullscreen) await el.requestFullscreen();
       else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
       try {
-        if (screen.orientation && screen.orientation.lock) {
-          await screen.orientation.lock("landscape");
-        }
+        if (screen.orientation && screen.orientation.lock) await screen.orientation.lock("landscape");
       } catch (_) {}
       document.getElementById("portrait-hint").classList.add("hidden");
-    } catch (err) {
-      console.warn("Fullscreen no disponible:", err);
-    }
-  }
-
-  function toggleEPaper() {
-    isEPaper = !isEPaper;
-    localStorage.setItem("epaper-mode", isEPaper ? "true" : "false");
-    applyEPaper();
-  }
-
-  function applyEPaper() {
-    document.body.classList.toggle("epaper-mode", isEPaper);
-
-    if (isEPaper) {
-      tempChart.options.scales.x.ticks.color = "#000";
-      tempChart.options.scales.x.grid.color = "#cbd5e1";
-      tempChart.options.scales.y.ticks.color = "#000";
-      tempChart.options.scales.y.grid.color = "#cbd5e1";
-      tempChart.options.plugins.legend.labels.color = "#000";
-    } else {
-      tempChart.options.scales.x.ticks.color = "#94a3b8";
-      tempChart.options.scales.x.grid.color = "rgba(51, 65, 85, 0.5)";
-      tempChart.options.scales.y.ticks.color = "#94a3b8";
-      tempChart.options.scales.y.grid.color = "rgba(51, 65, 85, 0.5)";
-      tempChart.options.plugins.legend.labels.color = "#cbd5e1";
-    }
-    tempChart.update();
+    } catch (e) { console.warn(e); }
   }
 
   async function exitAndGoBack() {
@@ -737,8 +663,9 @@
     location.replace("./index.html");
   }
 
+  /* Doble tap oculta UI */
   let lastTap = 0;
-  document.getElementById("chart-container").addEventListener("touchend", (e) => {
+  document.getElementById("chart-container").addEventListener("touchend", e => {
     const now = Date.now();
     if (now - lastTap < 300) {
       e.preventDefault();
@@ -749,53 +676,35 @@
   }, { passive: false });
 
   history.pushState({ page: "grafica" }, "", location.href);
-  window.addEventListener("popstate", () => {
-    exitAndGoBack();
-  });
+  window.addEventListener("popstate", () => exitAndGoBack());
 
   /* ============================================================
-     INICIALIZACIÓN
+     INIT
      ============================================================ */
   window.addEventListener("DOMContentLoaded", async () => {
-    const savedHours = parseInt(localStorage.getItem("graph-hours"));
-    if (savedHours && [2, 4, 8, 12, 24].includes(savedHours)) {
-      selectedHours = savedHours;
-    }
-
+    const savedH = parseInt(localStorage.getItem("graph-hours"));
+    if ([2,4,8,12,24].includes(savedH)) selectedHours = savedH;
     document.querySelectorAll(".range-btn[data-hours]").forEach(b => {
       b.classList.toggle("active", parseInt(b.dataset.hours) === selectedHours);
     });
 
-    applyEPaper();
     applySeriesVisibility();
 
-    if (window.matchMedia("(orientation: portrait)").matches && window.innerWidth < 1024) {
-      document.getElementById("portrait-hint").classList.add("force-hint");
-    }
-
-    window.matchMedia("(orientation: portrait)").addEventListener("change", (e) => {
-      const hint = document.getElementById("portrait-hint");
-      if (e.matches && window.innerWidth < 1024) {
-        hint.classList.add("force-hint");
-      } else {
-        hint.classList.remove("force-hint");
-      }
-    });
-
-    await refreshRange();
+    // Cargar TODO el historial UNA VEZ
+    await loadAllHistory();
     await refreshLatest();
+    renderChart();
+    updateBadge();
 
-    setInterval(() => {
-      if (offsetHours === 0) refreshRange();
-    }, 30000);
-
-    setInterval(refreshLatest, POLL_INTERVAL_MS);
-    setInterval(updateStatusBadge, 2000);
+    // Refrescos periódicos
+    setInterval(() => { if (offsetHours === 0) refreshLatest(); }, POLL_MS);
+    setInterval(() => { if (offsetHours === 0) refreshRecentHistory(); }, 60000);
+    setInterval(updateBadge, 2000);
 
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden && offsetHours === 0) {
-        refreshRange();
         refreshLatest();
+        refreshRecentHistory();
       }
     });
   });
