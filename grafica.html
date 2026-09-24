@@ -10,7 +10,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Versiones fijadas. hammerjs es necesario para pan/pinch táctil del plugin de zoom -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
@@ -60,7 +59,6 @@
       pointer-events: none;
     }
 
-    /* Hint de girar teléfono */
     #portrait-hint {
       position: absolute;
       inset: 0;
@@ -86,7 +84,6 @@
       50% { transform: rotate(90deg); }
     }
 
-    /* Rango de horas */
     .range-btn {
       padding: 4px 10px;
       border-radius: 6px;
@@ -121,7 +118,6 @@
       border-color: rgba(51, 65, 85, 0.6);
     }
 
-    /* ePaper */
     body.epaper-mode {
       background: #fff !important;
       color: #000 !important;
@@ -151,7 +147,6 @@
       color: #fff !important;
     }
 
-    /* Pills del selector de series */
     .series-toggle {
       border-color: #334155;
       background: #1e293b;
@@ -184,7 +179,6 @@
 
 <body>
 
-<!-- HINT DE GIRAR TELÉFONO -->
 <div id="portrait-hint">
   <div>
     <div class="rotate-icon text-6xl mb-4">📱</div>
@@ -196,7 +190,6 @@
   </div>
 </div>
 
-<!-- TOPBAR -->
 <div id="topbar" class="ui-bar border-b">
   <div class="flex items-center gap-2 px-3 py-2">
     <button onclick="exitAndGoBack()" title="Salir de la gráfica"
@@ -233,12 +226,10 @@
   <div id="history-notice" class="hidden text-center text-[10px] text-amber-400 px-3 pb-1.5"></div>
 </div>
 
-<!-- GRÁFICA -->
 <div id="chart-container">
   <canvas id="tempChart"></canvas>
 </div>
 
-<!-- BOTTOMBAR -->
 <div id="bottombar" class="ui-bar border-t">
   <div class="flex items-center justify-between px-3 py-2 text-[11px] gap-2 flex-wrap">
 
@@ -310,15 +301,14 @@
   const API_URL = "https://api-termometro.manuelaa1990.workers.dev";
   const POLL_INTERVAL_MS = 10000;
   const ESP_CONNECTED_MAX_AGE_MS = 35000;
-  const GAP_MS = 5 * 60 * 1000;        // hueco sin datos > 5 min => se corta la línea
-  const MAX_CHART_POINTS = 1500;       // por encima se promedian buckets
+  const GAP_MS = 5 * 60 * 1000;
+  const MAX_CHART_POINTS = 1500;
   const VALID_HOURS = [2, 4, 8, 12, 24];
   const WORKER_SUPPORTS_FROM_TO = false;
   const MAX_HOURS_BACK = 72;
 
   const params = new URLSearchParams(location.search);
 
-  /* Prioridad: ?hours= de la URL (viene de la app principal) > último valor guardado > 4 */
   let selectedHours = parseInt(params.get("hours"));
   if (!VALID_HOURS.includes(selectedHours)) {
     selectedHours = parseInt(localStorage.getItem("graph-hours"));
@@ -336,12 +326,9 @@
   let lastSeenAt = null;
   let latestAbsolute = null;
   let userZoomed = false;
-  let lastRenderedEnd = null;
   let isEPaper = localStorage.getItem("epaper-mode") === "true";
-  /* Misma inversión de sondas que la app principal */
   const isInverted = localStorage.getItem("probes-inverted") === "true";
 
-  // Estado de las series: [S1, S2, ΔT]
   let seriesState = [true, true, true];
   try {
     const saved = JSON.parse(localStorage.getItem("graph-series") || "[true,true,true]");
@@ -373,7 +360,6 @@
     return hm;
   }
 
-  /* Marcas en horas "redondas" locales; el paso se adapta al zoom actual */
   function buildTimeTicks(scale) {
     const min = scale.min, max = scale.max;
     if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return;
@@ -422,7 +408,7 @@
         legend: {
           display: true,
           position: "top",
-          onClick: () => {},   // el clic en la leyenda descuadraba el estado de los botones S1/S2/ΔT
+          onClick: () => {},
           labels: {
             color: "#cbd5e1",
             font: { size: 13, weight: "600" },
@@ -454,7 +440,7 @@
           }
         },
         zoom: {
-          limits: { x: { min: undefined, max: undefined } },   // se fijan en cada render con la ventana real
+          limits: { x: { min: undefined, max: undefined } },
           pan: {
             enabled: true,
             mode: "x",
@@ -526,6 +512,13 @@
     if (!el) return;
     el.textContent = text || "";
     el.classList.toggle("hidden", !text);
+    if (text) {
+      clearTimeout(setNotice._t);
+      setNotice._t = setTimeout(() => {
+        el.textContent = "";
+        el.classList.add("hidden");
+      }, 4000);
+    }
   }
 
   function updateNavUI() {
@@ -558,12 +551,14 @@
       return;
     }
 
+    const wasLive = isLive;
     userZoomed = true;
-    if (isLive && !nearPresent) {
+    if (!nearPresent) {
       isLive = false;
       windowEndTime = new Date(scale.max);
       updateNavUI();
       updateTimeRangeLabel();
+      if (wasLive) refreshRange();
     }
   }
 
@@ -577,13 +572,11 @@
     return Number.isFinite(n) ? n : null;
   }
 
-  /* Descarta valores imposibles del DS18B20 (-127 = desconectado) */
   function cleanTemp(v) {
     const n = toNum(v);
     return (n !== null && n > -50 && n <= 125) ? n : null;
   }
 
-  /* Misma curva que la app principal, para que ambas pantallas muestren el mismo % */
   const BATTERY_CURVE = [
     [4.20, 100], [4.06, 90], [3.98, 80], [3.92, 70],
     [3.87, 60],  [3.82, 50], [3.79, 40], [3.77, 30],
@@ -635,7 +628,6 @@
     return `${Math.floor(h / 24)} d`;
   }
 
-  /* Promedia buckets si hay demasiados puntos */
   function downsample(pts, maxPts) {
     if (pts.length <= maxPts) return pts;
     const k = Math.ceil(pts.length / maxPts);
@@ -659,8 +651,7 @@
      ============================================================ */
 
   function renderChart() {
-    const end = Date.now();
-    const start = end - selectedHours * 3600000;
+    const { start, end } = getWindow();
 
     const processed = rawData.map(processRow).filter(Boolean);
     const allPts = processed.map(r => ({ t: new Date(r.created_at).getTime(), s1: r.s1, s2: r.s2, delta: r.delta }));
@@ -685,7 +676,6 @@
     tempChart.data.datasets[1].data = d2;
     tempChart.data.datasets[2].data = dd;
 
-    /* Auto-escalado del eje Y con las series VISIBLES */
     let tMin = Infinity, tMax = -Infinity;
     allPts.forEach(p => {
       [[0, p.s1], [1, p.s2], [2, p.delta]].forEach(([i, v]) => {
@@ -705,7 +695,6 @@
       tempChart.options.scales.y.max = undefined;
     }
 
-    /* Ventana en vivo: solo se desliza si el usuario no ha hecho zoom/pan */
     tempChart.options.plugins.zoom.limits.x = { min: start, max: end };
     if (!userZoomed) {
       tempChart.options.scales.x.min = start;
@@ -736,11 +725,11 @@
   }
 
   function updateTimeRangeLabel() {
-    const now = new Date();
-    const start = new Date(now.getTime() - selectedHours * 3600 * 1000);
+    const { start, end } = getWindow();
     const opts = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
+    const tag = isLive ? "· LIVE" : "· HIST";
     document.getElementById("time-range-label").textContent =
-      `${start.toLocaleString([], opts)} → ${now.toLocaleString([], opts)} · ${selectedHours}h · ${rawData.length} pts`;
+      `${new Date(start).toLocaleString([], opts)} → ${new Date(end).toLocaleString([], opts)} ${tag} · ${selectedHours}h · ${rawData.length} pts`;
   }
 
   function updateStatusBadge() {
@@ -775,14 +764,13 @@
   }
 
   async function refreshRange() {
-    const mySeq = ++fetchSeq;      // si cambias de rango mientras carga, gana la petición más nueva
+    const mySeq = ++fetchSeq;
     const hours = selectedHours;
     try {
-      const data = await fetchRange(hours);
+      const { start, end } = getWindow();
+      const data = await fetchWindow(start, end);
       if (mySeq !== fetchSeq) return;
 
-      const end = Date.now();
-      const start = end - hours * 3600000;
       rawData = data
         .filter(r => {
           const t = new Date(r.created_at).getTime();
@@ -792,20 +780,25 @@
 
       if (rawData.length) noteSeen(rawData[rawData.length - 1].created_at);
       renderChart();
+      updateNavUI();
     } catch (err) {
       if (mySeq !== fetchSeq) return;
       console.error("Error rango:", err);
+      if (err.message === "LIMIT") {
+        setNotice(`No hay datos tan atrás (máx ${MAX_HOURS_BACK} h)`);
+      } else {
+        setNotice("Error cargando datos");
+      }
     } finally {
       if (mySeq === fetchSeq) updateStatusBadge();
     }
   }
 
-  /* Añade la lectura nueva a la gráfica sin esperar al refresco de 30 s */
   function mergeLiveRow(row) {
+    if (!isLive) return;
     const t = new Date(row.created_at).getTime();
     if (!Number.isFinite(t)) return;
-    const end = Date.now();
-    const start = end - selectedHours * 3600000;
+    const { start, end } = getWindow();
     if (t < start || t > end + 60000) return;
 
     const lastT = rawData.length ? new Date(rawData[rawData.length - 1].created_at).getTime() : -Infinity;
@@ -836,6 +829,48 @@
   }
 
   /* ============================================================
+     NAVEGACIÓN HISTORIAL
+     ============================================================ */
+
+  function navigateWindow(direction) {
+    const stepMs = selectedHours * 3600000;
+    const now = Date.now();
+
+    if (isLive) {
+      if (direction < 0) {
+        isLive = false;
+        windowEndTime = new Date(now - stepMs);
+      } else {
+        return;
+      }
+    } else {
+      const newEnd = windowEndTime.getTime() + direction * stepMs;
+      if (newEnd >= now - 5000) {
+        isLive = true;
+        windowEndTime = new Date();
+      } else {
+        windowEndTime = new Date(newEnd);
+      }
+    }
+
+    userZoomed = false;
+    if (tempChart.resetZoom) tempChart.resetZoom();
+    updateNavUI();
+    refreshRange();
+    if ("vibrate" in navigator) navigator.vibrate(15);
+  }
+
+  function goLive() {
+    isLive = true;
+    windowEndTime = new Date();
+    userZoomed = false;
+    if (tempChart.resetZoom) tempChart.resetZoom();
+    updateNavUI();
+    refreshRange();
+    if ("vibrate" in navigator) navigator.vibrate(15);
+  }
+
+  /* ============================================================
      SELECTOR DE SERIES
      ============================================================ */
 
@@ -848,7 +883,7 @@
     });
 
     localStorage.setItem("graph-series", JSON.stringify(seriesState));
-    renderChart();   // recalcula el eje Y según las series visibles
+    renderChart();
   }
 
   function toggleSeries(index) {
@@ -856,7 +891,7 @@
 
     const newState = [...seriesState];
     newState[index] = !newState[index];
-    if (!newState.some(v => v)) return;   // nunca dejar todas ocultas
+    if (!newState.some(v => v)) return;
 
     seriesState = newState;
     if ("vibrate" in navigator) navigator.vibrate(15);
@@ -870,10 +905,12 @@
   function setHours(h) {
     selectedHours = h;
     localStorage.setItem("graph-hours", h);
-    document.querySelectorAll(".range-btn").forEach(b => {
+    document.querySelectorAll(".range-btn[data-hours]").forEach(b => {
       b.classList.toggle("active", parseInt(b.dataset.hours) === h);
     });
-    resetZoom(true);
+    userZoomed = false;
+    if (tempChart.resetZoom) tempChart.resetZoom();
+    updateNavUI();
     refreshRange();
   }
 
@@ -946,7 +983,7 @@
   /* Doble tap para mostrar/ocultar UI */
   let lastTap = 0;
   document.getElementById("chart-container").addEventListener("touchend", (e) => {
-    if (e.touches.length > 0) return;       // ignora el final de un gesto de pinch
+    if (e.touches.length > 0) return;
     const now = Date.now();
     if (now - lastTap < 300) {
       e.preventDefault();
@@ -956,10 +993,7 @@
     lastTap = now;
   }, { passive: false });
 
-  /* ============================================================
-     BOTÓN FÍSICO "ATRÁS" DEL MÓVIL
-     ============================================================ */
-
+  /* Botón físico "atrás" */
   history.pushState({ page: "grafica" }, "", location.href);
   window.addEventListener("popstate", () => { exitAndGoBack(); });
 
@@ -968,12 +1002,13 @@
      ============================================================ */
 
   window.addEventListener("DOMContentLoaded", async () => {
-    document.querySelectorAll(".range-btn").forEach(b => {
+    document.querySelectorAll(".range-btn[data-hours]").forEach(b => {
       b.classList.toggle("active", parseInt(b.dataset.hours) === selectedHours);
     });
 
     applyEPaper();
     applySeriesVisibility();
+    updateNavUI();
 
     if (window.matchMedia("(orientation: portrait)").matches && window.innerWidth < 1024) {
       document.getElementById("portrait-hint").classList.add("force-hint");
@@ -988,7 +1023,7 @@
     await refreshRange();
     await refreshLatest();
 
-    setInterval(refreshRange, 30000);
+    setInterval(() => { if (isLive) refreshRange(); }, 30000);
     setInterval(refreshLatest, POLL_INTERVAL_MS);
     setInterval(updateStatusBadge, 2000);
 
