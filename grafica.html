@@ -103,6 +103,16 @@
       color: white;
       border-color: #0284c7;
     }
+    .range-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    .nav-btn {
+      min-width: 2.25rem;
+      padding: 4px 12px;
+      font-size: 16px;
+      line-height: 1;
+    }
 
     .ui-bar {
       background: rgba(15, 23, 42, 0.85);
@@ -215,6 +225,12 @@
       <button class="range-btn" data-hours="24" onclick="setHours(24)">24h</button>
     </div>
   </div>
+  <div class="flex items-center justify-center gap-2 px-3 pb-2">
+    <button id="btn-prev-nav" onclick="navigateWindow(-1)" title="Ventana anterior" class="range-btn nav-btn">‹</button>
+    <button id="btn-live" onclick="goLive()" class="range-btn px-4">Actual</button>
+    <button id="btn-next-nav" onclick="navigateWindow(1)" title="Ventana siguiente" class="range-btn nav-btn">›</button>
+  </div>
+  <div id="history-notice" class="hidden text-center text-[10px] text-amber-400 px-3 pb-1.5"></div>
 </div>
 
 <!-- GRÁFICA -->
@@ -297,6 +313,8 @@
   const GAP_MS = 5 * 60 * 1000;        // hueco sin datos > 5 min => se corta la línea
   const MAX_CHART_POINTS = 1500;       // por encima se promedian buckets
   const VALID_HOURS = [2, 4, 8, 12, 24];
+  const WORKER_SUPPORTS_FROM_TO = false;
+  const MAX_HOURS_BACK = 72;
 
   const params = new URLSearchParams(location.search);
 
@@ -307,12 +325,18 @@
     if (!VALID_HOURS.includes(selectedHours)) selectedHours = 4;
   }
 
+  let isLive = params.get("live") !== "0";
+  let windowEndTime = new Date();
+  const endParam = parseInt(params.get("end"));
+  if (!isLive && Number.isFinite(endParam)) windowEndTime = new Date(endParam);
+
   let rawData = [];
   let isPolling = false;
   let fetchSeq = 0;
   let lastSeenAt = null;
   let latestAbsolute = null;
   let userZoomed = false;
+  let lastRenderedEnd = null;
   let isEPaper = localStorage.getItem("epaper-mode") === "true";
   /* Misma inversión de sondas que la app principal */
   const isInverted = localStorage.getItem("probes-inverted") === "true";
@@ -435,14 +459,14 @@
             enabled: true,
             mode: "x",
             threshold: 5,
-            onPanComplete: () => { userZoomed = true; }
+            onPanComplete: onChartViewChanged
           },
           zoom: {
             wheel: { enabled: true, speed: 0.05 },
             pinch: { enabled: true },
             drag: { enabled: false },
             mode: "x",
-            onZoomComplete: () => { userZoomed = true; }
+            onZoomComplete: onChartViewChanged
           }
         }
       }
@@ -474,6 +498,73 @@
 
   async function fetchLatest() {
     return fetchJSON("/latest");
+  }
+
+  function hoursBackFor(startMs) {
+    return Math.ceil((Date.now() - startMs) / 3600000) + 1;
+  }
+
+  async function fetchWindow(startMs, endMs) {
+    if (WORKER_SUPPORTS_FROM_TO) {
+      const from = encodeURIComponent(new Date(startMs).toISOString());
+      const to = encodeURIComponent(new Date(endMs).toISOString());
+      const data = await fetchJSON(`/range?from=${from}&to=${to}`);
+      return Array.isArray(data) ? data : [];
+    }
+    const hoursBack = hoursBackFor(startMs);
+    if (hoursBack > MAX_HOURS_BACK) throw new Error("LIMIT");
+    return fetchRange(hoursBack);
+  }
+
+  function getWindow() {
+    const end = isLive ? Date.now() : windowEndTime.getTime();
+    return { start: end - selectedHours * 3600000, end };
+  }
+
+  function setNotice(text) {
+    const el = document.getElementById("history-notice");
+    if (!el) return;
+    el.textContent = text || "";
+    el.classList.toggle("hidden", !text);
+  }
+
+  function updateNavUI() {
+    const liveBtn = document.getElementById("btn-live");
+    if (liveBtn) liveBtn.classList.toggle("active", isLive);
+
+    const nextBtn = document.getElementById("btn-next-nav");
+    if (nextBtn) {
+      const atPresent = isLive || windowEndTime.getTime() >= Date.now() - 5000;
+      nextBtn.disabled = atPresent;
+      nextBtn.title = atPresent ? "Ya estás en el presente" : `Adelante ${selectedHours} h`;
+    }
+
+    const prevBtn = document.getElementById("btn-prev-nav");
+    if (prevBtn) prevBtn.title = `Atrás ${selectedHours} h`;
+  }
+
+  function onChartViewChanged() {
+    const scale = tempChart.scales.x;
+    if (!scale || !Number.isFinite(scale.min) || !Number.isFinite(scale.max)) {
+      userZoomed = true;
+      return;
+    }
+
+    const { end } = getWindow();
+    const nearPresent = scale.max >= end - 15000;
+
+    if (isLive && nearPresent) {
+      userZoomed = scale.max - scale.min < (selectedHours * 3600000) * 0.92;
+      return;
+    }
+
+    userZoomed = true;
+    if (isLive && !nearPresent) {
+      isLive = false;
+      windowEndTime = new Date(scale.max);
+      updateNavUI();
+      updateTimeRangeLabel();
+    }
   }
 
   /* ============================================================
