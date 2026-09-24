@@ -31,6 +31,7 @@
     #topbar.hidden-ui { opacity: 0; transform: translateY(-100%); pointer-events: none; }
     #bottombar.hidden-ui { opacity: 0; transform: translateY(100%); pointer-events: none; }
 
+    /* ===== HINT DE GIRAR TELÉFONO ===== */
     #portrait-hint {
       position: absolute; inset: 0; display: none; align-items: center;
       justify-content: center; background: #0f172a; z-index: 100;
@@ -66,7 +67,7 @@
 
 <body>
 
-<!-- HINT PORTRAIT -->
+<!-- HINT PORTRAIT (GIRA EL TELÉFONO) -->
 <div id="portrait-hint">
   <div>
     <div class="rotate-icon text-6xl mb-4">📱</div>
@@ -176,14 +177,14 @@
   const POLL_MS = 10000;
   const MAX_AGE_MS = 35000;
   const GAP_MS = 2 * 60 * 1000;
-  const MAX_HISTORY_HOURS = 168; // 7 días máximo a cargar
+  const MAX_HISTORY_HOURS = 168;
 
   /* ============================================================
      ESTADO
      ============================================================ */
   let selectedHours = 4;
   let offsetHours = 0;
-  let allData = [];          // TODOS los datos en memoria
+  let allData = [];
   let latestRow = null;
   let lastSeenAt = null;
   let isRefreshing = false;
@@ -238,13 +239,12 @@
   }
 
   /* ============================================================
-     CARGA INICIAL: descargar todo el historial en un solo paso
+     CARGA INICIAL: descargar todo el historial
      ============================================================ */
   async function loadAllHistory() {
     const chunks = [];
     let gotBig = false;
 
-    // Intento 1: pedir 7 días de golpe
     try {
       const big = await fetchRange(MAX_HISTORY_HOURS);
       if (big.length > 1) {
@@ -252,14 +252,10 @@
         const t1 = parseTs(big[big.length - 1].created_at);
         const span = (t1 - t0) / 3600000;
         console.log(`Intento 7d: ${big.length} pts, span ${span.toFixed(1)}h`);
-        if (span >= 12) {
-          chunks.push(big);
-          gotBig = true;
-        }
+        if (span >= 12) { chunks.push(big); gotBig = true; }
       }
     } catch (e) { console.warn("7d falló:", e); }
 
-    // Intento 2: si no sirvió, pedir en bloques de 24h con offset
     if (!gotBig) {
       console.log("Probando bloques de 24h...");
       let prevFirst = null;
@@ -267,53 +263,35 @@
         try {
           const chunk = await fetchRange(24, i * 24);
           if (!chunk.length) break;
-
           const firstTs = parseTs(chunk[0].created_at);
-          // Si el primer timestamp es igual al anterior, el offset NO funciona
           if (prevFirst !== null && Math.abs(firstTs - prevFirst) < 60000) {
             console.log(`Offset no funciona en i=${i}, parando.`);
             break;
           }
           prevFirst = firstTs;
           chunks.push(chunk);
-          console.log(`Bloque ${i}: ${chunk.length} pts`);
-        } catch (e) {
-          console.warn(`Bloque ${i} falló:`, e);
-          break;
-        }
+        } catch (e) { console.warn(`Bloque ${i} falló:`, e); break; }
       }
     }
 
-    // Merge + dedupe
     const seen = new Set();
     const merged = [];
     for (const chunk of chunks) {
       for (const row of chunk) {
         const key = row.created_at;
-        if (key && !seen.has(key)) {
-          seen.add(key);
-          merged.push(row);
-        }
+        if (key && !seen.has(key)) { seen.add(key); merged.push(row); }
       }
     }
-
-    // Ordenar ascendente
     merged.sort((a, b) => (parseTs(a.created_at) || 0) - (parseTs(b.created_at) || 0));
-
     allData = merged;
 
     if (allData.length) {
       const t0 = parseTs(allData[0].created_at);
       const t1 = parseTs(allData[allData.length - 1].created_at);
       console.log(`✅ Total: ${allData.length} pts, span ${((t1 - t0) / 3600000).toFixed(1)}h`);
-    } else {
-      console.warn("⚠️ Sin datos");
     }
   }
 
-  /* ============================================================
-     OBTENER EL SLICE VISIBLE (filtrado local, sin tocar la API)
-     ============================================================ */
   function getSlice() {
     if (!allData.length) return [];
     const now = Date.now();
@@ -417,7 +395,6 @@
     tempChart.data.datasets[1].data = s2;
     tempChart.data.datasets[2].data = dt;
 
-    // Eje X: ventana fija según rango seleccionado
     if (!userZoomed) {
       const now = Date.now();
       const windowMs = selectedHours * 3600 * 1000;
@@ -431,7 +408,6 @@
       }
     }
 
-    // Eje Y auto-escalado
     const temps = [];
     if (seriesState[0]) temps.push(...s1.map(d => d.y));
     if (seriesState[1]) temps.push(...s2.map(d => d.y));
@@ -523,68 +499,47 @@
         const t = parseTs(row.created_at);
         if (t && (!lastSeenAt || t > lastSeenAt.getTime())) lastSeenAt = new Date(t);
         latestRow = processRow(row);
-
-        // Agregar a allData si es nuevo
-        if (row.created_at) {
-          const exists = allData.some(r => r.created_at === row.created_at);
-          if (!exists) {
-            allData.push(row);
-            allData.sort((a, b) => (parseTs(a.created_at) || 0) - (parseTs(b.created_at) || 0));
-          }
+        const exists = allData.some(r => r.created_at === row.created_at);
+        if (!exists) {
+          allData.push(row);
+          allData.sort((a, b) => (parseTs(a.created_at) || 0) - (parseTs(b.created_at) || 0));
         }
         updateStatusBar();
         if (offsetHours === 0) renderChart();
       }
       updateBadge();
-    } catch (e) {
-      console.error("Latest falló:", e);
-      updateBadge();
-    }
+    } catch (e) { console.error("Latest falló:", e); updateBadge(); }
   }
 
   async function refreshRecentHistory() {
     if (isRefreshing) return;
     isRefreshing = true;
     try {
-      // Traer 24h recientes y mergear
       const recent = await fetchRange(24);
       const seen = new Set(allData.map(r => r.created_at));
       let added = 0;
       for (const row of recent) {
-        if (row.created_at && !seen.has(row.created_at)) {
-          allData.push(row);
-          added++;
-        }
+        if (row.created_at && !seen.has(row.created_at)) { allData.push(row); added++; }
       }
       if (added > 0) {
         allData.sort((a, b) => (parseTs(a.created_at) || 0) - (parseTs(b.created_at) || 0));
-        console.log(`Refresco: +${added} pts nuevos`);
         if (offsetHours === 0) renderChart();
       }
-    } catch (e) {
-      console.warn("Refresco falló:", e);
-    } finally {
-      isRefreshing = false;
-    }
+    } catch (e) { console.warn("Refresco falló:", e); }
+    finally { isRefreshing = false; }
   }
 
   /* ============================================================
      NAVEGACIÓN
      ============================================================ */
   function navigateHistory(direction, reset = false) {
-    if (reset) {
-      offsetHours = 0;
-    } else {
-      offsetHours += direction * selectedHours;
-      if (offsetHours < 0) offsetHours = 0;
-    }
+    if (reset) offsetHours = 0;
+    else { offsetHours += direction * selectedHours; if (offsetHours < 0) offsetHours = 0; }
     userZoomed = false;
     if (tempChart.resetZoom) tempChart.resetZoom();
-
     const isHistory = offsetHours > 0;
     document.getElementById("btn-actual").classList.toggle("hidden", !isHistory);
     document.getElementById("btn-forward").classList.toggle("hidden", !isHistory);
-
     renderChart();
     updateBadge();
   }
@@ -649,6 +604,7 @@
       try {
         if (screen.orientation && screen.orientation.lock) await screen.orientation.lock("landscape");
       } catch (_) {}
+      // Ocultar el hint al entrar en fullscreen
       document.getElementById("portrait-hint").classList.add("hidden");
     } catch (e) { console.warn(e); }
   }
@@ -679,6 +635,22 @@
   window.addEventListener("popstate", () => exitAndGoBack());
 
   /* ============================================================
+     CONTROL DEL HINT DE ROTAR TELÉFONO
+     ============================================================ */
+  function updatePortraitHint() {
+    const hint = document.getElementById("portrait-hint");
+    const isPortrait = window.matchMedia("(orientation: portrait)").matches;
+    const isSmall = window.innerWidth < 1024;
+
+    if (isPortrait && isSmall) {
+      hint.classList.add("force-hint");
+      hint.classList.remove("hidden");
+    } else {
+      hint.classList.remove("force-hint");
+    }
+  }
+
+  /* ============================================================
      INIT
      ============================================================ */
   window.addEventListener("DOMContentLoaded", async () => {
@@ -690,13 +662,20 @@
 
     applySeriesVisibility();
 
-    // Cargar TODO el historial UNA VEZ
+    // Mostrar el hint si estamos en vertical al abrir
+    updatePortraitHint();
+    window.addEventListener("resize", updatePortraitHint);
+    window.addEventListener("orientationchange", () => setTimeout(updatePortraitHint, 300));
+
+    // Botón del hint
+    document.querySelector("#portrait-hint button")
+      ?.addEventListener("click", enterFullscreen);
+
     await loadAllHistory();
     await refreshLatest();
     renderChart();
     updateBadge();
 
-    // Refrescos periódicos
     setInterval(() => { if (offsetHours === 0) refreshLatest(); }, POLL_MS);
     setInterval(() => { if (offsetHours === 0) refreshRecentHistory(); }, 60000);
     setInterval(updateBadge, 2000);
