@@ -84,7 +84,7 @@
       50% { transform: rotate(90deg); }
     }
 
-    /* Rango de horas */
+    /* Botones UI */
     .range-btn {
       padding: 4px 10px;
       border-radius: 6px;
@@ -202,8 +202,20 @@
       <div id="time-range-label" class="text-[10px] text-slate-400 font-mono">--</div>
     </div>
 
-    <!-- Rango de horas -->
-    <div class="flex items-center gap-1">
+    <!-- Navegación y Rango de horas -->
+    <div class="flex items-center gap-1 shrink-0 overflow-x-auto">
+      <!-- Navegación Historial -->
+      <button class="range-btn flex items-center justify-center w-8" onclick="navigateHistory(1)" title="Más antiguo">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </button>
+      <button id="btn-actual" class="range-btn bg-sky-600 text-white border-sky-600 hidden" onclick="navigateHistory(0, true)">Live</button>
+      <button id="btn-forward" class="range-btn flex items-center justify-center w-8 hidden" onclick="navigateHistory(-1)" title="Más reciente">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      </button>
+
+      <div class="w-px h-4 bg-slate-700 mx-1"></div>
+
+      <!-- Rango -->
       <button class="range-btn" data-hours="2" onclick="setHours(2)">2h</button>
       <button class="range-btn" data-hours="4" onclick="setHours(4)">4h</button>
       <button class="range-btn" data-hours="8" onclick="setHours(8)">8h</button>
@@ -294,10 +306,13 @@
   const API_URL = "https://api-termometro.manuelaa1990.workers.dev";
   const POLL_INTERVAL_MS = 10000;
   const ESP_CONNECTED_MAX_AGE_MS = 35000;
+  const MAX_GAP_MS = 2 * 60 * 1000; // 2 minutos sin datos = Espacio vacío
 
   const params = new URLSearchParams(location.search);
   let selectedHours = parseInt(params.get("hours")) || 4;
   if (![2, 4, 8, 12, 24].includes(selectedHours)) selectedHours = 4;
+  
+  let offsetHours = 0; // 0 = Tiempo real, > 0 = Historial
 
   let rawData = [];
   let isFetching = false;
@@ -332,7 +347,8 @@
           tension: 0.25,
           pointRadius: 0,
           pointHoverRadius: 6,
-          fill: true
+          fill: true,
+          spanGaps: false
         },
         {
           label: "Sonda 2",
@@ -343,7 +359,8 @@
           tension: 0.25,
           pointRadius: 0,
           pointHoverRadius: 6,
-          fill: true
+          fill: true,
+          spanGaps: false
         },
         {
           label: "ΔT",
@@ -354,7 +371,8 @@
           tension: 0.25,
           pointRadius: 0,
           pointHoverRadius: 6,
-          fill: false
+          fill: false,
+          spanGaps: false
         }
       ]
     },
@@ -406,7 +424,7 @@
           callbacks: {
             label: function (context) {
               const v = context.parsed.y;
-              if (v === null || v === undefined) return context.dataset.label + ": --";
+              if (v === null || v === undefined || isNaN(v)) return context.dataset.label + ": --";
               return context.dataset.label + ": " + v.toFixed(2) + " °C";
             }
           }
@@ -450,8 +468,9 @@
     return res.json();
   }
 
-  async function fetchRange(hours) {
-    const data = await fetchJSON(`/range?hours=${hours}`);
+  async function fetchRange(hours, offset = 0) {
+    const url = offset > 0 ? `/range?hours=${hours}&offset=${offset}` : `/range?hours=${hours}`;
+    const data = await fetchJSON(url);
     return Array.isArray(data) ? data : [];
   }
 
@@ -510,13 +529,27 @@
     const s2Data = [];
     const deltaData = [];
 
+    let lastTime = null;
+
     processed.forEach(r => {
       const d = new Date(r.created_at);
-      const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      labels.push(time);
+      const currentTime = d.getTime();
+
+      // Inyectar hueco si el tiempo entre datos supera MAX_GAP_MS
+      if (lastTime !== null && (currentTime - lastTime) > MAX_GAP_MS) {
+        labels.push(""); 
+        s1Data.push(null);
+        s2Data.push(null);
+        deltaData.push(null);
+      }
+
+      const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      labels.push(timeStr);
       s1Data.push(r.s1);
       s2Data.push(r.s2);
       deltaData.push(r.delta);
+      
+      lastTime = currentTime;
     });
 
     tempChart.data.labels = labels;
@@ -524,7 +557,7 @@
     tempChart.data.datasets[1].data = s2Data;
     tempChart.data.datasets[2].data = deltaData;
 
-    // Auto-escalado del eje Y — solo con series VISIBLES
+    // Auto-escalado del eje Y — solo con series VISIBLES y descartando los nulos
     const visibleData = [];
     if (seriesState[0]) visibleData.push(...s1Data);
     if (seriesState[1]) visibleData.push(...s2Data);
@@ -568,28 +601,36 @@
 
   function updateTimeRangeLabel() {
     const now = new Date();
-    const start = new Date(now.getTime() - selectedHours * 3600 * 1000);
+    // Calcular el rango basado en el offset
+    const end = new Date(now.getTime() - offsetHours * 3600 * 1000);
+    const start = new Date(end.getTime() - selectedHours * 3600 * 1000);
     const opts = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
     document.getElementById("time-range-label").textContent =
-      `${start.toLocaleDateString([], opts)} → ${now.toLocaleDateString([], opts)} · ${selectedHours}h · ${rawData.length} pts`;
+      `${start.toLocaleDateString([], opts)} → ${end.toLocaleDateString([], opts)} · ${selectedHours}h · ${rawData.length} pts`;
   }
 
   function updateStatusBadge() {
     const badge = document.getElementById("status-badge");
     if (!badge) return;
 
-    const age = lastSeenAt ? Date.now() - lastSeenAt.getTime() : null;
     let text, style;
-
-    if (age !== null && age <= ESP_CONNECTED_MAX_AGE_MS) {
-      text = "En vivo · " + formatAge(age);
-      style = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
-    } else if (age !== null) {
-      text = "Desconectado · " + formatAge(age);
-      style = "bg-rose-500/20 text-rose-400 border-rose-500/30";
+    
+    // Si estamos viendo el historial, cambiar el diseño del badge
+    if (offsetHours > 0) {
+      text = "Modo Historial";
+      style = "bg-purple-500/20 text-purple-400 border-purple-500/30";
     } else {
-      text = "Sin datos";
-      style = "bg-amber-500/20 text-amber-400 border-amber-500/30";
+      const age = lastSeenAt ? Date.now() - lastSeenAt.getTime() : null;
+      if (age !== null && age <= ESP_CONNECTED_MAX_AGE_MS) {
+        text = "En vivo · " + formatAge(age);
+        style = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+      } else if (age !== null) {
+        text = "Desconectado · " + formatAge(age);
+        style = "bg-rose-500/20 text-rose-400 border-rose-500/30";
+      } else {
+        text = "Sin datos";
+        style = "bg-amber-500/20 text-amber-400 border-amber-500/30";
+      }
     }
 
     badge.textContent = text;
@@ -597,16 +638,18 @@
   }
 
   /* ============================================================
-     FETCH LOOP
+     FETCH LOOP Y NAVEGACIÓN
      ============================================================ */
 
   async function refreshRange() {
     if (isFetching) return;
     isFetching = true;
     try {
-      const data = await fetchRange(selectedHours);
+      const data = await fetchRange(selectedHours, offsetHours);
       rawData = data;
-      if (data.length) {
+      
+      // Solo actualizamos "lastSeenAt" si estamos viendo datos en tiempo real
+      if (data.length && offsetHours === 0) {
         const last = data[data.length - 1];
         if (last.created_at) {
           const t = new Date(last.created_at).getTime();
@@ -624,7 +667,8 @@
   }
 
   async function refreshLatest() {
-    if (isPolling || document.hidden) return;
+    // Si estamos viendo el historial, no hacemos polling del latest
+    if (isPolling || document.hidden || offsetHours > 0) return;
     isPolling = true;
     try {
       const row = await fetchLatest();
@@ -643,6 +687,25 @@
     }
   }
 
+  function navigateHistory(direction, reset = false) {
+    if (reset) {
+      offsetHours = 0;
+    } else {
+      // 1 = Hacia atrás en el tiempo (historial), -1 = Hacia el presente
+      offsetHours += (direction * selectedHours);
+      if (offsetHours < 0) offsetHours = 0;
+    }
+
+    const isHistory = offsetHours > 0;
+    document.getElementById('btn-actual').classList.toggle('hidden', !isHistory);
+    document.getElementById('btn-forward').classList.toggle('hidden', !isHistory);
+
+    // Obligatorio reiniciar el zoom para que aparezcan las nuevas coordenadas
+    if (tempChart.resetZoom) tempChart.resetZoom();
+    
+    refreshRange();
+  }
+
   /* ============================================================
      SELECTOR DE SERIES
      ============================================================ */
@@ -652,7 +715,6 @@
       tempChart.setDatasetVisibility(i, visible);
     });
 
-    // Actualizar apariencia de los botones
     const ids = ["toggle-s1", "toggle-s2", "toggle-dt"];
     ids.forEach((id, i) => {
       const btn = document.getElementById(id);
@@ -660,18 +722,13 @@
     });
 
     localStorage.setItem("graph-series", JSON.stringify(seriesState));
-
-    // Recalcular rango Y según series visibles
     renderChart();
   }
 
   function toggleSeries(index) {
     if (index < 0 || index > 2) return;
-
     const newState = [...seriesState];
     newState[index] = !newState[index];
-
-    // Evitar que todas queden ocultas a la vez
     if (!newState.some(v => v)) return;
 
     seriesState = newState;
@@ -686,11 +743,11 @@
   function setHours(h) {
     selectedHours = h;
     localStorage.setItem("graph-hours", h);
-    document.querySelectorAll(".range-btn").forEach(b => {
+    document.querySelectorAll(".range-btn[data-hours]").forEach(b => {
       b.classList.toggle("active", parseInt(b.dataset.hours) === h);
     });
-    if (tempChart.resetZoom) tempChart.resetZoom();
-    refreshRange();
+    // Al cambiar de rango, regresamos automáticamente a la vista en vivo
+    navigateHistory(0, true); 
   }
 
   function resetZoom() {
@@ -711,14 +768,11 @@
       const el = document.documentElement;
       if (el.requestFullscreen) await el.requestFullscreen();
       else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
-
-      // Intentar bloquear orientación landscape
       try {
         if (screen.orientation && screen.orientation.lock) {
           await screen.orientation.lock("landscape");
         }
       } catch (_) {}
-
       document.getElementById("portrait-hint").classList.add("hidden");
     } catch (err) {
       console.warn("Fullscreen no disponible:", err);
@@ -757,12 +811,9 @@
         try { screen.orientation.unlock(); } catch (_) {}
       }
     } catch (_) {}
-
-    // Volver a la app principal
     location.href = "./index.html";
   }
 
-  /* Doble tap para mostrar/ocultar UI */
   let lastTap = 0;
   document.getElementById("chart-container").addEventListener("touchend", (e) => {
     const now = Date.now();
@@ -774,15 +825,9 @@
     lastTap = now;
   }, { passive: false });
 
-  /* Botón de pantalla completa del hint */
   document.querySelector("#portrait-hint button")?.addEventListener("click", enterFullscreen);
 
-  /* ============================================================
-     BOTÓN FÍSICO "ATRÁS" DEL MÓVIL
-     ============================================================ */
-
   history.pushState({ page: "grafica" }, "", location.href);
-
   window.addEventListener("popstate", (e) => {
     exitAndGoBack();
   });
@@ -792,27 +837,22 @@
      ============================================================ */
 
   window.addEventListener("DOMContentLoaded", async () => {
-    // Aplicar rango guardado
     const savedHours = parseInt(localStorage.getItem("graph-hours"));
     if (savedHours && [2, 4, 8, 12, 24].includes(savedHours)) {
       selectedHours = savedHours;
     }
 
-    document.querySelectorAll(".range-btn").forEach(b => {
+    document.querySelectorAll(".range-btn[data-hours]").forEach(b => {
       b.classList.toggle("active", parseInt(b.dataset.hours) === selectedHours);
     });
 
     applyEPaper();
-
-    // Aplicar estado guardado de las series
     applySeriesVisibility();
 
-    // Detectar orientación
     if (window.matchMedia("(orientation: portrait)").matches && window.innerWidth < 1024) {
       document.getElementById("portrait-hint").classList.add("force-hint");
     }
 
-    // Escuchar cambios de orientación
     window.matchMedia("(orientation: portrait)").addEventListener("change", (e) => {
       const hint = document.getElementById("portrait-hint");
       if (e.matches && window.innerWidth < 1024) {
@@ -822,18 +862,18 @@
       }
     });
 
-    // Cargar datos iniciales
     await refreshRange();
     await refreshLatest();
 
-    // Polling
-    setInterval(refreshRange, 30000);
+    setInterval(() => {
+      if (offsetHours === 0) refreshRange();
+    }, 30000);
+
     setInterval(refreshLatest, POLL_INTERVAL_MS);
     setInterval(updateStatusBadge, 2000);
 
-    // Al volver a la pestaña, refrescar
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) {
+      if (!document.hidden && offsetHours === 0) {
         refreshRange();
         refreshLatest();
       }
