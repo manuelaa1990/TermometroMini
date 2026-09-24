@@ -10,9 +10,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2"></script>
 
   <style>
     * { box-sizing: border-box; }
@@ -59,6 +58,7 @@
       pointer-events: none;
     }
 
+    /* Hint de girar teléfono */
     #portrait-hint {
       position: absolute;
       inset: 0;
@@ -84,6 +84,7 @@
       50% { transform: rotate(90deg); }
     }
 
+    /* Rango de horas */
     .range-btn {
       padding: 4px 10px;
       border-radius: 6px;
@@ -100,17 +101,8 @@
       color: white;
       border-color: #0284c7;
     }
-    .range-btn:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
-    .nav-btn {
-      min-width: 2.25rem;
-      padding: 4px 12px;
-      font-size: 16px;
-      line-height: 1;
-    }
 
+    /* Backdrop semitransparente para barras */
     .ui-bar {
       background: rgba(15, 23, 42, 0.85);
       backdrop-filter: blur(8px);
@@ -133,20 +125,16 @@
     body.epaper-mode #bottombar * {
       color: #000 !important;
     }
-    body.epaper-mode #topbar button:not(.range-btn),
-    body.epaper-mode #bottombar button:not(.series-toggle) {
-      background: #fff !important;
-      border: 2px solid #000 !important;
-    }
     body.epaper-mode .range-btn {
       border-color: #000;
       color: #000;
     }
     body.epaper-mode .range-btn.active {
       background: #000;
-      color: #fff !important;
+      color: #fff;
     }
 
+    /* Pills del selector de series */
     .series-toggle {
       border-color: #334155;
       background: #1e293b;
@@ -194,6 +182,7 @@
 <!-- TOPBAR -->
 <div id="topbar" class="ui-bar border-b">
   <div class="flex items-center gap-2 px-3 py-2">
+    <!-- Volver -->
     <button onclick="exitAndGoBack()" title="Salir de la gráfica"
       class="px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold border border-rose-500 shadow-lg flex items-center gap-1.5 active:scale-95 transition">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -202,6 +191,7 @@
       <span>Salir</span>
     </button>
 
+    <!-- Título + estado -->
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
         <span class="text-sm font-bold text-sky-400 truncate">Gráfica Live</span>
@@ -209,8 +199,10 @@
           Verificando...
         </div>
       </div>
+      <div id="time-range-label" class="text-[10px] text-slate-400 font-mono">--</div>
     </div>
 
+    <!-- Rango de horas -->
     <div class="flex items-center gap-1">
       <button class="range-btn" data-hours="2" onclick="setHours(2)">2h</button>
       <button class="range-btn" data-hours="4" onclick="setHours(4)">4h</button>
@@ -219,20 +211,6 @@
       <button class="range-btn" data-hours="24" onclick="setHours(24)">24h</button>
     </div>
   </div>
-
-  <!-- FECHA arriba de los botones -->
-  <div class="px-3 pb-1">
-    <div id="time-range-label" class="text-[10px] text-slate-400 font-mono text-center">--</div>
-  </div>
-
-  <!-- Botones de navegación debajo -->
-  <div class="flex items-center justify-center gap-2 px-3 pb-2">
-    <button id="btn-prev-nav" onclick="navigateWindow(-1)" title="Ventana anterior" class="range-btn nav-btn">‹</button>
-    <button id="btn-live" onclick="goLive()" class="range-btn px-4">Actual</button>
-    <button id="btn-next-nav" onclick="navigateWindow(1)" title="Ventana siguiente" class="range-btn nav-btn">›</button>
-  </div>
-
-  <div id="history-notice" class="hidden text-center text-[10px] text-amber-400 px-3 pb-1.5"></div>
 </div>
 
 <!-- GRÁFICA -->
@@ -244,6 +222,7 @@
 <div id="bottombar" class="ui-bar border-t">
   <div class="flex items-center justify-between px-3 py-2 text-[11px] gap-2 flex-wrap">
 
+    <!-- Batería -->
     <div class="flex items-center gap-1.5 shrink-0">
       <svg id="bat-icon" class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
@@ -251,6 +230,7 @@
       <span id="bat-val" class="font-mono text-slate-300">--% · --.--V</span>
     </div>
 
+    <!-- Selector de series (toggle pills) -->
     <div class="flex items-center gap-1 shrink-0">
       <button id="toggle-s1" onclick="toggleSeries(0)" title="Mostrar Sonda 1"
         class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
@@ -271,6 +251,7 @@
       </button>
     </div>
 
+    <!-- WiFi + IP -->
     <div class="flex items-center gap-1 text-slate-300 min-w-0">
       <svg class="w-4 h-4 text-sky-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071a10 10 0 0114.142 0M1.42 9.428a16 16 0 0121.16 0"/>
@@ -278,6 +259,7 @@
       <span id="wifi-val" class="truncate max-w-[180px]">--</span>
     </div>
 
+    <!-- Controles -->
     <div class="flex items-center gap-1.5 shrink-0">
       <button onclick="resetZoom()" title="Reset zoom"
         class="p-1.5 rounded bg-slate-800/70 hover:bg-slate-700 text-slate-200 border border-slate-700">
@@ -312,88 +294,68 @@
   const API_URL = "https://api-termometro.manuelaa1990.workers.dev";
   const POLL_INTERVAL_MS = 10000;
   const ESP_CONNECTED_MAX_AGE_MS = 35000;
-  const GAP_MS = 5 * 60 * 1000;
-  const MAX_CHART_POINTS = 1500;
-  const VALID_HOURS = [2, 4, 8, 12, 24];
-  const WORKER_SUPPORTS_FROM_TO = false;
-  const MAX_HOURS_BACK = 72;
 
   const params = new URLSearchParams(location.search);
-
-  let selectedHours = parseInt(params.get("hours"));
-  if (!VALID_HOURS.includes(selectedHours)) {
-    selectedHours = parseInt(localStorage.getItem("graph-hours"));
-    if (!VALID_HOURS.includes(selectedHours)) selectedHours = 4;
-  }
-
-  let isLive = params.get("live") !== "0";
-  let windowEndTime = new Date();
-  const endParam = parseInt(params.get("end"));
-  if (!isLive && Number.isFinite(endParam)) windowEndTime = new Date(endParam);
+  let selectedHours = parseInt(params.get("hours")) || 4;
+  if (![2, 4, 8, 12, 24].includes(selectedHours)) selectedHours = 4;
 
   let rawData = [];
+  let isFetching = false;
   let isPolling = false;
-  let fetchSeq = 0;
   let lastSeenAt = null;
   let latestAbsolute = null;
-  let userZoomed = false;
   let isEPaper = localStorage.getItem("epaper-mode") === "true";
-  const isInverted = localStorage.getItem("probes-inverted") === "true";
 
-  let seriesState = [true, true, true];
-  try {
-    const saved = JSON.parse(localStorage.getItem("graph-series") || "[true,true,true]");
-    if (Array.isArray(saved) && saved.length === 3 && saved.some(Boolean)) seriesState = saved.map(Boolean);
-  } catch (_) {}
+  // Estado de las series: [S1, S2, ΔT]
+  let seriesState = JSON.parse(localStorage.getItem("graph-series") || "[true,true,true]");
+  if (!Array.isArray(seriesState) || seriesState.length !== 3) {
+    seriesState = [true, true, true];
+  }
 
   /* ============================================================
      GRÁFICA
      ============================================================ */
-
-  const SERIES_STYLE = {
-    color: [
-      { borderColor: "#38bdf8", backgroundColor: "rgba(56,189,248,.08)", borderDash: [], fill: true },
-      { borderColor: "#f87171", backgroundColor: "rgba(248,113,113,.08)", borderDash: [], fill: true },
-      { borderColor: "#fbbf24", backgroundColor: "rgba(251,191,36,.08)", borderDash: [], fill: false }
-    ],
-    epaper: [
-      { borderColor: "#000", backgroundColor: "transparent", borderDash: [], fill: false },
-      { borderColor: "#000", backgroundColor: "transparent", borderDash: [10, 6], fill: false },
-      { borderColor: "#444", backgroundColor: "transparent", borderDash: [2, 5], fill: false }
-    ]
-  };
-
-  function formatXTick(value, index) {
-    const d = new Date(value);
-    const hm = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const dm = d.toLocaleDateString([], { day: "2-digit", month: "2-digit" });
-    if (index === 0 || (d.getHours() === 0 && d.getMinutes() === 0)) return [hm, dm];
-    return hm;
-  }
-
-  function buildTimeTicks(scale) {
-    const min = scale.min, max = scale.max;
-    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return;
-    const steps = [1, 2, 5, 10, 15, 30, 60, 120, 180, 360, 720].map(m => m * 60000);
-    const span = max - min;
-    const stepMs = steps.find(s => span / s <= 10) || steps[steps.length - 1];
-    const off = new Date().getTimezoneOffset() * 60000;
-    const ticks = [];
-    for (let t = Math.ceil((min - off) / stepMs) * stepMs + off; t <= max; t += stepMs) {
-      ticks.push({ value: t });
-    }
-    scale.ticks = ticks;
-  }
 
   const ctx = document.getElementById("tempChart").getContext("2d");
 
   const tempChart = new Chart(ctx, {
     type: "line",
     data: {
+      labels: [],
       datasets: [
-        { label: "Sonda 1", data: [], borderWidth: 2.5, tension: 0.25, pointRadius: 0, pointHoverRadius: 6, ...SERIES_STYLE.color[0] },
-        { label: "Sonda 2", data: [], borderWidth: 2.5, tension: 0.25, pointRadius: 0, pointHoverRadius: 6, ...SERIES_STYLE.color[1] },
-        { label: "ΔT",      data: [], borderWidth: 2.5, tension: 0.25, pointRadius: 0, pointHoverRadius: 6, ...SERIES_STYLE.color[2] }
+        {
+          label: "Sonda 1",
+          borderColor: "#38bdf8",
+          backgroundColor: "rgba(56,189,248,.08)",
+          data: [],
+          borderWidth: 2.5,
+          tension: 0.25,
+          pointRadius: 0,
+          pointHoverRadius: 6,
+          fill: true
+        },
+        {
+          label: "Sonda 2",
+          borderColor: "#f87171",
+          backgroundColor: "rgba(248,113,113,.08)",
+          data: [],
+          borderWidth: 2.5,
+          tension: 0.25,
+          pointRadius: 0,
+          pointHoverRadius: 6,
+          fill: true
+        },
+        {
+          label: "ΔT",
+          borderColor: "#fbbf24",
+          backgroundColor: "rgba(251,191,36,.08)",
+          data: [],
+          borderWidth: 2.5,
+          tension: 0.25,
+          pointRadius: 0,
+          pointHoverRadius: 6,
+          fill: false
+        }
       ]
     },
     options: {
@@ -404,14 +366,18 @@
       layout: { padding: { top: 8, right: 16, bottom: 8, left: 8 } },
       scales: {
         x: {
-          type: "linear",
-          ticks: { color: "#94a3b8", font: { size: 12 }, autoSkip: false, maxRotation: 0, callback: formatXTick },
-          grid: { color: "rgba(51, 65, 85, 0.5)" },
-          afterBuildTicks: buildTimeTicks
+          ticks: {
+            color: "#94a3b8",
+            font: { size: 12 },
+            maxTicksLimit: 10,
+            autoSkip: true,
+            maxRotation: 0
+          },
+          grid: { color: "rgba(51, 65, 85, 0.5)" }
         },
         y: {
           grace: "5%",
-          ticks: { color: "#94a3b8", font: { size: 12 }, maxTicksLimit: 10 },
+          ticks: { color: "#94a3b8", font: { size: 12 }, stepSize: 2 },
           grid: { color: "rgba(51, 65, 85, 0.5)" }
         }
       },
@@ -419,7 +385,6 @@
         legend: {
           display: true,
           position: "top",
-          onClick: () => {},
           labels: {
             color: "#cbd5e1",
             font: { size: 13, weight: "600" },
@@ -439,10 +404,6 @@
           titleFont: { size: 13 },
           bodyFont: { size: 13 },
           callbacks: {
-            title: function (items) {
-              if (!items.length) return "";
-              return new Date(items[0].parsed.x).toLocaleString([], { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
-            },
             label: function (context) {
               const v = context.parsed.y;
               if (v === null || v === undefined) return context.dataset.label + ": --";
@@ -451,19 +412,20 @@
           }
         },
         zoom: {
-          limits: { x: { min: undefined, max: undefined } },
+          limits: {
+            x: { min: "original", max: "original" }
+          },
           pan: {
             enabled: true,
             mode: "x",
-            threshold: 5,
-            onPanComplete: onChartViewChanged
+            modifierKey: null,
+            threshold: 5
           },
           zoom: {
             wheel: { enabled: true, speed: 0.05 },
             pinch: { enabled: true },
             drag: { enabled: false },
-            mode: "x",
-            onZoomComplete: onChartViewChanged
+            mode: "x"
           }
         }
       }
@@ -497,124 +459,28 @@
     return fetchJSON("/latest");
   }
 
-  function hoursBackFor(startMs) {
-    return Math.ceil((Date.now() - startMs) / 3600000) + 1;
-  }
-
-  async function fetchWindow(startMs, endMs) {
-    if (WORKER_SUPPORTS_FROM_TO) {
-      const from = encodeURIComponent(new Date(startMs).toISOString());
-      const to = encodeURIComponent(new Date(endMs).toISOString());
-      const data = await fetchJSON(`/range?from=${from}&to=${to}`);
-      return Array.isArray(data) ? data : [];
-    }
-    const hoursBack = hoursBackFor(startMs);
-    if (hoursBack > MAX_HOURS_BACK) throw new Error("LIMIT");
-    return fetchRange(hoursBack);
-  }
-
-  function getWindow() {
-    const end = isLive ? Date.now() : windowEndTime.getTime();
-    return { start: end - selectedHours * 3600000, end };
-  }
-
-  function setNotice(text) {
-    const el = document.getElementById("history-notice");
-    if (!el) return;
-    el.textContent = text || "";
-    el.classList.toggle("hidden", !text);
-  }
-
-  function updateNavUI() {
-    const liveBtn = document.getElementById("btn-live");
-    if (liveBtn) liveBtn.classList.toggle("active", isLive);
-
-    const nextBtn = document.getElementById("btn-next-nav");
-    if (nextBtn) {
-      const atPresent = isLive || windowEndTime.getTime() >= Date.now() - 5000;
-      nextBtn.disabled = atPresent;
-      nextBtn.title = atPresent ? "Ya estás en el presente" : `Adelante ${selectedHours} h`;
-    }
-
-    const prevBtn = document.getElementById("btn-prev-nav");
-    if (prevBtn) prevBtn.title = `Atrás ${selectedHours} h`;
-  }
-
-  function onChartViewChanged() {
-    const scale = tempChart.scales.x;
-    if (!scale || !Number.isFinite(scale.min) || !Number.isFinite(scale.max)) {
-      userZoomed = true;
-      return;
-    }
-
-    const { end } = getWindow();
-    const nearPresent = scale.max >= end - 15000;
-
-    if (isLive && nearPresent) {
-      userZoomed = scale.max - scale.min < (selectedHours * 3600000) * 0.92;
-      return;
-    }
-
-    const wasLive = isLive;
-    userZoomed = true;
-    if (!nearPresent) {
-      isLive = false;
-      windowEndTime = new Date(scale.max);
-      updateNavUI();
-      updateTimeRangeLabel();
-      if (wasLive) refreshRange();
-    }
-  }
-
   /* ============================================================
-     PROCESAR FILAS
+     PROCESAR ROW
      ============================================================ */
-
-  function toNum(v) {
-    if (v === null || v === undefined || v === "") return null;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  }
-
-  function cleanTemp(v) {
-    const n = toNum(v);
-    return (n !== null && n > -50 && n <= 125) ? n : null;
-  }
-
-  const BATTERY_CURVE = [
-    [4.20, 100], [4.06, 90], [3.98, 80], [3.92, 70],
-    [3.87, 60],  [3.82, 50], [3.79, 40], [3.77, 30],
-    [3.74, 20],  [3.68, 10], [3.45, 5],  [3.00, 0]
-  ];
-
-  function voltageToPercent(v) {
-    if (!Number.isFinite(v)) return null;
-    if (v >= BATTERY_CURVE[0][0]) return 100;
-    if (v <= BATTERY_CURVE[BATTERY_CURVE.length - 1][0]) return 0;
-    for (let i = 0; i < BATTERY_CURVE.length - 1; i++) {
-      const [vHigh, pHigh] = BATTERY_CURVE[i];
-      const [vLow, pLow] = BATTERY_CURVE[i + 1];
-      if (v <= vHigh && v >= vLow) {
-        return Math.round(pLow + ((v - vLow) / (vHigh - vLow)) * (pHigh - pLow));
-      }
-    }
-    return 0;
-  }
 
   function processRow(row) {
     if (!row) return null;
-    const raw1 = cleanTemp(row.temp1);
-    const raw2 = cleanTemp(row.temp2);
-    const s1 = isInverted ? raw2 : raw1;
-    const s2 = isInverted ? raw1 : raw2;
-    const delta = (s1 !== null && s2 !== null) ? Math.abs(s1 - s2) : null;
+    const raw1 = (row.temp1 === null || row.temp1 <= -127 || row.temp1 < -50 || row.temp1 > 125) ? null : Number(row.temp1);
+    const raw2 = (row.temp2 === null || row.temp2 <= -127 || row.temp2 < -50 || row.temp2 > 125) ? null : Number(row.temp2);
+    const delta = (raw1 !== null && raw2 !== null) ? Math.abs(raw1 - raw2) : null;
 
-    const vBat = toNum(row.bateriaVolt);
-    const bateria = vBat !== null ? voltageToPercent(vBat) : null;
+    const vBat = (row.bateriaVolt !== undefined && row.bateriaVolt !== null) ? Number(row.bateriaVolt) : null;
+    let bateria = null;
+    if (vBat !== null && !isNaN(vBat)) {
+      const pct = ((vBat - 3.10) / (4.20 - 3.10)) * 100;
+      bateria = Math.max(0, Math.min(100, Math.round(pct)));
+    }
 
     return {
       ...row,
-      s1, s2, delta,
+      s1: raw1,
+      s2: raw2,
+      delta,
       bateria,
       bateriaVolt: vBat,
       wifi: row.wifi || row.ssid || null,
@@ -632,77 +498,48 @@
     return `${Math.floor(h / 24)} d`;
   }
 
-  function downsample(pts, maxPts) {
-    if (pts.length <= maxPts) return pts;
-    const k = Math.ceil(pts.length / maxPts);
-    const out = [];
-    for (let i = 0; i < pts.length; i += k) {
-      const g = pts.slice(i, i + k);
-      const avg = key => {
-        const v = g.map(p => p[key]).filter(x => x !== null);
-        return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
-      };
-      out.push({
-        t: g.reduce((a, p) => a + p.t, 0) / g.length,
-        s1: avg("s1"), s2: avg("s2"), delta: avg("delta")
-      });
-    }
-    return out;
-  }
-
   /* ============================================================
      RENDER
      ============================================================ */
 
   function renderChart() {
-    const { start, end } = getWindow();
-
     const processed = rawData.map(processRow).filter(Boolean);
-    const allPts = processed.map(r => ({ t: new Date(r.created_at).getTime(), s1: r.s1, s2: r.s2, delta: r.delta }));
-    const pts = downsample(allPts, MAX_CHART_POINTS);
 
-    const d1 = [], d2 = [], dd = [];
-    let prevT = null;
-    pts.forEach(p => {
-      if (prevT !== null && p.t - prevT > GAP_MS) {
-        const g = (p.t + prevT) / 2;
-        d1.push({ x: g, y: null });
-        d2.push({ x: g, y: null });
-        dd.push({ x: g, y: null });
-      }
-      d1.push({ x: p.t, y: p.s1 });
-      d2.push({ x: p.t, y: p.s2 });
-      dd.push({ x: p.t, y: p.delta });
-      prevT = p.t;
+    const labels = [];
+    const s1Data = [];
+    const s2Data = [];
+    const deltaData = [];
+
+    processed.forEach(r => {
+      const d = new Date(r.created_at);
+      const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      labels.push(time);
+      s1Data.push(r.s1);
+      s2Data.push(r.s2);
+      deltaData.push(r.delta);
     });
 
-    tempChart.data.datasets[0].data = d1;
-    tempChart.data.datasets[1].data = d2;
-    tempChart.data.datasets[2].data = dd;
+    tempChart.data.labels = labels;
+    tempChart.data.datasets[0].data = s1Data;
+    tempChart.data.datasets[1].data = s2Data;
+    tempChart.data.datasets[2].data = deltaData;
 
-    let tMin = Infinity, tMax = -Infinity;
-    allPts.forEach(p => {
-      [[0, p.s1], [1, p.s2], [2, p.delta]].forEach(([i, v]) => {
-        if (seriesState[i] && v !== null) {
-          if (v < tMin) tMin = v;
-          if (v > tMax) tMax = v;
-        }
-      });
-    });
+    // Auto-escalado del eje Y — solo con series VISIBLES
+    const visibleData = [];
+    if (seriesState[0]) visibleData.push(...s1Data);
+    if (seriesState[1]) visibleData.push(...s2Data);
+    if (seriesState[2]) visibleData.push(...deltaData);
 
-    if (tMin !== Infinity) {
+    const allTemps = visibleData.filter(v => v !== null && Number.isFinite(v));
+    if (allTemps.length) {
+      const tMin = Math.min(...allTemps);
+      const tMax = Math.max(...allTemps);
       const margin = Math.max(1, (tMax - tMin) * 0.15);
       tempChart.options.scales.y.min = Math.floor((tMin - margin) / 2) * 2;
       tempChart.options.scales.y.max = Math.ceil((tMax + margin) / 2) * 2;
     } else {
       tempChart.options.scales.y.min = undefined;
       tempChart.options.scales.y.max = undefined;
-    }
-
-    tempChart.options.plugins.zoom.limits.x = { min: start, max: end };
-    if (!userZoomed) {
-      tempChart.options.scales.x.min = start;
-      tempChart.options.scales.x.max = end;
     }
 
     tempChart.update("none");
@@ -713,14 +550,15 @@
     if (!latestAbsolute) return;
 
     const bat = latestAbsolute;
-    if (bat.bateriaVolt !== null && bat.bateria !== null) {
-      document.getElementById("bat-val").textContent = `${bat.bateria}% · ${bat.bateriaVolt.toFixed(2)}V`;
+    if (bat.bateriaVolt !== null) {
+      const v = bat.bateriaVolt;
+      const pct = bat.bateria;
+      document.getElementById("bat-val").textContent = `${pct}% · ${v.toFixed(2)}V`;
 
       const icon = document.getElementById("bat-icon");
-      const cls = bat.bateria <= 20 || bat.bateriaVolt <= 3.10 ? "text-rose-500"
-                : bat.bateria <= 50 ? "text-amber-400"
-                : "text-emerald-400";
-      icon.setAttribute("class", "w-4 h-4 " + cls);
+      if (pct <= 20) icon.className = "w-4 h-4 text-rose-500";
+      else if (pct <= 50) icon.className = "w-4 h-4 text-amber-400";
+      else icon.className = "w-4 h-4 text-emerald-400";
     }
 
     const wifi = bat.wifi || "?";
@@ -729,11 +567,11 @@
   }
 
   function updateTimeRangeLabel() {
-    const { start, end } = getWindow();
+    const now = new Date();
+    const start = new Date(now.getTime() - selectedHours * 3600 * 1000);
     const opts = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
-    const tag = isLive ? "· LIVE" : "· HIST";
     document.getElementById("time-range-label").textContent =
-      `${new Date(start).toLocaleString([], opts)} → ${new Date(end).toLocaleString([], opts)} ${tag} · ${selectedHours}h · ${rawData.length} pts`;
+      `${start.toLocaleDateString([], opts)} → ${now.toLocaleDateString([], opts)} · ${selectedHours}h · ${rawData.length} pts`;
   }
 
   function updateStatusBadge() {
@@ -743,10 +581,7 @@
     const age = lastSeenAt ? Date.now() - lastSeenAt.getTime() : null;
     let text, style;
 
-    if (!isLive) {
-      text = "Historial";
-      style = "bg-purple-500/20 text-purple-400 border-purple-500/30";
-    } else if (age !== null && age <= ESP_CONNECTED_MAX_AGE_MS) {
+    if (age !== null && age <= ESP_CONNECTED_MAX_AGE_MS) {
       text = "En vivo · " + formatAge(age);
       style = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
     } else if (age !== null) {
@@ -765,63 +600,27 @@
      FETCH LOOP
      ============================================================ */
 
-  function noteSeen(createdAt) {
-    const t = new Date(createdAt).getTime();
-    if (Number.isFinite(t) && (!lastSeenAt || t > lastSeenAt.getTime())) lastSeenAt = new Date(t);
-  }
-
   async function refreshRange() {
-    const mySeq = ++fetchSeq;
+    if (isFetching) return;
+    isFetching = true;
     try {
-      const { start, end } = getWindow();
-      const data = await fetchWindow(start, end);
-      if (mySeq !== fetchSeq) return;
-
-      rawData = data
-        .filter(r => {
-          const t = new Date(r.created_at).getTime();
-          return Number.isFinite(t) && t >= start && t <= end + 60000;
-        })
-        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-
-      if (rawData.length) noteSeen(rawData[rawData.length - 1].created_at);
-
-      if (rawData.length === 0 && !isLive) {
-        setNotice("Sin datos en esta ventana.");
-      } else if (rawData.length === 0 && isLive) {
-        setNotice("Sin datos recientes.");
-      } else {
-        setNotice("");
+      const data = await fetchRange(selectedHours);
+      rawData = data;
+      if (data.length) {
+        const last = data[data.length - 1];
+        if (last.created_at) {
+          const t = new Date(last.created_at).getTime();
+          if (!lastSeenAt || t > lastSeenAt.getTime()) lastSeenAt = new Date(t);
+        }
       }
-
       renderChart();
-      updateNavUI();
       updateStatusBadge();
     } catch (err) {
-      if (mySeq !== fetchSeq) return;
       console.error("Error rango:", err);
-      if (err.message === "LIMIT") {
-        setNotice(`No hay datos tan atrás (máx ${MAX_HOURS_BACK} h).`);
-      } else {
-        setNotice("Error cargando datos: " + err.message);
-      }
       updateStatusBadge();
+    } finally {
+      isFetching = false;
     }
-  }
-
-  function mergeLiveRow(row) {
-    if (!isLive) return;
-    const t = new Date(row.created_at).getTime();
-    if (!Number.isFinite(t)) return;
-    const { start, end } = getWindow();
-    if (t < start || t > end + 60000) return;
-
-    const lastT = rawData.length ? new Date(rawData[rawData.length - 1].created_at).getTime() : -Infinity;
-    if (t <= lastT) return;
-
-    rawData = rawData.filter(r => new Date(r.created_at).getTime() >= start);
-    rawData.push(row);
-    renderChart();
   }
 
   async function refreshLatest() {
@@ -830,59 +629,18 @@
     try {
       const row = await fetchLatest();
       if (row && row.created_at) {
-        noteSeen(row.created_at);
+        const t = new Date(row.created_at).getTime();
+        if (!lastSeenAt || t > lastSeenAt.getTime()) lastSeenAt = new Date(t);
         latestAbsolute = processRow(row);
         renderStatusBar();
-        mergeLiveRow(row);
       }
+      updateStatusBadge();
     } catch (err) {
       console.error("Error latest:", err);
+      updateStatusBadge();
     } finally {
       isPolling = false;
-      updateStatusBadge();
     }
-  }
-
-  /* ============================================================
-     NAVEGACIÓN HISTORIAL
-     ============================================================ */
-
-  function navigateWindow(direction) {
-    const stepMs = selectedHours * 3600000;
-    const now = Date.now();
-
-    if (isLive) {
-      if (direction < 0) {
-        isLive = false;
-        windowEndTime = new Date(now - stepMs);
-      } else {
-        return;
-      }
-    } else {
-      const newEnd = windowEndTime.getTime() + direction * stepMs;
-      if (newEnd >= now - 5000) {
-        isLive = true;
-        windowEndTime = new Date();
-      } else {
-        windowEndTime = new Date(newEnd);
-      }
-    }
-
-    userZoomed = false;
-    if (tempChart.resetZoom) tempChart.resetZoom();
-    updateNavUI();
-    refreshRange();
-    if ("vibrate" in navigator) navigator.vibrate(15);
-  }
-
-  function goLive() {
-    isLive = true;
-    windowEndTime = new Date();
-    userZoomed = false;
-    if (tempChart.resetZoom) tempChart.resetZoom();
-    updateNavUI();
-    refreshRange();
-    if ("vibrate" in navigator) navigator.vibrate(15);
   }
 
   /* ============================================================
@@ -890,14 +648,20 @@
      ============================================================ */
 
   function applySeriesVisibility() {
-    seriesState.forEach((visible, i) => tempChart.setDatasetVisibility(i, visible));
+    seriesState.forEach((visible, i) => {
+      tempChart.setDatasetVisibility(i, visible);
+    });
 
-    ["toggle-s1", "toggle-s2", "toggle-dt"].forEach((id, i) => {
+    // Actualizar apariencia de los botones
+    const ids = ["toggle-s1", "toggle-s2", "toggle-dt"];
+    ids.forEach((id, i) => {
       const btn = document.getElementById(id);
       if (btn) btn.classList.toggle("active", seriesState[i]);
     });
 
     localStorage.setItem("graph-series", JSON.stringify(seriesState));
+
+    // Recalcular rango Y según series visibles
     renderChart();
   }
 
@@ -906,6 +670,8 @@
 
     const newState = [...seriesState];
     newState[index] = !newState[index];
+
+    // Evitar que todas queden ocultas a la vez
     if (!newState.some(v => v)) return;
 
     seriesState = newState;
@@ -920,25 +686,24 @@
   function setHours(h) {
     selectedHours = h;
     localStorage.setItem("graph-hours", h);
-    document.querySelectorAll(".range-btn[data-hours]").forEach(b => {
+    document.querySelectorAll(".range-btn").forEach(b => {
       b.classList.toggle("active", parseInt(b.dataset.hours) === h);
     });
-    userZoomed = false;
     if (tempChart.resetZoom) tempChart.resetZoom();
-    updateNavUI();
     refreshRange();
   }
 
-  function resetZoom(silent) {
+  function resetZoom() {
     if (tempChart.resetZoom) tempChart.resetZoom();
-    userZoomed = false;
-    renderChart();
-    if (silent !== true && "vibrate" in navigator) navigator.vibrate(15);
+    if ("vibrate" in navigator) navigator.vibrate(15);
   }
 
   function toggleFullscreen() {
-    if (!document.fullscreenElement) enterFullscreen();
-    else document.exitFullscreen();
+    if (!document.fullscreenElement) {
+      enterFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
   }
 
   async function enterFullscreen() {
@@ -947,6 +712,7 @@
       if (el.requestFullscreen) await el.requestFullscreen();
       else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
 
+      // Intentar bloquear orientación landscape
       try {
         if (screen.orientation && screen.orientation.lock) {
           await screen.orientation.lock("landscape");
@@ -968,20 +734,20 @@
   function applyEPaper() {
     document.body.classList.toggle("epaper-mode", isEPaper);
 
-    SERIES_STYLE[isEPaper ? "epaper" : "color"].forEach((st, i) => Object.assign(tempChart.data.datasets[i], st));
-
-    const sc = tempChart.options.scales;
-    const legend = tempChart.options.plugins.legend.labels;
     if (isEPaper) {
-      sc.x.ticks.color = "#000";  sc.x.grid.color = "#cbd5e1";
-      sc.y.ticks.color = "#000";  sc.y.grid.color = "#cbd5e1";
-      legend.color = "#000";
+      tempChart.options.scales.x.ticks.color = "#000";
+      tempChart.options.scales.x.grid.color = "#cbd5e1";
+      tempChart.options.scales.y.ticks.color = "#000";
+      tempChart.options.scales.y.grid.color = "#cbd5e1";
+      tempChart.options.plugins.legend.labels.color = "#000";
     } else {
-      sc.x.ticks.color = "#94a3b8";  sc.x.grid.color = "rgba(51, 65, 85, 0.5)";
-      sc.y.ticks.color = "#94a3b8";  sc.y.grid.color = "rgba(51, 65, 85, 0.5)";
-      legend.color = "#cbd5e1";
+      tempChart.options.scales.x.ticks.color = "#94a3b8";
+      tempChart.options.scales.x.grid.color = "rgba(51, 65, 85, 0.5)";
+      tempChart.options.scales.y.ticks.color = "#94a3b8";
+      tempChart.options.scales.y.grid.color = "rgba(51, 65, 85, 0.5)";
+      tempChart.options.plugins.legend.labels.color = "#cbd5e1";
     }
-    tempChart.update("none");
+    tempChart.update();
   }
 
   async function exitAndGoBack() {
@@ -992,13 +758,13 @@
       }
     } catch (_) {}
 
-    location.replace("./index.html");
+    // Volver a la app principal
+    location.href = "./index.html";
   }
 
   /* Doble tap para mostrar/ocultar UI */
   let lastTap = 0;
   document.getElementById("chart-container").addEventListener("touchend", (e) => {
-    if (e.touches.length > 0) return;
     const now = Date.now();
     if (now - lastTap < 300) {
       e.preventDefault();
@@ -1008,40 +774,64 @@
     lastTap = now;
   }, { passive: false });
 
-  /* Botón físico "atrás" */
+  /* Botón de pantalla completa del hint */
+  document.querySelector("#portrait-hint button")?.addEventListener("click", enterFullscreen);
+
+  /* ============================================================
+     BOTÓN FÍSICO "ATRÁS" DEL MÓVIL
+     ============================================================ */
+
   history.pushState({ page: "grafica" }, "", location.href);
-  window.addEventListener("popstate", () => { exitAndGoBack(); });
+
+  window.addEventListener("popstate", (e) => {
+    exitAndGoBack();
+  });
 
   /* ============================================================
      INICIALIZACIÓN
      ============================================================ */
 
   window.addEventListener("DOMContentLoaded", async () => {
-    document.querySelectorAll(".range-btn[data-hours]").forEach(b => {
+    // Aplicar rango guardado
+    const savedHours = parseInt(localStorage.getItem("graph-hours"));
+    if (savedHours && [2, 4, 8, 12, 24].includes(savedHours)) {
+      selectedHours = savedHours;
+    }
+
+    document.querySelectorAll(".range-btn").forEach(b => {
       b.classList.toggle("active", parseInt(b.dataset.hours) === selectedHours);
     });
 
     applyEPaper();
-    applySeriesVisibility();
-    updateNavUI();
 
+    // Aplicar estado guardado de las series
+    applySeriesVisibility();
+
+    // Detectar orientación
     if (window.matchMedia("(orientation: portrait)").matches && window.innerWidth < 1024) {
       document.getElementById("portrait-hint").classList.add("force-hint");
     }
 
+    // Escuchar cambios de orientación
     window.matchMedia("(orientation: portrait)").addEventListener("change", (e) => {
       const hint = document.getElementById("portrait-hint");
-      if (e.matches && window.innerWidth < 1024) hint.classList.add("force-hint");
-      else hint.classList.remove("force-hint");
+      if (e.matches && window.innerWidth < 1024) {
+        hint.classList.add("force-hint");
+      } else {
+        hint.classList.remove("force-hint");
+      }
     });
 
+    // Cargar datos iniciales
     await refreshRange();
     await refreshLatest();
 
-    setInterval(() => { if (isLive) refreshRange(); }, 30000);
+    // Polling
+    setInterval(refreshRange, 30000);
     setInterval(refreshLatest, POLL_INTERVAL_MS);
     setInterval(updateStatusBadge, 2000);
 
+    // Al volver a la pestaña, refrescar
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) {
         refreshRange();
