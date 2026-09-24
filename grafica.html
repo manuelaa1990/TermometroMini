@@ -101,16 +101,6 @@
       color: white;
       border-color: #0284c7;
     }
-    .range-btn:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
-    .nav-btn {
-      min-width: 2.25rem;
-      padding: 4px 12px;
-      font-size: 16px;
-      line-height: 1;
-    }
 
     /* Backdrop semitransparente para barras */
     .ui-bar {
@@ -209,6 +199,7 @@
           Verificando...
         </div>
       </div>
+      <div id="time-range-label" class="text-[10px] text-slate-400 font-mono">--</div>
     </div>
 
     <!-- Rango de horas -->
@@ -220,20 +211,6 @@
       <button class="range-btn" data-hours="24" onclick="setHours(24)">24h</button>
     </div>
   </div>
-
-  <!-- FECHA encima de los botones de navegación -->
-  <div class="px-3 pb-1">
-    <div id="time-range-label" class="text-[10px] text-slate-400 font-mono text-center">--</div>
-  </div>
-
-  <!-- Botones de navegación -->
-  <div class="flex items-center justify-center gap-2 px-3 pb-2">
-    <button id="btn-prev-nav" onclick="navigateWindow(-1)" title="Ventana anterior" class="range-btn nav-btn">‹</button>
-    <button id="btn-live" onclick="goLive()" class="range-btn px-4">Actual</button>
-    <button id="btn-next-nav" onclick="navigateWindow(1)" title="Ventana siguiente" class="range-btn nav-btn">›</button>
-  </div>
-
-  <div id="history-notice" class="hidden text-center text-[10px] text-amber-400 px-3 pb-1.5"></div>
 </div>
 
 <!-- GRÁFICA -->
@@ -317,11 +294,10 @@
   const API_URL = "https://api-termometro.manuelaa1990.workers.dev";
   const POLL_INTERVAL_MS = 10000;
   const ESP_CONNECTED_MAX_AGE_MS = 35000;
-  const VALID_HOURS = [2, 4, 8, 12, 24];
 
   const params = new URLSearchParams(location.search);
   let selectedHours = parseInt(params.get("hours")) || 4;
-  if (!VALID_HOURS.includes(selectedHours)) selectedHours = 4;
+  if (![2, 4, 8, 12, 24].includes(selectedHours)) selectedHours = 4;
 
   let rawData = [];
   let isFetching = false;
@@ -335,10 +311,6 @@
   if (!Array.isArray(seriesState) || seriesState.length !== 3) {
     seriesState = [true, true, true];
   }
-
-  /* --- Navegación histórica --- */
-  let isLive = true;
-  let windowEndTime = new Date();
 
   /* ============================================================
      GRÁFICA
@@ -595,12 +567,11 @@
   }
 
   function updateTimeRangeLabel() {
-    const end = isLive ? new Date() : windowEndTime;
-    const start = new Date(end.getTime() - selectedHours * 3600 * 1000);
+    const now = new Date();
+    const start = new Date(now.getTime() - selectedHours * 3600 * 1000);
     const opts = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
-    const tag = isLive ? "· LIVE" : "· HIST";
     document.getElementById("time-range-label").textContent =
-      `${start.toLocaleString([], opts)} → ${end.toLocaleString([], opts)} ${tag} · ${selectedHours}h · ${rawData.length} pts`;
+      `${start.toLocaleDateString([], opts)} → ${now.toLocaleDateString([], opts)} · ${selectedHours}h · ${rawData.length} pts`;
   }
 
   function updateStatusBadge() {
@@ -610,10 +581,7 @@
     const age = lastSeenAt ? Date.now() - lastSeenAt.getTime() : null;
     let text, style;
 
-    if (!isLive) {
-      text = "Historial";
-      style = "bg-purple-500/20 text-purple-400 border-purple-500/30";
-    } else if (age !== null && age <= ESP_CONNECTED_MAX_AGE_MS) {
+    if (age !== null && age <= ESP_CONNECTED_MAX_AGE_MS) {
       text = "En vivo · " + formatAge(age);
       style = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
     } else if (age !== null) {
@@ -637,36 +605,15 @@
     isFetching = true;
     try {
       const data = await fetchRange(selectedHours);
-
-      // Si estamos en historial, filtramos a la ventana histórica pedida.
-      // Si estamos en live, usamos todo lo que devuelve el Worker.
-      if (isLive) {
-        rawData = data;
-      } else {
-        const end = windowEndTime.getTime();
-        const start = end - selectedHours * 3600 * 1000;
-        rawData = data.filter(r => {
-          const t = new Date(r.created_at).getTime();
-          return Number.isFinite(t) && t >= start && t <= end + 60000;
-        });
-      }
-
-      if (rawData.length) {
-        const last = rawData[rawData.length - 1];
+      rawData = data;
+      if (data.length) {
+        const last = data[data.length - 1];
         if (last.created_at) {
           const t = new Date(last.created_at).getTime();
           if (!lastSeenAt || t > lastSeenAt.getTime()) lastSeenAt = new Date(t);
         }
       }
-
-      if (!isLive && rawData.length === 0) {
-        setNotice("Sin datos en esta ventana. Prueba con otra o vuelve a Actual.");
-      } else {
-        setNotice("");
-      }
-
       renderChart();
-      updateNavUI();
       updateStatusBadge();
     } catch (err) {
       console.error("Error rango:", err);
@@ -697,70 +644,6 @@
   }
 
   /* ============================================================
-     NAVEGACIÓN HISTÓRICA
-     ============================================================ */
-
-  function navigateWindow(direction) {
-    const stepMs = selectedHours * 3600 * 1000;
-    const now = Date.now();
-
-    if (isLive) {
-      if (direction < 0) {
-        // Salir de live hacia atrás
-        isLive = false;
-        windowEndTime = new Date(now - stepMs);
-      } else {
-        return; // ya estamos en el presente
-      }
-    } else {
-      const newEnd = windowEndTime.getTime() + direction * stepMs;
-      if (newEnd >= now - 5000) {
-        // Hemos llegado al presente
-        isLive = true;
-        windowEndTime = new Date();
-      } else {
-        windowEndTime = new Date(newEnd);
-      }
-    }
-
-    if (tempChart.resetZoom) tempChart.resetZoom();
-    updateNavUI();
-    refreshRange();
-    if ("vibrate" in navigator) navigator.vibrate(15);
-  }
-
-  function goLive() {
-    isLive = true;
-    windowEndTime = new Date();
-    if (tempChart.resetZoom) tempChart.resetZoom();
-    updateNavUI();
-    refreshRange();
-    if ("vibrate" in navigator) navigator.vibrate(15);
-  }
-
-  function updateNavUI() {
-    const liveBtn = document.getElementById("btn-live");
-    if (liveBtn) liveBtn.classList.toggle("active", isLive);
-
-    const prevBtn = document.getElementById("btn-prev-nav");
-    if (prevBtn) prevBtn.title = `Atrás ${selectedHours} h`;
-
-    const nextBtn = document.getElementById("btn-next-nav");
-    if (nextBtn) {
-      const atPresent = isLive || windowEndTime.getTime() >= Date.now() - 5000;
-      nextBtn.disabled = atPresent;
-      nextBtn.title = atPresent ? "Ya estás en el presente" : `Adelante ${selectedHours} h`;
-    }
-  }
-
-  function setNotice(text) {
-    const el = document.getElementById("history-notice");
-    if (!el) return;
-    el.textContent = text || "";
-    el.classList.toggle("hidden", !text);
-  }
-
-  /* ============================================================
      SELECTOR DE SERIES
      ============================================================ */
 
@@ -769,6 +652,7 @@
       tempChart.setDatasetVisibility(i, visible);
     });
 
+    // Actualizar apariencia de los botones
     const ids = ["toggle-s1", "toggle-s2", "toggle-dt"];
     ids.forEach((id, i) => {
       const btn = document.getElementById(id);
@@ -777,6 +661,7 @@
 
     localStorage.setItem("graph-series", JSON.stringify(seriesState));
 
+    // Recalcular rango Y según series visibles
     renderChart();
   }
 
@@ -786,6 +671,7 @@
     const newState = [...seriesState];
     newState[index] = !newState[index];
 
+    // Evitar que todas queden ocultas a la vez
     if (!newState.some(v => v)) return;
 
     seriesState = newState;
@@ -800,11 +686,10 @@
   function setHours(h) {
     selectedHours = h;
     localStorage.setItem("graph-hours", h);
-    document.querySelectorAll(".range-btn[data-hours]").forEach(b => {
+    document.querySelectorAll(".range-btn").forEach(b => {
       b.classList.toggle("active", parseInt(b.dataset.hours) === h);
     });
     if (tempChart.resetZoom) tempChart.resetZoom();
-    updateNavUI();
     refreshRange();
   }
 
@@ -827,6 +712,7 @@
       if (el.requestFullscreen) await el.requestFullscreen();
       else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
 
+      // Intentar bloquear orientación landscape
       try {
         if (screen.orientation && screen.orientation.lock) {
           await screen.orientation.lock("landscape");
@@ -872,6 +758,7 @@
       }
     } catch (_) {}
 
+    // Volver a la app principal
     location.href = "./index.html";
   }
 
@@ -887,6 +774,7 @@
     lastTap = now;
   }, { passive: false });
 
+  /* Botón de pantalla completa del hint */
   document.querySelector("#portrait-hint button")?.addEventListener("click", enterFullscreen);
 
   /* ============================================================
@@ -904,23 +792,27 @@
      ============================================================ */
 
   window.addEventListener("DOMContentLoaded", async () => {
+    // Aplicar rango guardado
     const savedHours = parseInt(localStorage.getItem("graph-hours"));
-    if (savedHours && VALID_HOURS.includes(savedHours)) {
+    if (savedHours && [2, 4, 8, 12, 24].includes(savedHours)) {
       selectedHours = savedHours;
     }
 
-    document.querySelectorAll(".range-btn[data-hours]").forEach(b => {
+    document.querySelectorAll(".range-btn").forEach(b => {
       b.classList.toggle("active", parseInt(b.dataset.hours) === selectedHours);
     });
 
     applyEPaper();
-    applySeriesVisibility();
-    updateNavUI();
 
+    // Aplicar estado guardado de las series
+    applySeriesVisibility();
+
+    // Detectar orientación
     if (window.matchMedia("(orientation: portrait)").matches && window.innerWidth < 1024) {
       document.getElementById("portrait-hint").classList.add("force-hint");
     }
 
+    // Escuchar cambios de orientación
     window.matchMedia("(orientation: portrait)").addEventListener("change", (e) => {
       const hint = document.getElementById("portrait-hint");
       if (e.matches && window.innerWidth < 1024) {
@@ -930,13 +822,16 @@
       }
     });
 
+    // Cargar datos iniciales
     await refreshRange();
     await refreshLatest();
 
-    setInterval(() => { if (isLive) refreshRange(); }, 30000);
+    // Polling
+    setInterval(refreshRange, 30000);
     setInterval(refreshLatest, POLL_INTERVAL_MS);
     setInterval(updateStatusBadge, 2000);
 
+    // Al volver a la pestaña, refrescar
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) {
         refreshRange();
