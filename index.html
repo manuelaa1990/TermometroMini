@@ -1639,9 +1639,11 @@
       ? "bg-rose-900/40 border-2 border-rose-500 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all animate-pulse"
       : "bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center relative transition-all";
 
-    $("card-delta").className = aDeltaActive
+    const showDelta = !$("chk-delta") || $("chk-delta").checked;
+    $("card-delta").className = (aDeltaActive
       ? "bg-rose-900/40 border-2 border-rose-500 py-2.5 px-3 rounded-xl shadow-md text-center transition-all animate-pulse"
-      : "bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center transition-all";
+      : "bg-slate-800 border border-slate-700/60 py-2.5 px-3 rounded-xl shadow-md text-center transition-all")
+      + (showDelta ? "" : " hidden");
 
     alarmActive = a1Active || a2Active || aDeltaActive;
 
