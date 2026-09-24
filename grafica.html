@@ -332,6 +332,21 @@
   }
 
   /* ============================================================
+     PARSER DE FECHAS UTC (CLAVE PARA SOLUCIONAR EL PANTALLAZO EN BLANCO)
+     ============================================================ */
+
+  function parseTimestamp(dateStr) {
+    if (!dateStr) return null;
+    let s = String(dateStr).trim();
+    if (s.includes(" ")) s = s.replace(" ", "T");
+    if (!s.endsWith("Z") && !s.includes("+") && !s.includes("-", 10)) {
+      s += "Z";
+    }
+    const t = new Date(s).getTime();
+    return isNaN(t) ? null : t;
+  }
+
+  /* ============================================================
      GRÁFICA (CONFIGURACIÓN ESCALA TEMPORAL)
      ============================================================ */
 
@@ -531,7 +546,7 @@
   }
 
   /* ============================================================
-     RENDER
+     RENDER CON REENCUADRE EXACTO DE FECHAS
      ============================================================ */
 
   function renderChart() {
@@ -544,9 +559,10 @@
     let lastTime = null;
 
     processed.forEach(r => {
-      const currentTime = new Date(r.created_at).getTime();
+      const currentTime = parseTimestamp(r.created_at);
+      if (!currentTime) return;
 
-      // Inyectar un punto nulo si el tiempo sin transmisión supera MAX_GAP_MS
+      // Inyectar hueco nulo si el espacio sin datos supera MAX_GAP_MS
       if (lastTime !== null && (currentTime - lastTime) > MAX_GAP_MS) {
         const gapTime = lastTime + 1000;
         s1Data.push({ x: gapTime, y: null });
@@ -565,15 +581,28 @@
     tempChart.data.datasets[1].data = s2Data;
     tempChart.data.datasets[2].data = deltaData;
 
-    // FIJAR LÍMITES TEMPORALES DEL EJE X PARA PRESERVAR EL ESPACIO VACÍO
-    const now = Date.now();
-    const end = now - (offsetHours * 3600 * 1000);
-    const start = end - (selectedHours * 3600 * 1000);
-    
-    tempChart.options.scales.x.min = start;
-    tempChart.options.scales.x.max = end;
+    // FIJAR LÍMITES EN EL EJE X SIN OCULTAR DATOS
+    if (processed.length > 0) {
+      const firstTime = parseTimestamp(processed[0].created_at);
+      const lastTimeData = parseTimestamp(processed[processed.length - 1].created_at);
 
-    // Auto-escalado Y considerando únicamente datos numéricos válidos
+      if (offsetHours === 0) {
+        // En vivo: la ventana finaliza en el instante actual o el último punto de datos
+        const end = Math.max(Date.now(), lastTimeData);
+        tempChart.options.scales.x.max = end;
+        tempChart.options.scales.x.min = end - (selectedHours * 3600 * 1000);
+      } else {
+        // Historial: encuadra exactamente entre el primer y último registro del lote devuelto
+        tempChart.options.scales.x.min = firstTime;
+        tempChart.options.scales.x.max = lastTimeData;
+      }
+    } else {
+      const end = Date.now() - (offsetHours * 3600 * 1000);
+      tempChart.options.scales.x.max = end;
+      tempChart.options.scales.x.min = end - (selectedHours * 3600 * 1000);
+    }
+
+    // Auto-escalado Y considerando datos numéricos válidos
     const visibleTemps = [];
     if (seriesState[0]) visibleTemps.push(...s1Data.map(d => d.y));
     if (seriesState[1]) visibleTemps.push(...s2Data.map(d => d.y));
@@ -616,12 +645,20 @@
   }
 
   function updateTimeRangeLabel() {
-    const now = new Date();
-    const end = new Date(now.getTime() - offsetHours * 3600 * 1000);
-    const start = new Date(end.getTime() - selectedHours * 3600 * 1000);
+    if (!rawData.length) {
+      document.getElementById("time-range-label").textContent = "--";
+      return;
+    }
+
     const opts = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
+    const firstTime = parseTimestamp(rawData[0].created_at);
+    const lastTime = parseTimestamp(rawData[rawData.length - 1].created_at);
+
+    const startStr = firstTime ? new Date(firstTime).toLocaleDateString([], opts) : "--";
+    const endStr = lastTime ? new Date(lastTime).toLocaleDateString([], opts) : "--";
+
     document.getElementById("time-range-label").textContent =
-      `${start.toLocaleDateString([], opts)} → ${end.toLocaleDateString([], opts)} · ${selectedHours}h · ${rawData.length} pts`;
+      `${startStr} → ${endStr} · ${selectedHours}h · ${rawData.length} pts`;
   }
 
   function updateStatusBadge() {
@@ -665,8 +702,8 @@
       if (data.length && offsetHours === 0) {
         const last = data[data.length - 1];
         if (last.created_at) {
-          const t = new Date(last.created_at).getTime();
-          if (!lastSeenAt || t > lastSeenAt.getTime()) lastSeenAt = new Date(t);
+          const t = parseTimestamp(last.created_at);
+          if (t && (!lastSeenAt || t > lastSeenAt.getTime())) lastSeenAt = new Date(t);
         }
       }
       renderChart();
@@ -685,8 +722,8 @@
     try {
       const row = await fetchLatest();
       if (row && row.created_at) {
-        const t = new Date(row.created_at).getTime();
-        if (!lastSeenAt || t > lastSeenAt.getTime()) lastSeenAt = new Date(t);
+        const t = parseTimestamp(row.created_at);
+        if (t && (!lastSeenAt || t > lastSeenAt.getTime())) lastSeenAt = new Date(t);
         latestAbsolute = processRow(row);
         renderStatusBar();
       }
