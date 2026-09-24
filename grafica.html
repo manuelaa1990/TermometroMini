@@ -9,10 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Chart.js + Adaptador de Fechas + Plugin Zoom -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2"></script>
@@ -20,158 +17,71 @@
   <style>
     * { box-sizing: border-box; }
     html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #0f172a;
-      color: #e2e8f0;
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      overflow: hidden; background: #0f172a; color: #e2e8f0;
       font-family: system-ui, -apple-system, sans-serif;
-      -webkit-tap-highlight-color: transparent;
-      user-select: none;
+      -webkit-tap-highlight-color: transparent; user-select: none;
     }
-
-    #chart-container {
-      position: absolute;
-      inset: 0;
-      touch-action: none;
-    }
-
+    #chart-container { position: absolute; inset: 0; touch-action: none; }
     #topbar {
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      z-index: 20;
+      position: absolute; top: 0; left: 0; right: 0; z-index: 20;
       transition: opacity 0.3s ease, transform 0.3s ease;
     }
-    #topbar.hidden-ui {
-      opacity: 0;
-      transform: translateY(-100%);
-      pointer-events: none;
-    }
-
+    #topbar.hidden-ui { opacity: 0; transform: translateY(-100%); pointer-events: none; }
     #bottombar {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      z-index: 20;
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 20;
       transition: opacity 0.3s ease, transform 0.3s ease;
     }
-    #bottombar.hidden-ui {
-      opacity: 0;
-      transform: translateY(100%);
-      pointer-events: none;
-    }
-
-    /* Hint de girar teléfono */
+    #bottombar.hidden-ui { opacity: 0; transform: translateY(100%); pointer-events: none; }
     #portrait-hint {
-      position: absolute;
-      inset: 0;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      background: #0f172a;
-      z-index: 100;
-      text-align: center;
-      padding: 2rem;
+      position: absolute; inset: 0; display: none; align-items: center;
+      justify-content: center; background: #0f172a; z-index: 100;
+      text-align: center; padding: 2rem;
     }
     @media (orientation: portrait) and (max-width: 1023px) {
       #portrait-hint.force-hint { display: flex; }
     }
     #portrait-hint.hidden { display: none !important; }
-
-    .rotate-icon {
-      animation: rotate 2s ease-in-out infinite;
-      display: inline-block;
-    }
-    @keyframes rotate {
-      0%, 100% { transform: rotate(0deg); }
-      50% { transform: rotate(90deg); }
-    }
-
-    /* Botones UI */
+    .rotate-icon { animation: rotate 2s ease-in-out infinite; display: inline-block; }
+    @keyframes rotate { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } }
     .range-btn {
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 600;
-      color: #94a3b8;
-      background: transparent;
-      border: 1px solid #334155;
-      transition: all 0.15s;
-      cursor: pointer;
+      padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+      color: #94a3b8; background: transparent; border: 1px solid #334155;
+      transition: all 0.15s; cursor: pointer;
     }
-    .range-btn.active {
-      background: #0284c7;
-      color: white;
-      border-color: #0284c7;
-    }
-
-    /* Backdrop semitransparente para barras */
+    .range-btn.active { background: #0284c7; color: white; border-color: #0284c7; }
     .ui-bar {
       background: rgba(15, 23, 42, 0.85);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
       border-color: rgba(51, 65, 85, 0.6);
     }
-
-    body.epaper-mode {
-      background: #fff !important;
-      color: #000 !important;
-    }
+    body.epaper-mode { background: #fff !important; color: #000 !important; }
     body.epaper-mode .ui-bar {
-      background: rgba(255, 255, 255, 0.95) !important;
-      color: #000 !important;
-      border-color: #000 !important;
+      background: rgba(255,255,255,0.95) !important; color: #000 !important; border-color: #000 !important;
     }
-    body.epaper-mode #topbar,
-    body.epaper-mode #bottombar,
-    body.epaper-mode #topbar *,
-    body.epaper-mode #bottombar * {
-      color: #000 !important;
-    }
-    body.epaper-mode .range-btn {
-      border-color: #000;
-      color: #000;
-    }
-    body.epaper-mode .range-btn.active {
-      background: #000;
-      color: #fff;
-    }
-
-    /* Pills del selector de series */
+    body.epaper-mode #topbar, body.epaper-mode #bottombar,
+    body.epaper-mode #topbar *, body.epaper-mode #bottombar * { color: #000 !important; }
+    body.epaper-mode .range-btn { border-color: #000; color: #000; }
+    body.epaper-mode .range-btn.active { background: #000; color: #fff; }
     .series-toggle {
-      border-color: #334155;
-      background: #1e293b;
-      color: #94a3b8;
-      opacity: 0.45;
+      border-color: #334155; background: #1e293b; color: #94a3b8; opacity: 0.45;
     }
     .series-toggle.active {
-      opacity: 1;
-      color: #e2e8f0;
-      background: #334155;
-      border-color: #475569;
+      opacity: 1; color: #e2e8f0; background: #334155; border-color: #475569;
     }
     body.epaper-mode .series-toggle {
-      background: #fff !important;
-      border-color: #000 !important;
-      color: #000 !important;
-      opacity: 0.4;
+      background: #fff !important; border-color: #000 !important;
+      color: #000 !important; opacity: 0.4;
     }
     body.epaper-mode .series-toggle.active {
-      opacity: 1;
-      background: #000 !important;
-      color: #fff !important;
-      border-color: #000 !important;
+      opacity: 1; background: #000 !important; color: #fff !important; border-color: #000 !important;
     }
-    body.epaper-mode .series-toggle.active span {
-      color: #fff !important;
-    }
+    body.epaper-mode .series-toggle.active span { color: #fff !important; }
   </style>
 </head>
 
 <body>
 
-<!-- HINT DE GIRAR TELÉFONO -->
 <div id="portrait-hint">
   <div>
     <div class="rotate-icon text-6xl mb-4">📱</div>
@@ -183,10 +93,8 @@
   </div>
 </div>
 
-<!-- TOPBAR -->
 <div id="topbar" class="ui-bar border-b">
   <div class="flex items-center gap-2 px-3 py-2">
-    <!-- Volver -->
     <button onclick="exitAndGoBack()" title="Salir de la gráfica"
       class="px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold border border-rose-500 shadow-lg flex items-center gap-1.5 active:scale-95 transition shrink-0">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -195,7 +103,6 @@
       <span>Salir</span>
     </button>
 
-    <!-- Título + estado -->
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
         <span class="text-sm font-bold text-sky-400 truncate">Gráfica Live</span>
@@ -206,9 +113,7 @@
       <div id="time-range-label" class="text-[10px] text-slate-400 font-mono truncate">--</div>
     </div>
 
-    <!-- Navegación y Rango de horas -->
     <div class="flex items-center gap-1 shrink-0 overflow-x-auto">
-      <!-- Navegación Historial -->
       <button class="range-btn flex items-center justify-center w-8 h-7" onclick="navigateHistory(1)" title="Más antiguo">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
       </button>
@@ -219,7 +124,6 @@
 
       <div class="w-px h-4 bg-slate-700 mx-1"></div>
 
-      <!-- Rango -->
       <button class="range-btn" data-hours="2" onclick="setHours(2)">2h</button>
       <button class="range-btn" data-hours="4" onclick="setHours(4)">4h</button>
       <button class="range-btn" data-hours="8" onclick="setHours(8)">8h</button>
@@ -229,16 +133,13 @@
   </div>
 </div>
 
-<!-- GRÁFICA -->
 <div id="chart-container">
   <canvas id="tempChart"></canvas>
 </div>
 
-<!-- BOTTOMBAR -->
 <div id="bottombar" class="ui-bar border-t">
   <div class="flex items-center justify-between px-3 py-2 text-[11px] gap-2 flex-wrap">
 
-    <!-- Batería -->
     <div class="flex items-center gap-1.5 shrink-0">
       <svg id="bat-icon" class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
@@ -246,20 +147,17 @@
       <span id="bat-val" class="font-mono text-slate-300">--% · --.--V</span>
     </div>
 
-    <!-- Selector de series (toggle pills) -->
     <div class="flex items-center gap-1 shrink-0">
       <button id="toggle-s1" onclick="toggleSeries(0)" title="Mostrar Sonda 1"
         class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
         <span class="w-2 h-2 rounded-full" style="background:#38bdf8"></span>
         <span>S1</span>
       </button>
-
       <button id="toggle-s2" onclick="toggleSeries(1)" title="Mostrar Sonda 2"
         class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
         <span class="w-2 h-2 rounded-full" style="background:#f87171"></span>
         <span>S2</span>
       </button>
-
       <button id="toggle-dt" onclick="toggleSeries(2)" title="Mostrar ΔT"
         class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
         <span class="w-2 h-2 rounded-full" style="background:#fbbf24"></span>
@@ -267,7 +165,6 @@
       </button>
     </div>
 
-    <!-- WiFi + IP -->
     <div class="flex items-center gap-1 text-slate-300 min-w-0">
       <svg class="w-4 h-4 text-sky-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071a10 10 0 0114.142 0M1.42 9.428a16 16 0 0121.16 0"/>
@@ -275,7 +172,6 @@
       <span id="wifi-val" class="truncate max-w-[180px]">--</span>
     </div>
 
-    <!-- Controles -->
     <div class="flex items-center gap-1.5 shrink-0">
       <button onclick="resetZoom()" title="Reset zoom"
         class="p-1.5 rounded bg-slate-800/70 hover:bg-slate-700 text-slate-200 border border-slate-700">
@@ -283,14 +179,12 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
         </svg>
       </button>
-
       <button onclick="toggleFullscreen()" title="Pantalla completa"
         class="p-1.5 rounded bg-slate-800/70 hover:bg-slate-700 text-slate-200 border border-slate-700">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
         </svg>
       </button>
-
       <button onclick="toggleEPaper()" title="Alto contraste"
         class="p-1.5 rounded bg-slate-800/70 hover:bg-slate-700 text-slate-200 border border-slate-700">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -298,7 +192,6 @@
         </svg>
       </button>
     </div>
-
   </div>
 </div>
 
@@ -306,17 +199,16 @@
   /* ============================================================
      CONFIGURACIÓN
      ============================================================ */
-
   const API_URL = "https://api-termometro.manuelaa1990.workers.dev";
   const POLL_INTERVAL_MS = 10000;
   const ESP_CONNECTED_MAX_AGE_MS = 35000;
-  const MAX_GAP_MS = 2 * 60 * 1000; // 2 minutos sin datos = Corte de línea
+  const MAX_GAP_MS = 2 * 60 * 1000;
 
   const params = new URLSearchParams(location.search);
   let selectedHours = parseInt(params.get("hours")) || 4;
   if (![2, 4, 8, 12, 24].includes(selectedHours)) selectedHours = 4;
-  
-  let offsetHours = 0; // 0 = Tiempo real, > 0 = Historial
+
+  let offsetHours = 0;
 
   let rawData = [];
   let isFetching = false;
@@ -325,7 +217,9 @@
   let latestAbsolute = null;
   let isEPaper = localStorage.getItem("epaper-mode") === "true";
 
-  // Estado de las series: [S1, S2, ΔT]
+  // Flag: el usuario hizo zoom/pan manual → no reencuadrar el eje X en cada refresco
+  let userZoomed = false;
+
   let seriesState = JSON.parse(localStorage.getItem("graph-series") || "[true,true,true]");
   if (!Array.isArray(seriesState) || seriesState.length !== 3) {
     seriesState = [true, true, true];
@@ -334,7 +228,6 @@
   /* ============================================================
      PARSER DE FECHAS UTC
      ============================================================ */
-
   function parseTimestamp(dateStr) {
     if (!dateStr) return null;
     let s = String(dateStr).trim();
@@ -347,9 +240,8 @@
   }
 
   /* ============================================================
-     GRÁFICA (CONFIGURACIÓN ESCALA TEMPORAL)
+     GRÁFICA
      ============================================================ */
-
   const ctx = document.getElementById("tempChart").getContext("2d");
 
   const tempChart = new Chart(ctx, {
@@ -360,37 +252,22 @@
           label: "Sonda 1",
           borderColor: "#38bdf8",
           backgroundColor: "rgba(56,189,248,.08)",
-          data: [],
-          borderWidth: 2.5,
-          tension: 0.25,
-          pointRadius: 0,
-          pointHoverRadius: 6,
-          fill: true,
-          spanGaps: false
+          data: [], borderWidth: 2.5, tension: 0.25,
+          pointRadius: 0, pointHoverRadius: 6, fill: true, spanGaps: false
         },
         {
           label: "Sonda 2",
           borderColor: "#f87171",
           backgroundColor: "rgba(248,113,113,.08)",
-          data: [],
-          borderWidth: 2.5,
-          tension: 0.25,
-          pointRadius: 0,
-          pointHoverRadius: 6,
-          fill: true,
-          spanGaps: false
+          data: [], borderWidth: 2.5, tension: 0.25,
+          pointRadius: 0, pointHoverRadius: 6, fill: true, spanGaps: false
         },
         {
           label: "ΔT",
           borderColor: "#fbbf24",
           backgroundColor: "rgba(251,191,36,.08)",
-          data: [],
-          borderWidth: 2.5,
-          tension: 0.25,
-          pointRadius: 0,
-          pointHoverRadius: 6,
-          fill: false,
-          spanGaps: false
+          data: [], borderWidth: 2.5, tension: 0.25,
+          pointRadius: 0, pointHoverRadius: 6, fill: false, spanGaps: false
         }
       ]
     },
@@ -406,18 +283,11 @@
           time: {
             unit: "hour",
             tooltipFormat: "dd/MM/yyyy, HH:mm",
-            displayFormats: {
-              minute: "HH:mm",
-              hour: "HH:mm",
-              day: "dd/MM"
-            }
+            displayFormats: { minute: "HH:mm", hour: "HH:mm", day: "dd/MM" }
           },
           ticks: {
-            color: "#94a3b8",
-            font: { size: 12 },
-            maxRotation: 0,
-            autoSkip: true,
-            maxTicksLimit: 10
+            color: "#94a3b8", font: { size: 12 },
+            maxRotation: 0, autoSkip: true, maxTicksLimit: 10
           },
           grid: { color: "rgba(51, 65, 85, 0.5)" }
         },
@@ -429,26 +299,17 @@
       },
       plugins: {
         legend: {
-          display: true,
-          position: "top",
+          display: true, position: "top",
           labels: {
-            color: "#cbd5e1",
-            font: { size: 13, weight: "600" },
-            boxWidth: 20,
-            boxHeight: 3,
-            padding: 16,
-            usePointStyle: false
+            color: "#cbd5e1", font: { size: 13, weight: "600" },
+            boxWidth: 20, boxHeight: 3, padding: 16, usePointStyle: false
           }
         },
         tooltip: {
           backgroundColor: "rgba(15,23,42,0.95)",
-          borderColor: "#334155",
-          borderWidth: 1,
-          titleColor: "#e2e8f0",
-          bodyColor: "#cbd5e1",
-          padding: 10,
-          titleFont: { size: 13 },
-          bodyFont: { size: 13 },
+          borderColor: "#334155", borderWidth: 1,
+          titleColor: "#e2e8f0", bodyColor: "#cbd5e1", padding: 10,
+          titleFont: { size: 13 }, bodyFont: { size: 13 },
           callbacks: {
             label: function (context) {
               const v = context.parsed.y;
@@ -458,20 +319,17 @@
           }
         },
         zoom: {
-          limits: {
-            x: { min: "original", max: "original" }
-          },
+          limits: { x: { min: "original", max: "original" } },
           pan: {
-            enabled: true,
-            mode: "x",
-            modifierKey: null,
-            threshold: 5
+            enabled: true, mode: "x", modifierKey: null, threshold: 5,
+            onPan: () => { userZoomed = true; }
           },
           zoom: {
             wheel: { enabled: true, speed: 0.05 },
             pinch: { enabled: true },
             drag: { enabled: false },
-            mode: "x"
+            mode: "x",
+            onZoom: () => { userZoomed = true; }
           }
         }
       }
@@ -481,7 +339,6 @@
   /* ============================================================
      FETCH
      ============================================================ */
-
   function withTimeout(promise, ms) {
     let timer;
     const timeout = new Promise((_, reject) => {
@@ -509,18 +366,20 @@
   /* ============================================================
      PROCESAR ROW
      ============================================================ */
-
   function processRow(row) {
     if (!row) return null;
+
     const raw1 = (row.temp1 === null || row.temp1 <= -127 || row.temp1 < -50 || row.temp1 > 125) ? null : Number(row.temp1);
     const raw2 = (row.temp2 === null || row.temp2 <= -127 || row.temp2 < -50 || row.temp2 > 125) ? null : Number(row.temp2);
     const delta = (raw1 !== null && raw2 !== null) ? Math.abs(raw1 - raw2) : null;
 
-    const vBat = (row.bateriaVolt !== undefined && row.bateriaVolt !== null) ? Number(row.bateriaVolt) : null;
+    // Batería: validar NaN antes de usarla
+    const vBatRaw = Number(row.bateriaVolt);
+    const vBat = Number.isFinite(vBatRaw) && vBatRaw > 0.5 ? vBatRaw : null;
+
     let bateria = null;
-    if (vBat !== null && !isNaN(vBat)) {
-      const pct = ((vBat - 3.10) / (4.20 - 3.10)) * 100;
-      bateria = Math.max(0, Math.min(100, Math.round(pct)));
+    if (vBat !== null) {
+      bateria = Math.max(0, Math.min(100, Math.round(((vBat - 3.10) / (4.20 - 3.10)) * 100)));
     }
 
     return {
@@ -546,23 +405,33 @@
   }
 
   /* ============================================================
-     RENDER CON RANGOS FIJOS (IDÉNTICO A INDEX.HTML)
+     RENDER (CORREGIDO: EJE X DINÁMICO)
      ============================================================ */
-
   function renderChart() {
+    // Ordenar defensivamente por timestamp ascendente
     const processed = rawData.map(processRow).filter(Boolean);
+    processed.sort((a, b) => {
+      const ta = parseTimestamp(a.created_at) || 0;
+      const tb = parseTimestamp(b.created_at) || 0;
+      return ta - tb;
+    });
 
     const s1Data = [];
     const s2Data = [];
     const deltaData = [];
 
     let lastTime = null;
+    let dataMin = Infinity;
+    let dataMax = -Infinity;
 
     processed.forEach(r => {
       const currentTime = parseTimestamp(r.created_at);
       if (!currentTime) return;
 
-      // Insertar corte si hay un espacio sin datos > 2 min
+      // Guardamos el mínimo y máximo real de los datos
+      dataMin = Math.min(dataMin, currentTime);
+      dataMax = Math.max(dataMax, currentTime);
+
       if (lastTime !== null && (currentTime - lastTime) > MAX_GAP_MS) {
         const gapTime = lastTime + 1000;
         s1Data.push({ x: gapTime, y: null });
@@ -573,7 +442,7 @@
       s1Data.push({ x: currentTime, y: r.s1 });
       s2Data.push({ x: currentTime, y: r.s2 });
       deltaData.push({ x: currentTime, y: r.delta });
-      
+
       lastTime = currentTime;
     });
 
@@ -581,17 +450,33 @@
     tempChart.data.datasets[1].data = s2Data;
     tempChart.data.datasets[2].data = deltaData;
 
-    // FIJAR EJE X SEGÚN EL RANGO SELECCIONADO (COMO INDEX.HTML)
-    const now = Date.now();
-    const windowMs = selectedHours * 3600 * 1000;
+    // FIJAR EJE X (con expansión dinámica para que los datos siempre entren)
+    if (!userZoomed) {
+      const now = Date.now();
+      const windowMs = selectedHours * 3600 * 1000;
 
-    if (offsetHours === 0) {
-      tempChart.options.scales.x.min = now - windowMs;
-      tempChart.options.scales.x.max = now;
-    } else {
-      const end = now - (offsetHours * 3600 * 1000);
-      tempChart.options.scales.x.min = end - windowMs;
-      tempChart.options.scales.x.max = end;
+      let xMin, xMax;
+
+      if (offsetHours === 0) {
+        xMin = now - windowMs;
+        xMax = now;
+      } else {
+        const end = now - (offsetHours * 3600 * 1000);
+        xMin = end - windowMs;
+        xMax = end;
+      }
+
+      // 🛠️ FIX: Si los datos están fuera de los límites, expandimos el rango
+      // para asegurarnos de que siempre se vean.
+      if (dataMin !== Infinity && dataMax !== -Infinity) {
+        // Damos un pequeño margen de 5 minutos para que no queden pegados al borde
+        const margen = 5 * 60 * 1000;
+        xMin = Math.min(xMin, dataMin - margen);
+        xMax = Math.max(xMax, dataMax + margen);
+      }
+
+      tempChart.options.scales.x.min = xMin;
+      tempChart.options.scales.x.max = xMax;
     }
 
     // Auto-escalado Y considerando datos numéricos válidos
@@ -613,14 +498,14 @@
     }
 
     tempChart.update("none");
-    updateTimeRangeLabel();
+    updateTimeRangeLabel(processed);
   }
 
   function renderStatusBar() {
     if (!latestAbsolute) return;
 
     const bat = latestAbsolute;
-    if (bat.bateriaVolt !== null) {
+    if (Number.isFinite(bat.bateriaVolt)) {
       const v = bat.bateriaVolt;
       const pct = bat.bateria;
       document.getElementById("bat-val").textContent = `${pct}% · ${v.toFixed(2)}V`;
@@ -636,21 +521,21 @@
     document.getElementById("wifi-val").textContent = `${wifi}${ip}`;
   }
 
-  function updateTimeRangeLabel() {
-    if (!rawData.length) {
+  function updateTimeRangeLabel(processed) {
+    if (!processed || !processed.length) {
       document.getElementById("time-range-label").textContent = "--";
       return;
     }
 
     const opts = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
-    const firstTime = parseTimestamp(rawData[0].created_at);
-    const lastTime = parseTimestamp(rawData[rawData.length - 1].created_at);
+    const firstTime = parseTimestamp(processed[0].created_at);
+    const lastTime = parseTimestamp(processed[processed.length - 1].created_at);
 
     const startStr = firstTime ? new Date(firstTime).toLocaleDateString([], opts) : "--";
     const endStr = lastTime ? new Date(lastTime).toLocaleDateString([], opts) : "--";
 
     document.getElementById("time-range-label").textContent =
-      `${startStr} → ${endStr} · ${selectedHours}h · ${rawData.length} pts`;
+      `${startStr} → ${endStr} · ${selectedHours}h · ${processed.length} pts`;
   }
 
   function updateStatusBadge() {
@@ -658,7 +543,7 @@
     if (!badge) return;
 
     let text, style;
-    
+
     if (offsetHours > 0) {
       text = "Modo Historial";
       style = "bg-purple-500/20 text-purple-400 border-purple-500/30";
@@ -683,14 +568,13 @@
   /* ============================================================
      FETCH LOOP Y NAVEGACIÓN
      ============================================================ */
-
   async function refreshRange() {
     if (isFetching) return;
     isFetching = true;
     try {
       const data = await fetchRange(selectedHours, offsetHours);
       rawData = data;
-      
+
       if (data.length && offsetHours === 0) {
         const last = data[data.length - 1];
         if (last.created_at) {
@@ -736,6 +620,8 @@
       if (offsetHours < 0) offsetHours = 0;
     }
 
+    userZoomed = false; // al cambiar de ventana, reencuadrar
+
     const isHistory = offsetHours > 0;
     document.getElementById('btn-actual').classList.toggle('hidden', !isHistory);
     document.getElementById('btn-forward').classList.toggle('hidden', !isHistory);
@@ -747,7 +633,6 @@
   /* ============================================================
      SELECTOR DE SERIES
      ============================================================ */
-
   function applySeriesVisibility() {
     seriesState.forEach((visible, i) => {
       tempChart.setDatasetVisibility(i, visible);
@@ -777,17 +662,18 @@
   /* ============================================================
      CONTROLES DE UI
      ============================================================ */
-
   function setHours(h) {
     selectedHours = h;
     localStorage.setItem("graph-hours", h);
     document.querySelectorAll(".range-btn[data-hours]").forEach(b => {
       b.classList.toggle("active", parseInt(b.dataset.hours) === h);
     });
-    navigateHistory(0, true); 
+    userZoomed = false;
+    navigateHistory(0, true);
   }
 
   function resetZoom() {
+    userZoomed = false;
     if (tempChart.resetZoom) tempChart.resetZoom();
     if ("vibrate" in navigator) navigator.vibrate(15);
   }
@@ -848,7 +734,7 @@
         try { screen.orientation.unlock(); } catch (_) {}
       }
     } catch (_) {}
-    location.href = "./index.html";
+    location.replace("./index.html");
   }
 
   let lastTap = 0;
@@ -862,17 +748,14 @@
     lastTap = now;
   }, { passive: false });
 
-  document.querySelector("#portrait-hint button")?.addEventListener("click", enterFullscreen);
-
   history.pushState({ page: "grafica" }, "", location.href);
-  window.addEventListener("popstate", (e) => {
+  window.addEventListener("popstate", () => {
     exitAndGoBack();
   });
 
   /* ============================================================
      INICIALIZACIÓN
      ============================================================ */
-
   window.addEventListener("DOMContentLoaded", async () => {
     const savedHours = parseInt(localStorage.getItem("graph-hours"));
     if (savedHours && [2, 4, 8, 12, 24].includes(savedHours)) {
