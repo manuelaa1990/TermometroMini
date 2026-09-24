@@ -179,6 +179,7 @@
 
 <body>
 
+<!-- HINT DE GIRAR TELÉFONO -->
 <div id="portrait-hint">
   <div>
     <div class="rotate-icon text-6xl mb-4">📱</div>
@@ -190,6 +191,7 @@
   </div>
 </div>
 
+<!-- TOPBAR -->
 <div id="topbar" class="ui-bar border-b">
   <div class="flex items-center gap-2 px-3 py-2">
     <button onclick="exitAndGoBack()" title="Salir de la gráfica"
@@ -207,7 +209,6 @@
           Verificando...
         </div>
       </div>
-      <div id="time-range-label" class="text-[10px] text-slate-400 font-mono">--</div>
     </div>
 
     <div class="flex items-center gap-1">
@@ -218,18 +219,28 @@
       <button class="range-btn" data-hours="24" onclick="setHours(24)">24h</button>
     </div>
   </div>
+
+  <!-- FECHA arriba de los botones -->
+  <div class="px-3 pb-1">
+    <div id="time-range-label" class="text-[10px] text-slate-400 font-mono text-center">--</div>
+  </div>
+
+  <!-- Botones de navegación debajo -->
   <div class="flex items-center justify-center gap-2 px-3 pb-2">
     <button id="btn-prev-nav" onclick="navigateWindow(-1)" title="Ventana anterior" class="range-btn nav-btn">‹</button>
     <button id="btn-live" onclick="goLive()" class="range-btn px-4">Actual</button>
     <button id="btn-next-nav" onclick="navigateWindow(1)" title="Ventana siguiente" class="range-btn nav-btn">›</button>
   </div>
+
   <div id="history-notice" class="hidden text-center text-[10px] text-amber-400 px-3 pb-1.5"></div>
 </div>
 
+<!-- GRÁFICA -->
 <div id="chart-container">
   <canvas id="tempChart"></canvas>
 </div>
 
+<!-- BOTTOMBAR -->
 <div id="bottombar" class="ui-bar border-t">
   <div class="flex items-center justify-between px-3 py-2 text-[11px] gap-2 flex-wrap">
 
@@ -512,13 +523,6 @@
     if (!el) return;
     el.textContent = text || "";
     el.classList.toggle("hidden", !text);
-    if (text) {
-      clearTimeout(setNotice._t);
-      setNotice._t = setTimeout(() => {
-        el.textContent = "";
-        el.classList.add("hidden");
-      }, 4000);
-    }
   }
 
   function updateNavUI() {
@@ -739,7 +743,10 @@
     const age = lastSeenAt ? Date.now() - lastSeenAt.getTime() : null;
     let text, style;
 
-    if (age !== null && age <= ESP_CONNECTED_MAX_AGE_MS) {
+    if (!isLive) {
+      text = "Historial";
+      style = "bg-purple-500/20 text-purple-400 border-purple-500/30";
+    } else if (age !== null && age <= ESP_CONNECTED_MAX_AGE_MS) {
       text = "En vivo · " + formatAge(age);
       style = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
     } else if (age !== null) {
@@ -765,7 +772,6 @@
 
   async function refreshRange() {
     const mySeq = ++fetchSeq;
-    const hours = selectedHours;
     try {
       const { start, end } = getWindow();
       const data = await fetchWindow(start, end);
@@ -779,18 +785,27 @@
         .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
       if (rawData.length) noteSeen(rawData[rawData.length - 1].created_at);
+
+      if (rawData.length === 0 && !isLive) {
+        setNotice("Sin datos en esta ventana.");
+      } else if (rawData.length === 0 && isLive) {
+        setNotice("Sin datos recientes.");
+      } else {
+        setNotice("");
+      }
+
       renderChart();
       updateNavUI();
+      updateStatusBadge();
     } catch (err) {
       if (mySeq !== fetchSeq) return;
       console.error("Error rango:", err);
       if (err.message === "LIMIT") {
-        setNotice(`No hay datos tan atrás (máx ${MAX_HOURS_BACK} h)`);
+        setNotice(`No hay datos tan atrás (máx ${MAX_HOURS_BACK} h).`);
       } else {
-        setNotice("Error cargando datos");
+        setNotice("Error cargando datos: " + err.message);
       }
-    } finally {
-      if (mySeq === fetchSeq) updateStatusBadge();
+      updateStatusBadge();
     }
   }
 
