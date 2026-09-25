@@ -140,7 +140,6 @@
       <button id="toggle-s2" onclick="toggleSeries(1)" class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
         <span class="w-2 h-2 rounded-full" style="background:#a855f7"></span><span>S2</span>
       </button>
-      <!-- 🔥 ΔT ahora en Rojo -->
       <button id="toggle-dt" onclick="toggleSeries(2)" class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
         <span class="w-2 h-2 rounded-full" style="background:#ef4444"></span><span>ΔT</span>
       </button>
@@ -348,7 +347,6 @@
           data: [], borderWidth: 3, tension: 0.5, pointRadius: 0, pointHoverRadius: 6, pointBackgroundColor: "#ffffff", pointBorderColor: "#eab308", pointBorderWidth: 2, fill: true, spanGaps: false 
         },
         { 
-          // 🔥 ΔT en Rojo
           label: "ΔT", 
           borderColor: "#ef4444", 
           backgroundColor: (context) => {
@@ -367,7 +365,8 @@
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: "index", intersect: false },
-      layout: { padding: { top: 40, right: 16, bottom: 8, left: 8 } },
+      // 🔥 AUMENTAMOS EL PADDING PARA CREAR UNA ZONA DE SEGURIDAD ALREDEDOR
+      layout: { padding: { top: 60, right: 60, bottom: 40, left: 60 } },
       scales: {
         x: {
           type: "time",
@@ -378,7 +377,8 @@
           border: { display: false }
         },
         y: {
-          grace: "20%", // Más espacio para las burbujas arriba y abajo
+          // 🔥 AUMENTAMOS EL GRACE PARA DAR MÁS ESPACIO VERTICAL A LAS BURBUJAS
+          grace: "30%", 
           ticks: { color: "#64748b", font: { size: 11 }, stepSize: 2, padding: 8 },
           grid: { color: "rgba(51, 65, 85, 0.15)", drawBorder: false },
           border: { display: false }
@@ -410,7 +410,6 @@
   /* ============================================================
      RENDER Y LÓGICA DE EXTREMOS (MÁX Y MÍN)
      ============================================================ */
-  // 🔥 Nueva función que calcula ambos extremos en una sola pasada
   function getExtrema(data) {
     if (!data || !data.length) return { max: null, min: null };
     let max = { y: -Infinity, x: null };
@@ -490,7 +489,7 @@
             content: [extS1.min.y.toFixed(2) + ' °C', 'Mín S1'],
             backgroundColor: 'rgba(255, 255, 255, 0.95)', borderColor: '#eab308', borderWidth: 1, borderRadius: 6,
             color: '#1e293b', font: { size: 10, weight: 'bold' }, padding: { top: 4, bottom: 4, left: 6, right: 6 },
-            callout: { display: true, borderColor: '#eab308', borderWidth: 1, margin: 4, position: 'top' } // Apunta hacia arriba
+            callout: { display: true, borderColor: '#eab308', borderWidth: 1, margin: 4, position: 'top' }
           };
         }
 
@@ -560,7 +559,7 @@
     
     if (valid.length) {
       const tMin = Math.min(...valid), tMax = Math.max(...valid);
-      const margin = Math.max(1, (tMax - tMin) * 0.25); // Un poco más de margen para que quepan las burbujas
+      const margin = Math.max(1, (tMax - tMin) * 0.25);
       tempChart.options.scales.y.min = Math.floor((tMin - margin) / 2) * 2;
       tempChart.options.scales.y.max = Math.ceil((tMax + margin) / 2) * 2;
     } else {
