@@ -365,21 +365,21 @@
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: "index", intersect: false },
-      // 🔥 AUMENTAMOS EL PADDING PARA CREAR UNA ZONA DE SEGURIDAD ALREDEDOR
-      layout: { padding: { top: 60, right: 60, bottom: 40, left: 60 } },
+      // 🔥 AJUSTE FINO: Reducimos el padding al mínimo necesario para las burbujas
+      layout: { padding: { top: 35, right: 35, bottom: 10, left: 15 } },
       scales: {
         x: {
           type: "time",
           time: { unit: "hour", tooltipFormat: "dd/MM/yyyy, HH:mm",
             displayFormats: { minute: "HH:mm", hour: "HH:mm", day: "dd/MM" } },
-          ticks: { color: "#64748b", font: { size: 11 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+          ticks: { color: "#64748b", font: { size: 11 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8, padding: 4 },
           grid: { display: false, drawBorder: false },
           border: { display: false }
         },
         y: {
-          // 🔥 AUMENTAMOS EL GRACE PARA DAR MÁS ESPACIO VERTICAL A LAS BURBUJAS
-          grace: "30%", 
-          ticks: { color: "#64748b", font: { size: 11 }, stepSize: 2, padding: 8 },
+          // 🔥 AJUSTE FINO: Reducimos el grace para aprovechar el alto
+          grace: "10%", 
+          ticks: { color: "#64748b", font: { size: 11 }, stepSize: 2, padding: 4 },
           grid: { color: "rgba(51, 65, 85, 0.15)", drawBorder: false },
           border: { display: false }
         }
@@ -559,7 +559,8 @@
     
     if (valid.length) {
       const tMin = Math.min(...valid), tMax = Math.max(...valid);
-      const margin = Math.max(1, (tMax - tMin) * 0.25);
+      // 🔥 AJUSTE FINO: Margen interno más ajustado (10% en vez de 25%)
+      const margin = Math.max(1, (tMax - tMin) * 0.10);
       tempChart.options.scales.y.min = Math.floor((tMin - margin) / 2) * 2;
       tempChart.options.scales.y.max = Math.ceil((tMax + margin) / 2) * 2;
     } else {
