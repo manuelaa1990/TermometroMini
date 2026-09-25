@@ -31,7 +31,6 @@
     #topbar.hidden-ui { opacity: 0; transform: translateY(-100%); pointer-events: none; }
     #bottombar.hidden-ui { opacity: 0; transform: translateY(100%); pointer-events: none; }
 
-    /* ===== HINT DE GIRAR TELÉFONO ===== */
     #portrait-hint {
       position: absolute; inset: 0; display: none; align-items: center;
       justify-content: center; background: #0f172a; z-index: 100;
@@ -67,7 +66,6 @@
 
 <body>
 
-<!-- HINT PORTRAIT (GIRA EL TELÉFONO) -->
 <div id="portrait-hint">
   <div>
     <div class="rotate-icon text-6xl mb-4">📱</div>
@@ -79,7 +77,6 @@
   </div>
 </div>
 
-<!-- TOPBAR -->
 <div id="topbar" class="ui-bar border-b">
   <div class="flex items-center gap-2 px-3 py-2">
     <button onclick="exitAndGoBack()"
@@ -118,12 +115,10 @@
   </div>
 </div>
 
-<!-- GRÁFICA -->
 <div id="chart-container">
   <canvas id="tempChart"></canvas>
 </div>
 
-<!-- BOTTOMBAR -->
 <div id="bottombar" class="ui-bar border-t">
   <div class="flex items-center justify-between px-3 py-2 text-[11px] gap-2 flex-wrap">
     <div class="flex items-center gap-1.5 shrink-0">
@@ -135,10 +130,10 @@
 
     <div class="flex items-center gap-1 shrink-0">
       <button id="toggle-s1" onclick="toggleSeries(0)" class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
-        <span class="w-2 h-2 rounded-full" style="background:#38bdf8"></span><span>S1</span>
+        <span class="w-2 h-2 rounded-full" style="background:#eab308"></span><span>S1</span>
       </button>
       <button id="toggle-s2" onclick="toggleSeries(1)" class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
-        <span class="w-2 h-2 rounded-full" style="background:#f87171"></span><span>S2</span>
+        <span class="w-2 h-2 rounded-full" style="background:#a855f7"></span><span>S2</span>
       </button>
       <button id="toggle-dt" onclick="toggleSeries(2)" class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
         <span class="w-2 h-2 rounded-full" style="background:#fbbf24"></span><span>ΔT</span>
@@ -239,7 +234,7 @@
   }
 
   /* ============================================================
-     CARGA INICIAL: descargar todo el historial
+     CARGA INICIAL
      ============================================================ */
   async function loadAllHistory() {
     const chunks = [];
@@ -251,26 +246,21 @@
         const t0 = parseTs(big[0].created_at);
         const t1 = parseTs(big[big.length - 1].created_at);
         const span = (t1 - t0) / 3600000;
-        console.log(`Intento 7d: ${big.length} pts, span ${span.toFixed(1)}h`);
         if (span >= 12) { chunks.push(big); gotBig = true; }
       }
     } catch (e) { console.warn("7d falló:", e); }
 
     if (!gotBig) {
-      console.log("Probando bloques de 24h...");
       let prevFirst = null;
       for (let i = 0; i < 8; i++) {
         try {
           const chunk = await fetchRange(24, i * 24);
           if (!chunk.length) break;
           const firstTs = parseTs(chunk[0].created_at);
-          if (prevFirst !== null && Math.abs(firstTs - prevFirst) < 60000) {
-            console.log(`Offset no funciona en i=${i}, parando.`);
-            break;
-          }
+          if (prevFirst !== null && Math.abs(firstTs - prevFirst) < 60000) break;
           prevFirst = firstTs;
           chunks.push(chunk);
-        } catch (e) { console.warn(`Bloque ${i} falló:`, e); break; }
+        } catch (e) { break; }
       }
     }
 
@@ -284,12 +274,6 @@
     }
     merged.sort((a, b) => (parseTs(a.created_at) || 0) - (parseTs(b.created_at) || 0));
     allData = merged;
-
-    if (allData.length) {
-      const t0 = parseTs(allData[0].created_at);
-      const t1 = parseTs(allData[allData.length - 1].created_at);
-      console.log(`✅ Total: ${allData.length} pts, span ${((t1 - t0) / 3600000).toFixed(1)}h`);
-    }
   }
 
   function getSlice() {
@@ -304,7 +288,7 @@
   }
 
   /* ============================================================
-     GRÁFICA (CONFIGURACIÓN VISUAL ESTILO NZXT)
+     GRÁFICA (ESTILO FINANCIERO / STOCK)
      ============================================================ */
   const ctx = document.getElementById("tempChart").getContext("2d");
   const tempChart = new Chart(ctx, {
@@ -312,72 +296,94 @@
     data: {
       datasets: [
         { 
-          label: "Sonda 1", 
-          borderColor: "#38bdf8", 
-          // 🔥 Degradado para Sonda 1
-          backgroundColor: (context) => {
-            const ctx = context.chart.ctx;
-            const chartArea = context.chart.chartArea;
-            if (!chartArea) return null;
-            const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
-            gradient.addColorStop(0, 'rgba(56, 189, 248, 0)');
-            gradient.addColorStop(1, 'rgba(56, 189, 248, 0.35)');
-            return gradient;
-          },
-          data: [], borderWidth: 2.5, tension: 0.4, pointRadius: 0, pointHoverRadius: 6, fill: true, spanGaps: false 
-        },
-        { 
+          // Sonda 2 (Púrpura) - Va debajo para que la amarilla resalte
           label: "Sonda 2", 
-          borderColor: "#f87171", 
-          // 🔥 Degradado para Sonda 2
+          borderColor: "#a855f7", 
           backgroundColor: (context) => {
             const ctx = context.chart.ctx;
             const chartArea = context.chart.chartArea;
             if (!chartArea) return null;
             const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
-            gradient.addColorStop(0, 'rgba(248, 113, 113, 0)');
-            gradient.addColorStop(1, 'rgba(248, 113, 113, 0.35)');
+            gradient.addColorStop(0, 'rgba(168, 85, 247, 0)');
+            gradient.addColorStop(1, 'rgba(168, 85, 247, 0.45)'); // Púrpura con 45% de opacidad
             return gradient;
           },
-          data: [], borderWidth: 2.5, tension: 0.4, pointRadius: 0, pointHoverRadius: 6, fill: true, spanGaps: false 
+          data: [], 
+          borderWidth: 3, 
+          tension: 0.5, // 🔥 Curva muy suave (tipo ola)
+          pointRadius: 0, 
+          pointHoverRadius: 6, 
+          pointBackgroundColor: "#ffffff", // Punto blanco
+          pointBorderColor: "#a855f7",
+          pointBorderWidth: 2,
+          fill: true, 
+          spanGaps: false 
         },
         { 
+          // Sonda 1 (Amarilla) - Va encima
+          label: "Sonda 1", 
+          borderColor: "#eab308", 
+          backgroundColor: (context) => {
+            const ctx = context.chart.ctx;
+            const chartArea = context.chart.chartArea;
+            if (!chartArea) return null;
+            const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+            gradient.addColorStop(0, 'rgba(234, 179, 8, 0)');
+            gradient.addColorStop(1, 'rgba(234, 179, 8, 0.45)'); // Amarillo con 45% de opacidad
+            return gradient;
+          },
+          data: [], 
+          borderWidth: 3, 
+          tension: 0.5, 
+          pointRadius: 0, 
+          pointHoverRadius: 6, 
+          pointBackgroundColor: "#ffffff",
+          pointBorderColor: "#eab308",
+          pointBorderWidth: 2,
+          fill: true, 
+          spanGaps: false 
+        },
+        { 
+          // ΔT (Línea de puntos tenue)
           label: "ΔT", 
-          borderColor: "#fbbf24", 
+          borderColor: "rgba(255, 255, 255, 0.4)", 
           backgroundColor: "transparent",
-          data: [], borderWidth: 2.5, tension: 0.4, pointRadius: 0, pointHoverRadius: 6, fill: false, spanGaps: false 
+          data: [], 
+          borderWidth: 1.5, 
+          borderDash: [5, 5], // 🔥 Línea punteada
+          tension: 0.5, 
+          pointRadius: 0, 
+          pointHoverRadius: 6, 
+          fill: false, 
+          spanGaps: false 
         }
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: "index", intersect: false },
-      layout: { padding: { top: 8, right: 16, bottom: 8, left: 8 } },
+      layout: { padding: { top: 30, right: 16, bottom: 8, left: 8 } }, // Más espacio arriba para las etiquetas
       scales: {
         x: {
           type: "time",
           time: { unit: "hour", tooltipFormat: "dd/MM/yyyy, HH:mm",
             displayFormats: { minute: "HH:mm", hour: "HH:mm", day: "dd/MM" } },
           ticks: { color: "#64748b", font: { size: 11 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
-          grid: { display: false, drawBorder: false }, // ❌ Sin cuadrícula vertical ni borde
+          grid: { display: false, drawBorder: false },
           border: { display: false }
         },
         y: {
-          grace: "10%",
+          grace: "15%", // Más espacio arriba y abajo
           ticks: { color: "#64748b", font: { size: 11 }, stepSize: 2, padding: 8 },
-          grid: { color: "rgba(51, 65, 85, 0.2)", drawBorder: false }, // 🌟 Líneas horizontales tenues
-          border: { display: false } // ❌ Sin borde en el eje Y
+          grid: { color: "rgba(51, 65, 85, 0.15)", drawBorder: false }, // Cuadrícula casi invisible
+          border: { display: false }
         }
       },
       plugins: {
-        legend: {
-          display: true, position: "top",
-          labels: { color: "#cbd5e1", font: { size: 13, weight: "600" }, boxWidth: 20, boxHeight: 3, padding: 16 }
-        },
+        legend: { display: false }, // Ocultamos la leyenda de Chart.js para usar tus botones
         tooltip: {
           backgroundColor: "rgba(15,23,42,0.95)", borderColor: "#334155", borderWidth: 1,
           titleColor: "#e2e8f0", bodyColor: "#cbd5e1", padding: 10,
-          titleFont: { size: 13 }, bodyFont: { size: 13 },
           callbacks: {
             label: c => {
               const v = c.parsed.y;
@@ -423,9 +429,10 @@
       lastTs = t;
     });
 
-    tempChart.data.datasets[0].data = s1;
-    tempChart.data.datasets[1].data = s2;
-    tempChart.data.datasets[2].data = dt;
+    // Asignar los datos respetando el orden del dataset
+    tempChart.data.datasets[0].data = s2; // Púrpura
+    tempChart.data.datasets[1].data = s1; // Amarilla
+    tempChart.data.datasets[2].data = dt; // ΔT
 
     if (!userZoomed) {
       const now = Date.now();
@@ -447,7 +454,7 @@
     const valid = temps.filter(v => v !== null && Number.isFinite(v));
     if (valid.length) {
       const tMin = Math.min(...valid), tMax = Math.max(...valid);
-      const margin = Math.max(1, (tMax - tMin) * 0.15);
+      const margin = Math.max(1, (tMax - tMin) * 0.20);
       tempChart.options.scales.y.min = Math.floor((tMin - margin) / 2) * 2;
       tempChart.options.scales.y.max = Math.ceil((tMax + margin) / 2) * 2;
     } else {
@@ -521,9 +528,6 @@
     return `${Math.floor(h / 24)} d`;
   }
 
-  /* ============================================================
-     REFRESCOS
-     ============================================================ */
   async function refreshLatest() {
     try {
       const row = await fetchJSON("/latest");
@@ -540,7 +544,7 @@
         if (offsetHours === 0) renderChart();
       }
       updateBadge();
-    } catch (e) { console.error("Latest falló:", e); updateBadge(); }
+    } catch (e) { updateBadge(); }
   }
 
   async function refreshRecentHistory() {
@@ -557,13 +561,9 @@
         allData.sort((a, b) => (parseTs(a.created_at) || 0) - (parseTs(b.created_at) || 0));
         if (offsetHours === 0) renderChart();
       }
-    } catch (e) { console.warn("Refresco falló:", e); }
-    finally { isRefreshing = false; }
+    } catch (e) {} finally { isRefreshing = false; }
   }
 
-  /* ============================================================
-     NAVEGACIÓN
-     ============================================================ */
   function navigateHistory(direction, reset = false) {
     if (reset) offsetHours = 0;
     else { offsetHours += direction * selectedHours; if (offsetHours < 0) offsetHours = 0; }
@@ -591,11 +591,13 @@
     updateBadge();
   }
 
-  /* ============================================================
-     SERIES
-     ============================================================ */
   function applySeriesVisibility() {
-    seriesState.forEach((v, i) => tempChart.setDatasetVisibility(i, v));
+    // Dataset 0 es Sonda 2, Dataset 1 es Sonda 1, Dataset 2 es ΔT
+    // Pero en la UI los botones son S1, S2, ΔT. Hay que mapear:
+    tempChart.setDatasetVisibility(0, seriesState[1]); // Visibilidad de Sonda 2 (index 1 en UI)
+    tempChart.setDatasetVisibility(1, seriesState[0]); // Visibilidad de Sonda 1 (index 0 en UI)
+    tempChart.setDatasetVisibility(2, seriesState[2]); // Visibilidad de ΔT
+    
     ["toggle-s1","toggle-s2","toggle-dt"].forEach((id, i) => {
       const b = document.getElementById(id);
       if (b) b.classList.toggle("active", seriesState[i]);
@@ -614,9 +616,6 @@
     applySeriesVisibility();
   }
 
-  /* ============================================================
-     UI
-     ============================================================ */
   function resetZoom() {
     userZoomed = false;
     if (tempChart.resetZoom) tempChart.resetZoom();
@@ -637,7 +636,7 @@
         if (screen.orientation && screen.orientation.lock) await screen.orientation.lock("landscape");
       } catch (_) {}
       document.getElementById("portrait-hint").classList.add("hidden");
-    } catch (e) { console.warn(e); }
+    } catch (e) {}
   }
 
   async function exitAndGoBack() {
@@ -650,7 +649,6 @@
     location.replace("./index.html");
   }
 
-  /* Doble tap oculta UI */
   let lastTap = 0;
   document.getElementById("chart-container").addEventListener("touchend", e => {
     const now = Date.now();
@@ -665,9 +663,6 @@
   history.pushState({ page: "grafica" }, "", location.href);
   window.addEventListener("popstate", () => exitAndGoBack());
 
-  /* ============================================================
-     CONTROL DEL HINT DE ROTAR TELÉFONO
-     ============================================================ */
   function updatePortraitHint() {
     const hint = document.getElementById("portrait-hint");
     const isPortrait = window.matchMedia("(orientation: portrait)").matches;
@@ -681,9 +676,6 @@
     }
   }
 
-  /* ============================================================
-     INIT
-     ============================================================ */
   window.addEventListener("DOMContentLoaded", async () => {
     const savedH = parseInt(localStorage.getItem("graph-hours"));
     if ([2,4,8,12,24].includes(savedH)) selectedHours = savedH;
