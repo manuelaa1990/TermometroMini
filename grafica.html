@@ -304,19 +304,49 @@
   }
 
   /* ============================================================
-     GRÁFICA
+     GRÁFICA (CONFIGURACIÓN VISUAL ESTILO NZXT)
      ============================================================ */
   const ctx = document.getElementById("tempChart").getContext("2d");
   const tempChart = new Chart(ctx, {
     type: "line",
     data: {
       datasets: [
-        { label: "Sonda 1", borderColor: "#38bdf8", backgroundColor: "rgba(56,189,248,.08)",
-          data: [], borderWidth: 2.5, tension: 0.25, pointRadius: 0, pointHoverRadius: 6, fill: true, spanGaps: false },
-        { label: "Sonda 2", borderColor: "#f87171", backgroundColor: "rgba(248,113,113,.08)",
-          data: [], borderWidth: 2.5, tension: 0.25, pointRadius: 0, pointHoverRadius: 6, fill: true, spanGaps: false },
-        { label: "ΔT", borderColor: "#fbbf24", backgroundColor: "rgba(251,191,36,.08)",
-          data: [], borderWidth: 2.5, tension: 0.25, pointRadius: 0, pointHoverRadius: 6, fill: false, spanGaps: false }
+        { 
+          label: "Sonda 1", 
+          borderColor: "#38bdf8", 
+          // 🔥 Degradado para Sonda 1
+          backgroundColor: (context) => {
+            const ctx = context.chart.ctx;
+            const chartArea = context.chart.chartArea;
+            if (!chartArea) return null;
+            const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+            gradient.addColorStop(0, 'rgba(56, 189, 248, 0)');
+            gradient.addColorStop(1, 'rgba(56, 189, 248, 0.35)');
+            return gradient;
+          },
+          data: [], borderWidth: 2.5, tension: 0.4, pointRadius: 0, pointHoverRadius: 6, fill: true, spanGaps: false 
+        },
+        { 
+          label: "Sonda 2", 
+          borderColor: "#f87171", 
+          // 🔥 Degradado para Sonda 2
+          backgroundColor: (context) => {
+            const ctx = context.chart.ctx;
+            const chartArea = context.chart.chartArea;
+            if (!chartArea) return null;
+            const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+            gradient.addColorStop(0, 'rgba(248, 113, 113, 0)');
+            gradient.addColorStop(1, 'rgba(248, 113, 113, 0.35)');
+            return gradient;
+          },
+          data: [], borderWidth: 2.5, tension: 0.4, pointRadius: 0, pointHoverRadius: 6, fill: true, spanGaps: false 
+        },
+        { 
+          label: "ΔT", 
+          borderColor: "#fbbf24", 
+          backgroundColor: "transparent",
+          data: [], borderWidth: 2.5, tension: 0.4, pointRadius: 0, pointHoverRadius: 6, fill: false, spanGaps: false 
+        }
       ]
     },
     options: {
@@ -328,13 +358,15 @@
           type: "time",
           time: { unit: "hour", tooltipFormat: "dd/MM/yyyy, HH:mm",
             displayFormats: { minute: "HH:mm", hour: "HH:mm", day: "dd/MM" } },
-          ticks: { color: "#94a3b8", font: { size: 12 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 },
-          grid: { color: "rgba(51, 65, 85, 0.5)" }
+          ticks: { color: "#64748b", font: { size: 11 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+          grid: { display: false, drawBorder: false }, // ❌ Sin cuadrícula vertical ni borde
+          border: { display: false }
         },
         y: {
-          grace: "5%",
-          ticks: { color: "#94a3b8", font: { size: 12 }, stepSize: 2 },
-          grid: { color: "rgba(51, 65, 85, 0.5)" }
+          grace: "10%",
+          ticks: { color: "#64748b", font: { size: 11 }, stepSize: 2, padding: 8 },
+          grid: { color: "rgba(51, 65, 85, 0.2)", drawBorder: false }, // 🌟 Líneas horizontales tenues
+          border: { display: false } // ❌ Sin borde en el eje Y
         }
       },
       plugins: {
@@ -604,7 +636,6 @@
       try {
         if (screen.orientation && screen.orientation.lock) await screen.orientation.lock("landscape");
       } catch (_) {}
-      // Ocultar el hint al entrar en fullscreen
       document.getElementById("portrait-hint").classList.add("hidden");
     } catch (e) { console.warn(e); }
   }
@@ -662,12 +693,10 @@
 
     applySeriesVisibility();
 
-    // Mostrar el hint si estamos en vertical al abrir
     updatePortraitHint();
     window.addEventListener("resize", updatePortraitHint);
     window.addEventListener("orientationchange", () => setTimeout(updatePortraitHint, 300));
 
-    // Botón del hint
     document.querySelector("#portrait-hint button")
       ?.addEventListener("click", enterFullscreen);
 
