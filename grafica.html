@@ -13,7 +13,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2"></script>
-  <!-- Plugin para las etiquetas flotantes -->
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
 
   <style>
@@ -141,8 +140,9 @@
       <button id="toggle-s2" onclick="toggleSeries(1)" class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
         <span class="w-2 h-2 rounded-full" style="background:#a855f7"></span><span>S2</span>
       </button>
+      <!-- 🔥 ΔT ahora en Rojo -->
       <button id="toggle-dt" onclick="toggleSeries(2)" class="series-toggle active flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 border">
-        <span class="w-2 h-2 rounded-full" style="background:#fbbf24"></span><span>ΔT</span>
+        <span class="w-2 h-2 rounded-full" style="background:#ef4444"></span><span>ΔT</span>
       </button>
     </div>
 
@@ -228,7 +228,6 @@
   }
 
   async function fetchJSON(path) {
-    console.log("Fetching:", API_URL + path);
     const res = await withTimeout(fetch(API_URL + path), 12000);
     if (!res.ok) throw new Error("HTTP " + res.status);
     return res.json();
@@ -241,7 +240,7 @@
   }
 
   /* ============================================================
-     CARGA INICIAL + DATOS DE PRUEBA (MOCK)
+     CARGA INICIAL
      ============================================================ */
   async function loadAllHistory() {
     const chunks = [];
@@ -282,24 +281,20 @@
     merged.sort((a, b) => (parseTs(a.created_at) || 0) - (parseTs(b.created_at) || 0));
     allData = merged;
 
-    // 🔥 SI LA API FALLA, GENERAMOS DATOS DE PRUEBA PARA VER LA GRÁFICA
     if (allData.length === 0) {
-      console.warn("⚠️ API sin datos. Generando Mock Data para probar la gráfica...");
+      console.warn("⚠️ API sin datos. Generando Mock Data...");
       const now = Date.now();
       for (let i = 0; i < 60; i++) {
-        const t = now - (60 - i) * 5 * 60000; // Cada 5 minutos
-        const base1 = 25 + Math.sin(i / 5) * 6;
-        const base2 = 28 + Math.cos(i / 5) * 4;
+        const t = now - (60 - i) * 5 * 60000;
         allData.push({
           created_at: new Date(t).toISOString(),
-          temp1: base1 + Math.random() * 1.5,
-          temp2: base2 + Math.random() * 1.5,
+          temp1: 25 + Math.sin(i / 5) * 6 + Math.random(),
+          temp2: 28 + Math.cos(i / 5) * 4 + Math.random(),
           bateriaVolt: 3.8 + Math.random() * 0.3,
           wifi: "Mock WiFi",
           ip: "192.168.1.100"
         });
       }
-      // Actualizamos el badge para que el usuario sepa
       document.getElementById("status-badge").textContent = "⚠️ Modo Prueba";
       document.getElementById("status-badge").className = "px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 truncate";
     }
@@ -353,10 +348,19 @@
           data: [], borderWidth: 3, tension: 0.5, pointRadius: 0, pointHoverRadius: 6, pointBackgroundColor: "#ffffff", pointBorderColor: "#eab308", pointBorderWidth: 2, fill: true, spanGaps: false 
         },
         { 
+          // 🔥 ΔT en Rojo
           label: "ΔT", 
-          borderColor: "rgba(255, 255, 255, 0.4)", 
-          backgroundColor: "transparent",
-          data: [], borderWidth: 1.5, borderDash: [5, 5], tension: 0.5, pointRadius: 0, pointHoverRadius: 6, fill: false, spanGaps: false 
+          borderColor: "#ef4444", 
+          backgroundColor: (context) => {
+            const ctx = context.chart.ctx;
+            const chartArea = context.chart.chartArea;
+            if (!chartArea) return null;
+            const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+            gradient.addColorStop(0, 'rgba(239, 68, 68, 0)');
+            gradient.addColorStop(1, 'rgba(239, 68, 68, 0.45)');
+            return gradient;
+          },
+          data: [], borderWidth: 3, tension: 0.5, pointRadius: 0, pointHoverRadius: 6, pointBackgroundColor: "#ffffff", pointBorderColor: "#ef4444", pointBorderWidth: 2, fill: true, spanGaps: false 
         }
       ]
     },
@@ -374,7 +378,7 @@
           border: { display: false }
         },
         y: {
-          grace: "15%", 
+          grace: "20%", // Más espacio para las burbujas arriba y abajo
           ticks: { color: "#64748b", font: { size: 11 }, stepSize: 2, padding: 8 },
           grid: { color: "rgba(51, 65, 85, 0.15)", drawBorder: false },
           border: { display: false }
@@ -404,19 +408,20 @@
   });
 
   /* ============================================================
-     RENDER Y LÓGICA DE BURBUJAS
+     RENDER Y LÓGICA DE EXTREMOS (MÁX Y MÍN)
      ============================================================ */
-  function getMaxPoint(data) {
-    if (!data || !data.length) return null;
-    let max = -Infinity;
-    let point = null;
+  // 🔥 Nueva función que calcula ambos extremos en una sola pasada
+  function getExtrema(data) {
+    if (!data || !data.length) return { max: null, min: null };
+    let max = { y: -Infinity, x: null };
+    let min = { y: Infinity, x: null };
     data.forEach(p => {
-      if (p.y !== null && p.y > max) {
-        max = p.y;
-        point = p;
+      if (p.y !== null && Number.isFinite(p.y)) {
+        if (p.y > max.y) { max = { x: p.x, y: p.y }; }
+        if (p.y < min.y) { min = { x: p.x, y: p.y }; }
       }
     });
-    return point;
+    return { max: (max.y === -Infinity ? null : max), min: (min.y === Infinity ? null : min) };
   }
 
   function renderChart() {
@@ -445,51 +450,87 @@
     tempChart.data.datasets[1].data = s1; 
     tempChart.data.datasets[2].data = dt; 
 
-    // --- LÓGICA DE BURBUJAS (CON PROTECCIÓN CONTRA ERRORES) ---
+    // --- LÓGICA DE BURBUJAS (MAX Y MIN) ---
     try {
       const annotations = {};
-      
       if (processed.length === 0) {
-        // Calcular posición segura para el mensaje de "Sin datos"
         let xMin = tempChart.options.scales.x.min;
         let xMax = tempChart.options.scales.x.max;
-        
-        // Si los límites no son números válidos (porque no hay datos), usar el rango actual
         if (!Number.isFinite(xMin) || !Number.isFinite(xMax)) {
           const now = Date.now();
           xMin = now - (selectedHours * 3600 * 1000);
           xMax = now;
         }
-        
         annotations.emptyLabel = {
           type: 'label',
           xValue: xMin + (xMax - xMin) / 2,
-          yValue: 0,
-          content: ['Sin datos en este rango', 'Usa las flechas para navegar'],
-          font: { size: 12, weight: 'bold' },
+          yValue: 20,
+          content: ['Sin datos en este rango'],
+          font: { size: 14, weight: 'bold' },
           color: '#64748b'
         };
       } else {
-        const maxS1 = getMaxPoint(s1);
-        const maxS2 = getMaxPoint(s2);
+        const extS1 = getExtrema(s1);
+        const extS2 = getExtrema(s2);
+        const extDT = getExtrema(dt);
 
-        if (maxS1 && seriesState[0]) {
-          annotations.bubbleS1 = {
-            type: 'label', xValue: maxS1.x, yValue: maxS1.y,
-            content: [maxS1.y.toFixed(2) + ' °C', 'Máx S1'],
+        // --- Sonda 1 (Amarillo) ---
+        if (extS1.max && seriesState[0]) {
+          annotations.bubbleMaxS1 = {
+            type: 'label', xValue: extS1.max.x, yValue: extS1.max.y,
+            content: [extS1.max.y.toFixed(2) + ' °C', 'Máx S1'],
             backgroundColor: 'rgba(255, 255, 255, 0.95)', borderColor: '#eab308', borderWidth: 1, borderRadius: 6,
             color: '#1e293b', font: { size: 10, weight: 'bold' }, padding: { top: 4, bottom: 4, left: 6, right: 6 },
             callout: { display: true, borderColor: '#eab308', borderWidth: 1, margin: 4, position: 'bottom' }
           };
         }
+        if (extS1.min && seriesState[0]) {
+          annotations.bubbleMinS1 = {
+            type: 'label', xValue: extS1.min.x, yValue: extS1.min.y,
+            content: [extS1.min.y.toFixed(2) + ' °C', 'Mín S1'],
+            backgroundColor: 'rgba(255, 255, 255, 0.95)', borderColor: '#eab308', borderWidth: 1, borderRadius: 6,
+            color: '#1e293b', font: { size: 10, weight: 'bold' }, padding: { top: 4, bottom: 4, left: 6, right: 6 },
+            callout: { display: true, borderColor: '#eab308', borderWidth: 1, margin: 4, position: 'top' } // Apunta hacia arriba
+          };
+        }
 
-        if (maxS2 && seriesState[1]) {
-          annotations.bubbleS2 = {
-            type: 'label', xValue: maxS2.x, yValue: maxS2.y,
-            content: [maxS2.y.toFixed(2) + ' °C', 'Máx S2'],
+        // --- Sonda 2 (Púrpura) ---
+        if (extS2.max && seriesState[1]) {
+          annotations.bubbleMaxS2 = {
+            type: 'label', xValue: extS2.max.x, yValue: extS2.max.y,
+            content: [extS2.max.y.toFixed(2) + ' °C', 'Máx S2'],
             backgroundColor: 'rgba(255, 255, 255, 0.95)', borderColor: '#a855f7', borderWidth: 1, borderRadius: 6,
             color: '#1e293b', font: { size: 10, weight: 'bold' }, padding: { top: 4, bottom: 4, left: 6, right: 6 },
             callout: { display: true, borderColor: '#a855f7', borderWidth: 1, margin: 4, position: 'bottom' }
+          };
+        }
+        if (extS2.min && seriesState[1]) {
+          annotations.bubbleMinS2 = {
+            type: 'label', xValue: extS2.min.x, yValue: extS2.min.y,
+            content: [extS2.min.y.toFixed(2) + ' °C', 'Mín S2'],
+            backgroundColor: 'rgba(255, 255, 255, 0.95)', borderColor: '#a855f7', borderWidth: 1, borderRadius: 6,
+            color: '#1e293b', font: { size: 10, weight: 'bold' }, padding: { top: 4, bottom: 4, left: 6, right: 6 },
+            callout: { display: true, borderColor: '#a855f7', borderWidth: 1, margin: 4, position: 'top' }
+          };
+        }
+
+        // --- ΔT (Rojo) ---
+        if (extDT.max && seriesState[2]) {
+          annotations.bubbleMaxDT = {
+            type: 'label', xValue: extDT.max.x, yValue: extDT.max.y,
+            content: [extDT.max.y.toFixed(2) + ' °C', 'Máx ΔT'],
+            backgroundColor: 'rgba(255, 255, 255, 0.95)', borderColor: '#ef4444', borderWidth: 1, borderRadius: 6,
+            color: '#1e293b', font: { size: 10, weight: 'bold' }, padding: { top: 4, bottom: 4, left: 6, right: 6 },
+            callout: { display: true, borderColor: '#ef4444', borderWidth: 1, margin: 4, position: 'bottom' }
+          };
+        }
+        if (extDT.min && seriesState[2]) {
+          annotations.bubbleMinDT = {
+            type: 'label', xValue: extDT.min.x, yValue: extDT.min.y,
+            content: [extDT.min.y.toFixed(2) + ' °C', 'Mín ΔT'],
+            backgroundColor: 'rgba(255, 255, 255, 0.95)', borderColor: '#ef4444', borderWidth: 1, borderRadius: 6,
+            color: '#1e293b', font: { size: 10, weight: 'bold' }, padding: { top: 4, bottom: 4, left: 6, right: 6 },
+            callout: { display: true, borderColor: '#ef4444', borderWidth: 1, margin: 4, position: 'top' }
           };
         }
       }
@@ -497,7 +538,6 @@
     } catch (err) {
       console.error("Error al dibujar anotaciones:", err);
     }
-    // --------------------------------------------------------
 
     if (!userZoomed) {
       const now = Date.now();
@@ -517,14 +557,15 @@
     if (seriesState[1]) temps.push(...s2.map(d => d.y));
     if (seriesState[2]) temps.push(...dt.map(d => d.y));
     const valid = temps.filter(v => v !== null && Number.isFinite(v));
+    
     if (valid.length) {
       const tMin = Math.min(...valid), tMax = Math.max(...valid);
-      const margin = Math.max(1, (tMax - tMin) * 0.20);
+      const margin = Math.max(1, (tMax - tMin) * 0.25); // Un poco más de margen para que quepan las burbujas
       tempChart.options.scales.y.min = Math.floor((tMin - margin) / 2) * 2;
       tempChart.options.scales.y.max = Math.ceil((tMax + margin) / 2) * 2;
     } else {
-      tempChart.options.scales.y.min = undefined;
-      tempChart.options.scales.y.max = undefined;
+      tempChart.options.scales.y.min = 15;
+      tempChart.options.scales.y.max = 35;
     }
 
     tempChart.update("none");
@@ -538,18 +579,18 @@
     if (offsetHours > 0) historyInd.classList.remove("hidden");
     else historyInd.classList.add("hidden");
 
-    if (!processed.length) {
-      el.textContent = `Sin datos en esta ventana · ${selectedHours}h`;
-      return;
-    }
+    const now = Date.now();
+    const endTime = now - offsetHours * 3600 * 1000;
+    const startTime = endTime - selectedHours * 3600 * 1000;
+
     const opts = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
-    const t0 = parseTs(processed[0].created_at);
-    const t1 = parseTs(processed[processed.length - 1].created_at);
-    const s0 = new Date(t0).toLocaleDateString([], opts);
-    const s1 = new Date(t1).toLocaleDateString([], opts);
+    const s0 = new Date(startTime).toLocaleDateString([], opts);
+    const s1 = new Date(endTime).toLocaleDateString([], opts);
     
     let text = `${s0} → ${s1} · ${selectedHours}h`;
     if (offsetHours > 0) text += ` · Hace ${offsetHours}h`;
+    if (processed.length === 0) text += ` (Sin datos)`;
+    
     el.textContent = text;
   }
 
@@ -570,7 +611,6 @@
 
   function updateBadge() {
     const b = document.getElementById("status-badge");
-    // Si estamos en modo prueba, no sobreescribir
     if (b.textContent.includes("Modo Prueba")) return;
 
     let text, style;
@@ -752,12 +792,8 @@
   }
 
   window.addEventListener("DOMContentLoaded", async () => {
-    // 🔥 REGISTRAR EL PLUGIN DE ANOTACIONES AQUÍ
     if (typeof ChartAnnotation !== 'undefined') {
       Chart.register(ChartAnnotation);
-      console.log("✅ Plugin ChartAnnotation registrado");
-    } else {
-      console.error("❌ ChartAnnotation NO está definido. Revisa la conexión a Internet o el CDN.");
     }
 
     const savedH = parseInt(localStorage.getItem("graph-hours"));
