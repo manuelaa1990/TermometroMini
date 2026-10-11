@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Diagrama de Mollier (p-h) · Fullscreen</title>
+
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <script type="module">
+    (async () => {
+      try {
+        const M = await import('https://unpkg.com/coolprop-wasm@6.6.0/coolprop.js');
+        window.CoolProp = await M.default();
+        window.dispatchEvent(new Event('coolprop-ready'));
+      } catch (e) {
+        console.warn('CoolProp WASM no disponible');
+        window.dispatchEvent(new Event('coolprop-failed'));
+      }
+    })();
+  </script>
+
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      overflow: hidden; background: #0f172a; color: #e2e8f0;
+      font-family: system-ui, -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #topbar {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 20;
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+      transition: opacity .3s ease, transform .3s ease;
+    }
+    #topbar.hidden-ui { opacity: 0; transform: translateY(-100%); pointer-events: none; }
+
+    #mollier-wrap {
+      position: absolute; top: 56px; bottom: 0; left: 0; right: 0;
+      display: flex; flex-direction: row;
+    }
+
+    #mollierPlotFull { flex: 1; min-width: 0; min-height: 0; }
+
+    #datos-ciclo {
+      flex: 0 0 280px; max-width: 340px;
+      overflow-y: auto;
+      background: #1e293b;
+      border-left: 1px solid #334155;
+      padding: 10px;
+      transition: flex-basis .2s ease, padding .2s ease;
+    }
+    #datos-ciclo.colapsado {
+      flex-basis: 0; padding: 0; border: none; overflow: hidden;
+    }
+
+    #portrait-hint {
+      position: absolute; inset: 0; display: none; align-items: center;
+      justify-content: center; background: #0f172a; z-index: 100;
+      text-align: center; padding: 2rem;
+    }
+    @media (orientation: portrait) and (max-width: 1023px) {
+      #portrait-hint.force-hint { display: flex; }
+    }
+    #portrait-hint.hidden { display: none !important; }
+    .rotate-icon { animation: rotate 2s ease-in-out infinite; display: inline-block; font-size: 4rem; }
+    @keyframes rotate { 0%,100%{transform:rotate(0deg);} 50%{transform:rotate(90deg);} }
+
+    .btn-toggle-line {
+      padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+      color: #94a3b8; background: transparent; border: 1px solid #334155;
+      transition: all .15s; cursor: pointer; white-space: nowrap;
+    }
+    .btn-toggle-line.active { background: #0284c7; color: white; border-color: #0284c7; }
+    .btn-toggle-line:hover:not(.active) { color: #e2e8f0; border-color: #475569; }
+
+    .kpi-row {
+      display: flex; justify-content: space-between;
+      padding: 5px 0; border-bottom: 1px solid #263449;
+      font-size: 12px; gap: 8px;
+    }
+    .kpi-row:last-child { border-bottom: none; }
+    .kpi-row .lbl { color: #94a3b8; }
+    .kpi-row .val { color: #f8fafc; font-weight: 700; font-family: ui-monospace, monospace; text-align: right; }
+
+    .seccion-titulo {
+      font-size: 11px; text-transform: uppercase; color: #38bdf8;
+      margin: 12px 0 6px; letter-spacing: .5px; font-weight: 700;
+    }
+    .seccion-titulo:first-child { margin-top: 0; }
+
+    .modo-chip {
+      display: inline-block; padding: 3px 8px; border-radius: 6px;
+      font-size: 11px; font-weight: 700; margin-bottom: 6px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Aviso girar (móvil vertical) -->
+  <div id="portrait-hint">
+    <div>
+      <div class="rotate-icon">📱</div>
+      <div style="font-size:1.2rem; font-weight:700; margin:1rem 0 .5rem;">Gira el teléfono</div>
+      <div style="font-size:.85rem; color:#94a3b8; margin-bottom:1.5rem;">
+        Para ver el diagrama de Mollier a pantalla completa
+      </div>
+      <button onclick="enterFullscreen()"
+        style="padding:.75rem 1.5rem; background:#0284c7; color:white; border:none; border-radius:.5rem; font-weight:600; cursor:pointer;">
+        Intentar pantalla completa
+      </button>
+    </div>
+  </div>
+
+  <!-- Barra superior -->
+  <div id="topbar">
+    <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; flex-wrap:wrap;">
+      <button onclick="exitAndGoBack()"
+        style="padding:6px 12px; border-radius:6px; background:#dc2626; color:white; border:none; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px; flex-shrink:0;">
+        ← Salir
+      </button>
+
+      <div style="flex:1; min-width:0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <span style="font-size:13px; font-weight:700; color:#38bdf8; white-space:nowrap;">
+          Diagrama de Mollier (p-h)
+        </span>
+        <span id="mollier-ref" style="font-size:11px; color:#94a3b8;">—</span>
+      </div>
+
+      <div style="display:flex; gap:4px; flex-wrap:wrap; flex-shrink:0;">
+        <button id="toggle-domo"  class="btn-toggle-line active" onclick="toggleLinea('domo')">Domo</button>
+        <button id="toggle-ciclo" class="btn-toggle-line active" onclick="toggleLinea('ciclo')">Ciclo</button>
+        <button id="toggle-banda" class="btn-toggle-line active" onclick="toggleLinea('banda')">Aplicación</button>
+        <button id="toggle-iso"   class="btn-toggle-line"        onclick="toggleLinea('iso')">Isotermas</button>
+        <button id="toggle-isen"  class="btn-toggle-line"        onclick="toggleLinea('isen')">Isentrópicas</button>
+      </div>
+
+      <button id="btn-toggle-datos" onclick="toggleDatos()"
+        style="padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; color:#94a3b8; background:transparent; border:1px solid #334155; cursor:pointer; flex-shrink:0;">
+        ◀ Datos
+      </button>
+    </div>
+  </div>
+
+  <!-- Diagrama + panel de datos -->
+  <div id="mollier-wrap">
+    <div id="mollierPlotFull"></div>
+    <aside id="datos-ciclo">
+      <div id="chip-modo" class="modo-chip">—</div>
+      <div class="seccion-titulo">Datos del ciclo</div>
+      <div id="lista-datos"></div>
+      <div class="seccion-titulo">Trabajo y rendimiento</div>
+      <div id="lista-trabajo"></div>
+    </aside>
+  </div>
+
+<script>
+  /* ============================================================
+     1. CONSTANTES
+     ============================================================ */
+  const P_ATM    = { psi: 14.696, bar: 1.01325, kpa: 101.325 };
+  const P_FACTOR = { psi: 14.5038, bar: 1.0, kpa: 100.0 };
+
+  const FLUID_MAP = {
+    R134a:'R134a', R22:'R22', R404A:'R404A', R410A:'R410A', R32:'R32',
+    R290:'R290', R600a:'R600a', R507A:'R507A', R407C:'R407C',
+    R717:'Ammonia', R744:'CarbonDioxide', R407F:'R407F', R448A:'R448A',
+    R449A:'R449A', R513A:'R513A', R422D:'R422D', R427A:'R427A', R438A:'R438A'
+  };
+
+  const MODOS_EVAP = {
+    LBP: { label:'LBP', full:'LBP — Low Back Pressure',        tMin:-35, tMax:-10, color:'#38bdf8' },
+    MBP: { label:'MBP', full:'MBP — Medium Back Pressure',     tMin:-20, tMax:  0, color:'#22c55e' },
+    HBP: { label:'HBP', full:'HBP — High Back Pressure',       tMin: -5, tMax: 15, color:'#f59e0b' },
+    CBP: { label:'CBP', full:'CBP — Commercial Back Pressure', tMin:-18, tMax: 10, color:'#a78bfa' }
+  };
+
+  let estadoLineas = {
+    domo: true,
+    ciclo: true,
+    banda: true,
+    iso: false,
+    isen: false
+  };
+
+  let datosColapsados = false;
+
+  /* ============================================================
+     2. LECTURA DE PARÁMETROS POR URL
+     ============================================================ */
+  function leerParametros() {
+    const p = new URLSearchParams(location.search);
+    return {
+      ref:   p.get('ref')   || 'R404A',
+      mod:   p.get('mod')   || 'MBP',
+      pu:    p.get('pu')    || 'psi',
+      tu:    p.get('tu')    || 'C',
+      psuct: parseFloat(p.get('psuct')) || 25,
+      pdesc: parseFloat(p.get('pdesc')) || 290,
+      tevap: parseFloat(p.get('tevap')) || -12,
+      tsuct: parseFloat(p.get('tsuct')) || -10,
+      tdesc: parseFloat(p.get('tdesc')) || 90,
+      tliq:  parseFloat(p.get('tliq'))  || 45
+    };
+  }
+
+  /* ============================================================
+     3. CONVERSIONES
+     ============================================================ */
+  function aBarAbs(valor, unidad) {
+    return (valor / P_FACTOR[unidad]) + P_ATM[unidad];
+  }
+  function aCelsius(valor, unidad) {
+    return unidad === 'F' ? (valor - 32) * 5/9 : valor;
+  }
+
+  /* ============================================================
+     4. COOLPROP — Helpers
+     ============================================================ */
+  function cpCall(output, n1, v1, n2, v2, fluid) {
+    if (!window.CoolProp) return null;
+    try {
+      const r = window.CoolProp.PropsSI(output, n1, v1, n2, v2, fluid);
+      return Number.isFinite(r) ? r : null;
+    } catch (e) { return null; }
+  }
+
+  function domeCoolProp(refKey) {
+    const fluid = FLUID_MAP[refKey];
+    if (!window.CoolProp || !fluid) return null;
+    try {
+      const pc = window.CoolProp.PropsSI('pcrit', '', 0, '', 0, fluid);
+      const pmin = Math.max(window.CoolProp.PropsSI('ptriple', '', 0, '', 0, fluid), 5000);
+      const lo = pmin / 1e5;
+      const hi = (pc / 1e5) * 0.995;
+      const n = 60;
+      const pts = [];
+      for (let i = 0; i < n; i++) {
+        const f = i / (n - 1);
+        const pBar = Math.exp(Math.log(lo) + f * (Math.log(hi) - Math.log(lo)));
+        const P = pBar * 1e5;
+        const hL = window.CoolProp.PropsSI('H', 'P', P, 'Q', 0, fluid) / 1000;
+        const hV = window.CoolProp.PropsSI('H', 'P', P, 'Q', 1, fluid) / 1000;
+        const tDew = window.CoolProp.PropsSI('T', 'P', P, 'Q', 1, fluid) - 273.15;
+        pts.push({ p: pBar, hL, hV, tSat: tDew });
+      }
+      return pts;
+    } catch (e) {
+      console.error('CoolProp falló:', e);
+      return null;
+    }
+  }
+
+  function entalpiaPT(refKey, pBarAbs, tC) {
+    const fluid = FLUID_MAP[refKey];
+    if (!window.CoolProp || !fluid) return null;
+    const h = cpCall('H', 'P', pBarAbs*1e5, 'T', tC+273.15, fluid);
+    return h !== null ? h / 1000 : null;
+  }
+
+  function entropiaPT(refKey, pBarAbs, tC) {
+    const fluid = FLUID_MAP[refKey];
+    if (!window.CoolProp || !fluid) return null;
+    const s = cpCall('S', 'P', pBarAbs*1e5, 'T', tC+273.15, fluid);
+    return s !== null ? s / 1000 : null;
+  }
+
+  function presionSaturacion(refKey, tC) {
+    const fluid = FLUID_MAP[refKey];
+    if (!window.CoolProp || !fluid) return null;
+    const pPa = cpCall('P', 'T', tC + 273.15, 'Q', 1, fluid);
+    return pPa ? pPa / 1e5 : null;
+  }
+
+  /* ============================================================
+     5. APLICACIÓN (banda de referencia)
+     ============================================================ */
+  function bandaAplicacion(refKey, modoKey, pu) {
+    const modo = MODOS_EVAP[modoKey];
+    if (!modo) return null;
+    const pMinBar = presionSaturacion(refKey, modo.tMin);
+    const pMaxBar = presionSaturacion(refKey, modo.tMax);
+    if (pMinBar === null || pMaxBar === null) return null;
+    return {
+      pMin: pMinBar * P_FACTOR[pu],
+      pMax: pMaxBar * P_FACTOR[pu],
+      label: modo.label,
+      full: modo.full,
+      tMin: modo.tMin,
+      tMax: modo.tMax
+    };
+  }
+
+  /* ============================================================
+     6. CONSTRUCCIÓN DE TRAZAS
+     ============================================================ */
+  function construirTraces(cfg) {
+    const domo = domeCoolProp(cfg.ref);
+    if (!domo) return null;
+
+    const pSuctBar = aBarAbs(cfg.psuct, cfg.pu);
+    const pDescBar = aBarAbs(cfg.pdesc, cfg.pu);
+    const tSuctC   = aCelsius(cfg.tsuct, cfg.tu);
+    const tDescC   = aCelsius(cfg.tdesc, cfg.tu);
+    const tLiqC    = aCelsius(cfg.tliq,  cfg.tu);
+
+    const h1 = entalpiaPT(cfg.ref, pSuctBar, tSuctC);
+    const h2 = entalpiaPT(cfg.ref, pDescBar, tDescC);
+    const h3 = entalpiaPT(cfg.ref, pDescBar, tLiqC);
+    const h4 = h3;
+    const s1 = entropiaPT(cfg.ref, pSuctBar, tSuctC);
+
+    const pf = P_FACTOR[cfg.pu];
+    const pSuctPlot = pSuctBar * pf;
+    const pDescPlot = pDescBar * pf;
+
+    const xMin = Math.min(...domo.map(d => d.hL));
+    const xMax = Math.max(...domo.map(d => d.hV));
+    const anchoBanda = xMax - xMin;
+
+    const traces = [];
+
+    /* ---------- 6.1 Banda de aplicación ---------- */
+    if (estadoLineas.banda) {
+      const banda = bandaAplicacion(cfg.ref, cfg.mod, cfg.pu);
+      if (banda) {
+        const colorGris = '#64748b';
+        const tamTexto = Math.max(12, Math.min(28, Math.floor(anchoBanda / 10)));
+        const nMarcas = Math.max(3, Math.min(10, Math.floor(anchoBanda / 60)));
+
+        traces.push({
+          x: [xMin, xMax], y: [banda.pMin, banda.pMin],
+          mode: 'lines', name: `${banda.label} — límite inferior`,
+          line: { color: colorGris, width: 1.2, dash: 'dot' },
+          hovertemplate: `<b>${banda.full}</b><br>Límite inferior<br>Tevap: ${banda.tMin} °C<br>P: %{y:.1f} ${cfg.pu}<extra></extra>`
+        });
+
+        traces.push({
+          x: [xMin, xMax], y: [banda.pMax, banda.pMax],
+          mode: 'lines', name: `${banda.label} — límite superior`,
+          line: { color: colorGris, width: 1.2, dash: 'dot' },
+          hovertemplate: `<b>${banda.full}</b><br>Límite superior<br>Tevap: ${banda.tMax} °C<br>P: %{y:.1f} ${cfg.pu}<extra></extra>`
+        });
+
+        const pMedio = Math.sqrt(banda.pMin * banda.pMax);
+        const xsTexto = [], ysTexto = [], txtTexto = [];
+        for (let i = 0; i < nMarcas; i++) {
+          const f = (i + 0.5) / nMarcas;
+          xsTexto.push(xMin + f * anchoBanda);
+          ysTexto.push(pMedio);
+          txtTexto.push(banda.label);
+        }
+        traces.push({
+          x: xsTexto, y: ysTexto,
+          mode: 'text', text: txtTexto,
+          textposition: 'middle center',
+          textfont: {
+            size: tamTexto,
+            color: 'rgba(100, 116, 139, 0.18)',
+            family: 'system-ui, sans-serif'
+          },
+          hoverinfo: 'skip', showlegend: false
+        });
+
+        traces.push({
+          x: [xMax], y: [pMedio],
+          mode: 'text', text: [banda.label],
+          textposition: 'middle right',
+          textfont: { size: 11, color: colorGris, family: 'system-ui, sans-serif' },
+          hoverinfo: 'skip', showlegend: false
+        });
+      }
+    }
+
+    /* ---------- 6.2 Domo de saturación ---------- */
+    if (estadoLineas.domo) {
+      const xs = [...domo.map(d => d.hL), ...domo.slice().reverse().map(d => d.hV)];
+      const ys = [...domo.map(d => d.p * pf), ...domo.slice().reverse().map(d => d.p * pf)];
+      const textoT = [...domo.map(d => d.tSat), ...domo.slice().reverse().map(d => d.tSat)];
+      traces.push({
+        x: xs, y: ys,
+        mode: 'lines', name: 'Domo de saturación',
+        line: { color: '#38bdf8', width: 2 },
+        customdata: textoT,
+        hovertemplate: '<b>Domo de saturación</b><br>P: %{y:.1f} ' + cfg.pu + '<br>h: %{x:.1f} kJ/kg<br>T sat: %{customdata:.1f} °C<extra></extra>'
+      });
+    }
+
+    /* ---------- 6.3 Isotermas ---------- */
+    if (estadoLineas.iso && domo.length > 5) {
+      const tMinDomo = domo[0].tSat;
+      const tMaxDomo = domo[domo.length - 1].tSat;
+      const nIso = 8;
+      for (let i = 1; i <= nIso; i++) {
+        const f = i / (nIso + 1);
+        const tIso = tMinDomo + f * (tMaxDomo - tMinDomo);
+        const xs = [], ys = [];
+        const nPts = 30;
+        for (let j = 0; j < nPts; j++) {
+          const pBar = Math.exp(Math.log(domo[0].p) + (j/(nPts-1)) * (Math.log(domo[domo.length-1].p) - Math.log(domo[0].p)));
+          const h = entalpiaPT(cfg.ref, pBar, tIso);
+          if (h !== null) { xs.push(h); ys.push(pBar * pf); }
+        }
+        if (xs.length > 1) {
+          traces.push({
+            x: xs, y: ys, mode: 'lines',
+            name: `T = ${tIso.toFixed(0)} °C`,
+            line: { color: 'rgba(148,163,184,.25)', width: 1, dash: 'dot' },
+            hoverinfo: 'name', showlegend: false
+          });
+        }
+      }
+    }
+
+    /* ---------- 6.4 Isentrópicas ---------- */
+    if (estadoLineas.isen && s1 !== null) {
+      const nIsen = 5;
+      for (let i = 0; i < nIsen; i++) {
+        const sIso = s1 + (i - 2) * 0.15;
+        const xs = [], ys = [];
+        const nPts = 30;
+        for (let j = 0; j < nPts; j++) {
+          const pBar = Math.exp(Math.log(domo[0].p) + (j/(nPts-1)) * (Math.log(domo[domo.length-1].p) - Math.log(domo[0].p)));
+          const fluid = FLUID_MAP[cfg.ref];
+          if (!fluid) break;
+          const h = cpCall('H', 'P', pBar*1e5, 'S', sIso*1000, fluid);
+          if (h !== null) { xs.push(h/1000); ys.push(pBar * pf); }
+        }
+        if (xs.length > 1) {
+          traces.push({
+            x: xs, y: ys, mode: 'lines',
+            name: `s = ${sIso.toFixed(2)} kJ/kg·K`,
+            line: { color: 'rgba(167,139,250,.25)', width: 1, dash: 'dot' },
+            hoverinfo: 'name', showlegend: false
+          });
+        }
+      }
+    }
+
+    /* ---------- 6.5 Ciclo 1→2→3→4 ---------- */
+    if (estadoLineas.ciclo && h1 !== null && h2 !== null && h3 !== null) {
+      const t1 = `${cfg.tsuct.toFixed(1)} °${cfg.tu}`;
+      const t2 = `${cfg.tdesc.toFixed(1)} °${cfg.tu}`;
+      const t3 = `${cfg.tliq.toFixed(1)} °${cfg.tu}`;
+      const t4 = `${cfg.tevap.toFixed(1)} °${cfg.tu}`;
+
+      traces.push({
+        x: [h1, h2, h3, h4, h1],
+        y: [pSuctPlot, pDescPlot, pDescPlot, pSuctPlot, pSuctPlot],
+        mode: 'lines+markers+text',
+        name: 'Ciclo operativo',
+        text: ['1', '2', '3', '4', ''],
+        textposition: 'top center',
+        textfont: { size: 11, color: '#f8fafc', weight: 'bold' },
+        line: { color: '#ef4444', width: 2.5 },
+        marker: { size: 10, color: '#f59e0b', line: { color: '#0f172a', width: 1.5 } },
+        customdata: [
+          [t1, `P: ${cfg.psuct.toFixed(1)} ${cfg.pu}`],
+          [t2, `P: ${cfg.pdesc.toFixed(1)} ${cfg.pu}`],
+          [t3, `P: ${cfg.pdesc.toFixed(1)} ${cfg.pu}`],
+          [t4, `P: ${cfg.psuct.toFixed(1)} ${cfg.pu}`],
+          [t1, '']
+        ],
+        hovertemplate:
+          '<b>Punto %{text}</b><br>' +
+          'T: %{customdata[0]}<br>' +
+          '%{customdata[1]}<br>' +
+          'h: %{x:.1f} kJ/kg<extra></extra>'
+      });
+    }
+
+    return { traces, h1, h2, h3, h4, pSuctBar, pDescBar, s1 };
+  }
+
+  /* ============================================================
+     7. DIBUJAR
+     ============================================================ */
+  function dibujar() {
+    const cfg = leerParametros();
+    const resultado = construirTraces(cfg);
+    if (!resultado) return;
+
+    const { traces } = resultado;
+
+    Plotly.react('mollierPlotFull', traces, {
+      paper_bgcolor: '#0f172a',
+      plot_bgcolor: '#0f172a',
+      margin: { l: 55, r: 20, t: 15, b: 45 },
+      xaxis: {
+        title: { text: 'Entalpía (kJ/kg)', font: { size: 11, color: '#94a3b8' } },
+        color: '#94a3b8',
+        gridcolor: '#334155',
+        zeroline: false,
+        tickfont: { size: 10 }
+      },
+      yaxis: {
+        title: { text: `Presión (${cfg.pu})`, font: { size: 11, color: '#94a3b8' } },
+        type: 'log',
+        color: '#94a3b8',
+        gridcolor: '#334155',
+        zeroline: false,
+        tickfont: { size: 10 }
+      },
+      showlegend: false,
+      hovermode: 'closest',
+      dragmode: 'pan'
+    }, {
+      responsive: true,
+      displayModeBar: false,
+      scrollZoom: true,
+      doubleClick: 'reset'
+    });
+  }
+
+  /* ============================================================
+     8. PANEL DE DATOS
+     ============================================================ */
+  function pintarDatos() {
+    const cfg = leerParametros();
+    const resultado = construirTraces(cfg);
+    if (!resultado) return;
+
+    const { h1, h2, h3, h4 } = resultado;
+
+    const w  = (h2 !== null && h1 !== null) ? h2 - h1 : null;
+    const qn = (h1 !== null && h4 !== null) ? h1 - h4 : null;
+    const cop = (w !== null && w > 0 && qn !== null) ? qn / w : null;
+
+    const fila = (lbl, val) => `<div class="kpi-row"><span class="lbl">${lbl}</span><span class="val">${val}</span></div>`;
+
+    const modo = MODOS_EVAP[cfg.mod] || MODOS_EVAP.MBP;
+    const chip = document.getElementById('chip-modo');
+    chip.textContent = modo.full;
+    chip.style.background = modo.color + '22';
+    chip.style.color = modo.color;
+    chip.style.border = '1px solid ' + modo.color + '55';
+
+    document.getElementById('lista-datos').innerHTML =
+      fila('P. Succión',  cfg.psuct.toFixed(1) + ' ' + cfg.pu) +
+      fila('P. Descarga', cfg.pdesc.toFixed(1) + ' ' + cfg.pu) +
+      fila('T. Evap.',    cfg.tevap.toFixed(1) + ' °' + cfg.tu) +
+      fila('T. Succión',  cfg.tsuct.toFixed(1) + ' °' + cfg.tu) +
+      fila('T. Descarga', cfg.tdesc.toFixed(1) + ' °' + cfg.tu) +
+      fila('T. Líquido',  cfg.tliq.toFixed(1)  + ' °' + cfg.tu);
+
+    document.getElementById('lista-trabajo').innerHTML =
+      fila('h₁', h1 !== null ? h1.toFixed(1) + ' kJ/kg' : '—') +
+      fila('h₂', h2 !== null ? h2.toFixed(1) + ' kJ/kg' : '—') +
+      fila('h₃', h3 !== null ? h3.toFixed(1) + ' kJ/kg' : '—') +
+      fila('h₄', h4 !== null ? h4.toFixed(1) + ' kJ/kg' : '—') +
+      fila('Trabajo (w)', w !== null ? w.toFixed(1) + ' kJ/kg' : '—') +
+      fila('Cap. frig. (qn)', qn !== null ? qn.toFixed(1) + ' kJ/kg' : '—') +
+      fila('COP', cop !== null ? cop.toFixed(2) : '—');
+
+    document.getElementById('mollier-ref').textContent = cfg.ref;
+  }
+
+  /* ============================================================
+     9. TOGGLES
+     ============================================================ */
+  function toggleLinea(nombre) {
+    estadoLineas[nombre] = !estadoLineas[nombre];
+    document.getElementById('toggle-' + nombre).classList.toggle('active', estadoLineas[nombre]);
+    dibujar();
+  }
+
+  function toggleDatos() {
+    datosColapsados = !datosColapsados;
+    const panel = document.getElementById('datos-ciclo');
+    panel.classList.toggle('colapsado', datosColapsados);
+    document.getElementById('btn-toggle-datos').textContent = datosColapsados ? '▶ Datos' : '◀ Datos';
+    setTimeout(() => {
+      const gd = document.getElementById('mollierPlotFull');
+      if (gd && typeof Plotly !== 'undefined') Plotly.Plots.resize(gd);
+    }, 220);
+  }
+
+  /* ============================================================
+     10. FULLSCREEN, SALIR, ORIENTACIÓN
+     ============================================================ */
+  async function enterFullscreen() {
+    try {
+      if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
+      try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch(_) {}
+      document.getElementById('portrait-hint').classList.add('hidden');
+    } catch(_) {}
+  }
+
+  async function exitAndGoBack() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      if (screen.orientation && screen.orientation.unlock) { try { screen.orientation.unlock(); } catch(_) {} }
+    } catch(_) {}
+    location.replace('./index.html');
+  }
+
+  function updatePortraitHint() {
+    const hint = document.getElementById('portrait-hint');
+    const isPortrait = window.matchMedia('(orientation: portrait)').matches;
+    const isSmall = window.innerWidth < 1024;
+    if (isPortrait && isSmall) {
+      hint.classList.add('force-hint');
+      hint.classList.remove('hidden');
+    } else {
+      hint.classList.remove('force-hint');
+    }
+  }
+
+  history.pushState({ page: 'mollier' }, '', location.href);
+  window.addEventListener('popstate', () => exitAndGoBack());
+
+  window.addEventListener('DOMContentLoaded', () => {
+    updatePortraitHint();
+    window.addEventListener('resize', updatePortraitHint);
+    window.addEventListener('orientationchange', () => setTimeout(updatePortraitHint, 300));
+
+    pintarDatos();
+    window.addEventListener('coolprop-ready', () => { dibujar(); pintarDatos(); });
+    window.addEventListener('coolprop-failed', () => { dibujar(); pintarDatos(); });
+    if (window.CoolProp) { dibujar(); pintarDatos(); }
+  });
+</script>
+
+</body>
+</html>
